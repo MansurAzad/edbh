@@ -134,6 +134,81 @@ export type Database = {
         }
         Relationships: []
       }
+      analytics_events: {
+        Row: {
+          browser: string | null
+          city: string | null
+          client_id: string | null
+          country: string | null
+          created_at: string
+          currency: string | null
+          device_type: string | null
+          event_name: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          os: string | null
+          page_path: string | null
+          page_title: string | null
+          referrer: string | null
+          session_id: string | null
+          user_agent: string | null
+          user_id: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          value: number | null
+        }
+        Insert: {
+          browser?: string | null
+          city?: string | null
+          client_id?: string | null
+          country?: string | null
+          created_at?: string
+          currency?: string | null
+          device_type?: string | null
+          event_name: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          os?: string | null
+          page_path?: string | null
+          page_title?: string | null
+          referrer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          value?: number | null
+        }
+        Update: {
+          browser?: string | null
+          city?: string | null
+          client_id?: string | null
+          country?: string | null
+          created_at?: string
+          currency?: string | null
+          device_type?: string | null
+          event_name?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          os?: string | null
+          page_path?: string | null
+          page_title?: string | null
+          referrer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          value?: number | null
+        }
+        Relationships: []
+      }
       back_in_stock_alerts: {
         Row: {
           created_at: string
