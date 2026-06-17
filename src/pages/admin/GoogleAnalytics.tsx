@@ -84,110 +84,128 @@ const GoogleAnalytics = () => {
     },
   });
 
-  useEffect(() => {
-    const fetchConfig = async () => {
+  // Real native analytics events
+  const { data: events_data, refetch: refetchEvents } = useQuery({
+    queryKey: ["analytics-events", reportPeriod],
+    queryFn: async () => {
+      const since = subDays(new Date(), parseInt(reportPeriod)).toISOString();
       const { data } = await supabase
-        .from("site_content")
-        .select("section_key, content, is_active")
-        .in("section_key", ["google_analytics_id", "ga_events_config", "ga_settings"]);
-      if (data) {
-        data.forEach((row) => {
-          if (row.section_key === "google_analytics_id") {
-            setGaId(row.content || "");
-            setIsActive(row.is_active);
-          }
-          if (row.section_key === "ga_events_config" && row.content) {
-            try {
-              const saved: Record<string, boolean> = JSON.parse(row.content);
-              setEvents(prev => prev.map(e => ({ ...e, enabled: saved[e.name] ?? e.enabled })));
-            } catch {}
-          }
-          if (row.section_key === "ga_settings" && row.content) {
-            try {
-              const cfg = JSON.parse(row.content);
-              setEnhancedMeasurement(cfg.enhancedMeasurement ?? true);
-              setDebugMode(cfg.debugMode ?? false);
-              setCrossDomain(cfg.crossDomain ?? false);
-              setAnonymizeIp(cfg.anonymizeIp ?? true);
-            } catch {}
-          }
-        });
-      }
-    };
-    fetchConfig();
-  }, []);
+        .from("analytics_events")
+        .select("event_name, page_path, session_id, client_id, device_type, browser, referrer, utm_source, country, city, created_at")
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(50000);
+      return data || [];
+    },
+    refetchInterval: 30000,
+  });
 
-  const upsert = useCallback(async (key: string, payload: Record<string, any>) => {
-    const { data: existing } = await supabase.from("site_content").select("id").eq("section_key", key).maybeSingle();
-    if (existing) {
-      await supabase.from("site_content").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", existing.id);
-    } else {
-      await supabase.from("site_content").insert({ section_key: key, title: key, ...payload });
-    }
-  }, []);
+  // Live visitors (active in last 5 minutes)
+  const { data: liveVisitors, refetch: refetchLive } = useQuery({
+    queryKey: ["analytics-live"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from("analytics_events")
+        .select("session_id, page_path, created_at, device_type, country")
+        .gte("created_at", since)
+        .order("created_at", { ascending: false });
+      const sessions = new Set((data || []).map((d: any) => d.session_id).filter(Boolean));
+      return { count: sessions.size, recent: (data || []).slice(0, 20) };
+    },
+    refetchInterval: 10000,
+  });
+
+  // Realtime subscription for instant updates
+  useEffect(() => {
+    const channel = supabase
+      .channel("analytics_events_live")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "analytics_events" }, () => {
+        refetchLive();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [refetchLive]);
 
   const reportData = useMemo(() => {
-    if (!orders) return { daily: [], totalRevenue: 0, totalOrders: 0, totalSessions: 0, bounceRate: 0, avgSessionDuration: 0, topPages: [], topCities: [], deviceData: [], sourceData: [] };
-
     const days = parseInt(reportPeriod);
+    const evs = events_data || [];
     const dailyMap: Record<string, { date: string; sessions: number; pageViews: number; users: number; revenue: number; orders: number; bounceRate: number }> = {};
-
     for (let i = 0; i < days; i++) {
       const d = format(subDays(new Date(), days - 1 - i), "MM/dd");
       dailyMap[d] = { date: d, sessions: 0, pageViews: 0, users: 0, revenue: 0, orders: 0, bounceRate: 0 };
     }
-
-    let totalRevenue = 0;
+    // sessions per day: unique session_id
+    const sessionByDay: Record<string, Set<string>> = {};
+    const userByDay: Record<string, Set<string>> = {};
+    const pagePerSession: Record<string, number> = {};
+    const pageCount: Record<string, number> = {};
     const cityMap: Record<string, number> = {};
+    const deviceMap: Record<string, number> = {};
+    const sourceMap: Record<string, number> = {};
 
-    orders.forEach((o) => {
+    evs.forEach((e: any) => {
+      const d = format(new Date(e.created_at), "MM/dd");
+      if (!dailyMap[d]) return;
+      if (e.event_name === "page_view") {
+        dailyMap[d].pageViews += 1;
+        if (e.page_path) pageCount[e.page_path] = (pageCount[e.page_path] || 0) + 1;
+      }
+      if (e.session_id) {
+        (sessionByDay[d] ||= new Set()).add(e.session_id);
+        pagePerSession[e.session_id] = (pagePerSession[e.session_id] || 0) + 1;
+      }
+      if (e.client_id) (userByDay[d] ||= new Set()).add(e.client_id);
+      if (e.device_type) deviceMap[e.device_type] = (deviceMap[e.device_type] || 0) + 1;
+      const src = e.utm_source || (e.referrer ? (() => { try { return new URL(e.referrer).hostname; } catch { return "Direct"; } })() : "Direct");
+      sourceMap[src] = (sourceMap[src] || 0) + 1;
+    });
+
+    Object.keys(dailyMap).forEach(d => {
+      dailyMap[d].sessions = sessionByDay[d]?.size || 0;
+      dailyMap[d].users = userByDay[d]?.size || 0;
+    });
+
+    (orders || []).forEach((o: any) => {
       const d = format(new Date(o.created_at), "MM/dd");
       if (dailyMap[d]) {
         dailyMap[d].orders += 1;
         dailyMap[d].revenue += Number(o.total);
-        dailyMap[d].sessions += Math.floor(Math.random() * 80 + 30);
-        dailyMap[d].pageViews += Math.floor(Math.random() * 200 + 60);
-        dailyMap[d].users += Math.floor(Math.random() * 60 + 20);
-        dailyMap[d].bounceRate = Math.floor(Math.random() * 30 + 25);
       }
-      totalRevenue += Number(o.total);
-      cityMap[o.shipping_city] = (cityMap[o.shipping_city] || 0) + 1;
+      if (o.shipping_city) cityMap[o.shipping_city] = (cityMap[o.shipping_city] || 0) + 1;
     });
 
     const daily = Object.values(dailyMap);
+    const totalRevenue = (orders || []).reduce((s: number, o: any) => s + Number(o.total), 0);
     const totalSessions = daily.reduce((s, d) => s + d.sessions, 0);
-    const bounceRate = daily.length > 0 ? daily.reduce((s, d) => s + d.bounceRate, 0) / Math.max(daily.filter(d => d.bounceRate > 0).length, 1) : 0;
-    const avgSessionDuration = Math.floor(Math.random() * 120 + 60);
+    // bounce: sessions with only 1 pageview
+    const sessionsArr = Object.values(pagePerSession);
+    const bounced = sessionsArr.filter(c => c === 1).length;
+    const bounceRate = sessionsArr.length ? (bounced / sessionsArr.length) * 100 : 0;
+    const avgSessionDuration = 0;
 
-    const topPages = [
-      { page: "/", views: Math.floor(totalSessions * 0.35) },
-      { page: "/shop", views: Math.floor(totalSessions * 0.25) },
-      { page: "/product/*", views: Math.floor(totalSessions * 0.2) },
-      { page: "/cart", views: Math.floor(totalSessions * 0.1) },
-      { page: "/checkout", views: Math.floor(totalSessions * 0.05) },
-    ];
+    const topPages = Object.entries(pageCount)
+      .sort(([, a], [, b]) => b - a).slice(0, 8)
+      .map(([page, views]) => ({ page, views }));
 
     const topCities = Object.entries(cityMap)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
+      .sort(([, a], [, b]) => b - a).slice(0, 5)
       .map(([city, count]) => ({ city, count }));
 
-    const deviceData = [
-      { name: "Mobile", value: 65, fill: COLORS[0] },
-      { name: "Desktop", value: 28, fill: COLORS[1] },
-      { name: "Tablet", value: 7, fill: COLORS[2] },
-    ];
+    const deviceTotal = Object.values(deviceMap).reduce((s, v) => s + v, 0) || 1;
+    const deviceData = ["mobile", "desktop", "tablet"].map((name, i) => ({
+      name: name[0].toUpperCase() + name.slice(1),
+      value: Math.round(((deviceMap[name] || 0) / deviceTotal) * 100),
+      fill: COLORS[i],
+    }));
 
-    const sourceData = [
-      { name: "Direct", value: 35, fill: COLORS[0] },
-      { name: "Social", value: 30, fill: COLORS[4] },
-      { name: "Organic Search", value: 20, fill: COLORS[1] },
-      { name: "Referral", value: 10, fill: COLORS[2] },
-      { name: "Other", value: 5, fill: COLORS[3] },
-    ];
+    const srcTotal = Object.values(sourceMap).reduce((s, v) => s + v, 0) || 1;
+    const sourceData = Object.entries(sourceMap)
+      .sort(([, a], [, b]) => b - a).slice(0, 6)
+      .map(([name, v], i) => ({ name, value: Math.round((v / srcTotal) * 100), fill: COLORS[i % COLORS.length] }));
 
-    return { daily, totalRevenue, totalOrders: orders.length, totalSessions, bounceRate, avgSessionDuration, topPages, topCities, deviceData, sourceData };
-  }, [orders, reportPeriod]);
+    return { daily, totalRevenue, totalOrders: (orders || []).length, totalSessions, bounceRate, avgSessionDuration, topPages, topCities, deviceData, sourceData };
+  }, [orders, events_data, reportPeriod]);
 
   const handleSaveGaId = async () => {
     setSaving(true);
