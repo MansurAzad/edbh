@@ -321,6 +321,9 @@ const GoogleAnalytics = () => {
             <p className="text-muted-foreground text-sm mt-1">GA4 ইন্টিগ্রেশন, ইভেন্ট ট্র্যাকিং ও বিস্তারিত রিপোর্ট</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-600 animate-pulse">
+              🟢 লাইভ: {liveVisitors?.count || 0}
+            </Badge>
             <Badge variant={isActive && gaId ? "default" : "secondary"} className="text-xs">{isActive && gaId ? "✅ Active" : "⏸ Inactive"}</Badge>
             <Badge variant="outline" className="text-xs">{enabledCount} Events</Badge>
           </div>
