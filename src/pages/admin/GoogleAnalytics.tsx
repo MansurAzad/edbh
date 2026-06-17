@@ -127,6 +127,15 @@ const GoogleAnalytics = () => {
     return () => { supabase.removeChannel(channel); };
   }, [refetchLive]);
 
+  const upsert = useCallback(async (key: string, payload: Record<string, any>) => {
+    const { data: existing } = await supabase.from("site_content").select("id").eq("section_key", key).maybeSingle();
+    if (existing) {
+      await supabase.from("site_content").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", existing.id);
+    } else {
+      await supabase.from("site_content").insert({ section_key: key, title: key, ...payload });
+    }
+  }, []);
+
   const reportData = useMemo(() => {
     const days = parseInt(reportPeriod);
     const evs = events_data || [];
