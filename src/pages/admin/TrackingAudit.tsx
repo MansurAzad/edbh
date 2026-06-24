@@ -29,6 +29,8 @@ const TrackingAudit = () => {
   const [browserChecks, setBrowserChecks] = useState<{ key: string; label: string; status: Status; detail: string }[]>([]);
   const [capiTest, setCapiTest] = useState<{ status: Status; detail: string }>({ status: "loading", detail: "Click 'Run Test Event'" });
   const [testing, setTesting] = useState(false);
+  const [ga4Test, setGa4Test] = useState<{ status: Status; detail: string; payload?: any }>({ status: "loading", detail: "Click 'Run GA4 DebugView Test'" });
+  const [ga4Testing, setGa4Testing] = useState(false);
 
   const refreshBrowserChecks = () => {
     const w = window as any;
@@ -132,6 +134,38 @@ const TrackingAudit = () => {
     }
   };
 
+  const runGa4DebugTest = async () => {
+    setGa4Testing(true);
+    setGa4Test({ status: "loading", detail: "GA4 MP /debug endpoint-এ পাঠানো হচ্ছে..." });
+    try {
+      const { data, error } = await supabase.functions.invoke("ga4-debug-test", {
+        body: { event_name: "admin_debug_test", params: { source: "tracking_audit_page" } },
+      });
+      if (error) throw error;
+      if (!data?.ok) {
+        setGa4Test({ status: "fail", detail: data?.error || "GA4 not configured", payload: data });
+        return;
+      }
+      if (data.valid) {
+        setGa4Test({
+          status: "ok",
+          detail: `✅ Valid payload! GA4 DebugView-এ এখনই দেখা যাবে (Measurement ID: ${data.measurement_id})`,
+          payload: data,
+        });
+      } else {
+        setGa4Test({
+          status: "warn",
+          detail: `⚠️ ${data.validation_messages?.length || 0}টি validation issue পাওয়া গেছে`,
+          payload: data,
+        });
+      }
+    } catch (err: any) {
+      setGa4Test({ status: "fail", detail: err?.message || "Test failed" });
+    } finally {
+      setGa4Testing(false);
+    }
+  };
+
   const okCount = browserChecks.filter(c => c.status === "ok").length;
   const totalCount = browserChecks.length;
 
@@ -183,6 +217,47 @@ const TrackingAudit = () => {
             </p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>GA4 DebugView Test</CardTitle>
+            <Button onClick={runGa4DebugTest} disabled={ga4Testing} size="sm" variant="secondary">
+              {ga4Testing ? "Testing..." : "Run GA4 DebugView Test"}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+              <StatusIcon s={ga4Test.status} />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">GA4 Measurement Protocol</div>
+                <div className="text-sm text-muted-foreground">{ga4Test.detail}</div>
+              </div>
+            </div>
+            {ga4Test.payload && (
+              <div className="mt-3 space-y-2">
+                {ga4Test.payload.validation_messages?.length > 0 && (
+                  <div className="p-3 rounded border bg-amber-50/50 dark:bg-amber-950/20">
+                    <div className="text-xs font-semibold mb-1 text-amber-700 dark:text-amber-400">Validation messages:</div>
+                    <pre className="text-xs overflow-x-auto whitespace-pre-wrap">
+                      {JSON.stringify(ga4Test.payload.validation_messages, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Sent payload + response</summary>
+                  <pre className="mt-2 p-3 rounded border bg-muted/50 overflow-x-auto">
+                    {JSON.stringify(ga4Test.payload, null, 2)}
+                  </pre>
+                </details>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-3">
+              GA4 → Admin → DebugView খুলে real-time event আসছে কিনা দেখুন। Client ID:{" "}
+              <code className="text-xs">{ga4Test.payload?.client_id || "—"}</code>
+            </p>
+          </CardContent>
+        </Card>
+
 
         <Card>
           <CardHeader><CardTitle>Native Analytics (analytics_events table)</CardTitle></CardHeader>

@@ -2,14 +2,15 @@ import { useMemo, useState } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle2, TrendingDown, TrendingUp, Activity } from "lucide-react";
+import { AlertCircle, CheckCircle2, TrendingDown, TrendingUp, Activity, Download, Lightbulb } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell,
-  LineChart, Line, CartesianGrid, Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
+  LineChart, Line, CartesianGrid, Legend, PieChart, Pie,
 } from "recharts";
 
 const FUNNEL_STEPS = [
@@ -107,6 +108,63 @@ const TrackingFunnel = () => {
     refetchInterval: 60000,
   });
 
+  // Purchase revenue breakdown — by product category and by device
+  const { data: revenueBreakdown } = useQuery({
+    queryKey: ["funnel-revenue", days],
+    queryFn: async () => {
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const byCategory: Record<string, { revenue: number; orders: number }> = {};
+      const byDevice: Record<string, { revenue: number; orders: number }> = {};
+      let from = 0;
+      const PAGE = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("analytics_events")
+          .select("device_type, value, metadata")
+          .eq("event_name", "purchase")
+          .gte("created_at", since)
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const row of data) {
+          const value = Number(row.value || 0);
+          const device = row.device_type || "unknown";
+          if (!byDevice[device]) byDevice[device] = { revenue: 0, orders: 0 };
+          byDevice[device].revenue += value;
+          byDevice[device].orders += 1;
+
+          // Extract categories from items in metadata
+          const items = (row.metadata as any)?.items || (row.metadata as any)?.contents || [];
+          if (Array.isArray(items) && items.length > 0) {
+            // Distribute order value across item categories proportionally
+            const totalItems = items.length;
+            for (const it of items) {
+              const cat = it.item_category || it.category || "Uncategorized";
+              if (!byCategory[cat]) byCategory[cat] = { revenue: 0, orders: 0 };
+              byCategory[cat].revenue += value / totalItems;
+              byCategory[cat].orders += 1 / totalItems;
+            }
+          } else {
+            if (!byCategory["Uncategorized"]) byCategory["Uncategorized"] = { revenue: 0, orders: 0 };
+            byCategory["Uncategorized"].revenue += value;
+            byCategory["Uncategorized"].orders += 1;
+          }
+        }
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return {
+        categories: Object.entries(byCategory)
+          .map(([name, v]) => ({ name, revenue: Math.round(v.revenue), orders: Math.round(v.orders) }))
+          .sort((a, b) => b.revenue - a.revenue),
+        devices: Object.entries(byDevice)
+          .map(([name, v]) => ({ name, revenue: Math.round(v.revenue), orders: v.orders }))
+          .sort((a, b) => b.revenue - a.revenue),
+      };
+    },
+    refetchInterval: 60000,
+  });
+
   const alerts = useMemo(() => {
     if (!funnelData) return [];
     const a: { severity: "error" | "warning" | "ok"; title: string; msg: string }[] = [];
@@ -148,6 +206,116 @@ const TrackingFunnel = () => {
 
   const funnelChartData = funnelData?.map(d => ({ name: d.label, value: d.sessions, fill: d.color })) || [];
 
+  // Automated recommendations — figure out the WEAKEST step and recommend fixes for it
+  const recommendations = useMemo(() => {
+    if (!funnelData || funnelData.length < 2) return [];
+    const steps: { from: string; to: string; rate: number; key: string }[] = [];
+    for (let i = 1; i < funnelData.length; i++) {
+      const fromN = funnelData[i - 1].sessions;
+      const toN = funnelData[i].sessions;
+      if (fromN < 5) continue; // skip noise
+      steps.push({
+        from: funnelData[i - 1].label,
+        to: funnelData[i].label,
+        rate: fromN > 0 ? (toN / fromN) * 100 : 0,
+        key: `${funnelData[i - 1].key}__${funnelData[i].key}`,
+      });
+    }
+    if (steps.length === 0) return [];
+    const weakest = [...steps].sort((a, b) => a.rate - b.rate)[0];
+
+    const RECS: Record<string, { title: string; priority: "High" | "Medium"; actions: string[] }[]> = {
+      page_view__view_item: [{
+        title: "Homepage / Shop → Product page CTR কম", priority: "High",
+        actions: [
+          "Product card-এ Quick View button যোগ করুন",
+          "Hero banner-এ best seller products feature করুন",
+          "Category navigation মোবাইলে আরও visible করুন",
+          "Product card image quality + price visibility বাড়ান",
+        ],
+      }],
+      view_item__add_to_cart: [{
+        title: "Product → Cart conversion দুর্বল", priority: "High",
+        actions: [
+          'Sticky "Add to Cart" bar মোবাইলে যোগ করুন',
+          "Stock urgency badge দেখান (e.g. \"মাত্র ৩টি বাকি\")",
+          'Variant (size/color) selector default-এ একটি pre-selected রাখুন',
+          "Social proof: \"X জন এই পণ্য কিনেছেন আজ\"",
+          "Cash on Delivery badge prominent করুন",
+        ],
+      }],
+      add_to_cart__begin_checkout: [{
+        title: "Cart drawer থেকে Checkout-এ যাচ্ছে না", priority: "High",
+        actions: [
+          'Cart drawer-এ "Free Shipping" progress bar দেখান (e.g. "৳150 আরও কিনলে ফ্রি ডেলিভারি")',
+          'Coupon code input cart drawer-এ direct দিন',
+          'Estimated delivery date দেখান',
+          'Trust badge: "Cash on Delivery", "Easy Return", "100% Authentic"',
+          'Exit-intent popup-এ discount offer দিন',
+        ],
+      }],
+      begin_checkout__purchase: [{
+        title: "Checkout abandon হচ্ছে", priority: "High",
+        actions: [
+          "Form field সংখ্যা কমান — শুধু Name, Phone, Address রাখুন",
+          "Guest checkout button আরও prominent করুন",
+          "Payment options (bKash, Nagad, COD) early step-এ দেখান",
+          "OTP verification delay কমান বা skip করার option দিন",
+          "Order summary সবসময় visible রাখুন (sticky sidebar)",
+        ],
+      }],
+    };
+
+    const recs = RECS[weakest.key] || [];
+    return recs.map(r => ({
+      ...r,
+      step: `${weakest.from} → ${weakest.to}`,
+      currentRate: weakest.rate.toFixed(1),
+    }));
+  }, [funnelData]);
+
+  const downloadCSV = () => {
+    if (!funnelData) return;
+    const rows: string[] = [];
+    rows.push("Section,Metric,Value");
+    rows.push(`Meta,Range,"Last ${days} days"`);
+    rows.push(`Meta,Generated,"${new Date().toISOString()}"`);
+    rows.push("");
+    rows.push("Funnel Step,Events,Sessions,Unique Users");
+    funnelData.forEach(d => rows.push(`"${d.label}",${d.events},${d.sessions},${d.users}`));
+    rows.push("");
+    rows.push("From Step,To Step,Conversion %,Dropped Sessions");
+    conversionRates.forEach(c => rows.push(`"${c.from}","${c.to}",${c.rate},${c.dropped}`));
+    rows.push("");
+    if (revenueBreakdown) {
+      rows.push("Revenue by Category,Revenue (BDT),Orders");
+      revenueBreakdown.categories.forEach(c => rows.push(`"${c.name}",${c.revenue},${c.orders}`));
+      rows.push("");
+      rows.push("Revenue by Device,Revenue (BDT),Orders");
+      revenueBreakdown.devices.forEach(d => rows.push(`"${d.name}",${d.revenue},${d.orders}`));
+      rows.push("");
+    }
+    if (dailyData && dailyData.length) {
+      rows.push("Daily Trend");
+      rows.push(["Date", ...FUNNEL_STEPS.map(s => s.label)].join(","));
+      dailyData.forEach((row: any) => {
+        rows.push([row.date, ...FUNNEL_STEPS.map(s => row[s.key] || 0)].join(","));
+      });
+    }
+    const csv = rows.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `funnel-report-${days}d-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const DEVICE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#94a3b8"];
+
   return (
     <AdminLayout>
       <div className="space-y-6 max-w-6xl">
@@ -163,6 +331,9 @@ const TrackingFunnel = () => {
               ))}
             </TabsList>
           </Tabs>
+          <Button onClick={downloadCSV} variant="outline" size="sm" disabled={!funnelData}>
+            <Download className="w-4 h-4 mr-2" /> Export CSV
+          </Button>
         </div>
 
         {/* Alerts */}
@@ -266,13 +437,112 @@ const TrackingFunnel = () => {
           </CardContent>
         </Card>
 
+        {/* Revenue Breakdown — by Category and Device */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader><CardTitle>💰 Revenue by Category</CardTitle></CardHeader>
+            <CardContent>
+              {!revenueBreakdown?.categories?.length ? (
+                <p className="text-sm text-muted-foreground">No purchase data yet</p>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={revenueBreakdown.categories.slice(0, 8)} layout="vertical" margin={{ left: 10, right: 40 }}>
+                      <XAxis type="number" tickFormatter={(v) => `৳${(v / 1000).toFixed(0)}k`} />
+                      <YAxis type="category" dataKey="name" width={100} />
+                      <Tooltip formatter={(v: number) => [`৳${v.toLocaleString()}`, "Revenue"]} />
+                      <Bar dataKey="revenue" fill="#10b981" radius={[0, 6, 6, 0]}>
+                        <LabelList dataKey="revenue" position="right" formatter={(v: number) => `৳${v.toLocaleString()}`} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Total: ৳{revenueBreakdown.categories.reduce((s, c) => s + c.revenue, 0).toLocaleString()} · {revenueBreakdown.categories.length} categories
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>📱 Revenue by Device</CardTitle></CardHeader>
+            <CardContent>
+              {!revenueBreakdown?.devices?.length ? (
+                <p className="text-sm text-muted-foreground">No purchase data yet</p>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie
+                        data={revenueBreakdown.devices}
+                        dataKey="revenue"
+                        nameKey="name"
+                        cx="50%" cy="50%"
+                        outerRadius={80}
+                        label={(entry: any) => `${entry.name}: ৳${(entry.revenue / 1000).toFixed(1)}k`}
+                      >
+                        {revenueBreakdown.devices.map((_, i) => (
+                          <Cell key={i} fill={DEVICE_COLORS[i % DEVICE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => [`৳${v.toLocaleString()}`, "Revenue"]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="mt-2 space-y-1 text-xs">
+                    {revenueBreakdown.devices.map((d, i) => (
+                      <div key={d.name} className="flex justify-between">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full" style={{ background: DEVICE_COLORS[i % DEVICE_COLORS.length] }} />
+                          {d.name} ({d.orders} orders)
+                        </span>
+                        <span className="font-semibold">৳{d.revenue.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Automated Recommendations */}
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-amber-500" />
+              Smart Recommendations — Weakest Funnel Step
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recommendations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">যথেষ্ট data নেই, অথবা funnel-এর সব ধাপ healthy। আরও traffic আসলে suggestion দেখানো হবে।</p>
+            ) : (
+              <div className="space-y-4">
+                {recommendations.map((r, i) => (
+                  <div key={i}>
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <Badge variant="destructive">{r.priority} Priority</Badge>
+                      <Badge variant="outline">{r.step}</Badge>
+                      <Badge variant="secondary">Current: {r.currentRate}%</Badge>
+                    </div>
+                    <div className="font-semibold mb-2">{r.title}</div>
+                    <ul className="text-sm space-y-1.5 text-muted-foreground list-disc pl-5">
+                      {r.actions.map((a, j) => <li key={j}>{a}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Optimization tips */}
         <Card>
-          <CardHeader><CardTitle>💡 Funnel Optimization Tips</CardTitle></CardHeader>
+          <CardHeader><CardTitle>💡 General Funnel Optimization Tips</CardTitle></CardHeader>
           <CardContent className="text-sm space-y-2 text-muted-foreground">
-            <p>• <b>View → Add to Cart কম?</b> Price, stock badge, "Buy Now" CTA prominent করুন। Variant selector simplify করুন।</p>
-            <p>• <b>Cart → Checkout drop?</b> Free shipping threshold show করুন। Trust badges, return policy visible রাখুন।</p>
-            <p>• <b>Checkout → Purchase drop?</b> Form fields কমান। COD option highlight করুন। OTP delay কমান।</p>
+            <p>• <b>View → Add to Cart কম?</b> Price, stock badge, "Buy Now" CTA prominent করুন।</p>
+            <p>• <b>Cart → Checkout drop?</b> Free shipping threshold show করুন। Trust badges visible রাখুন।</p>
+            <p>• <b>Checkout → Purchase drop?</b> Form fields কমান। COD option highlight করুন।</p>
             <p>• <b>Abandoned cart recovery</b> automation on করুন (Admin → Email Campaigns)।</p>
           </CardContent>
         </Card>

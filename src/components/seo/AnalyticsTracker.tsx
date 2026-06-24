@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { serverTrack, type ServerTrackUserData } from "@/lib/server-tracking";
+import { serverTrack, getTrackingSessionId, type ServerTrackUserData } from "@/lib/server-tracking";
 
-// Generate dedup event_id shared between browser pixel, GTM dataLayer, and server CAPI
-const eid = (name: string) =>
-  `${name}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+// Deterministic dedup key shared between browser pixel, GTM dataLayer, and server CAPI.
+// Same (event + session + primary id + 1-min bucket) → identical event_id everywhere,
+// so Meta Events Manager dedups Pixel↔CAPI and GA4 won't double-count.
+const dedupKey = (event: string, primaryId: string = "") => {
+  const sid = (getTrackingSessionId() || "anon").slice(0, 8);
+  const bucket = Math.floor(Date.now() / 60000); // 60s window
+  const key = primaryId ? primaryId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) : "_";
+  return `${event}-${sid}-${key}-${bucket}`;
+};
+// Backwards-compat alias
+const eid = (name: string) => dedupKey(name);
 
 // Push to GTM dataLayer (GTM tags use these to fire GA4/Meta/etc)
 const dlPush = (payload: Record<string, unknown>) => {
@@ -27,7 +35,7 @@ export const trackAddToCart = (
   product: { id: string; name: string; price: number; category: string },
   quantity: number,
 ) => {
-  const event_id = eid("add_to_cart");
+  const event_id = dedupKey("add_to_cart", `${product.id}-${quantity}`);
   const value = product.price * quantity;
   dlPush({
     event: "add_to_cart",
@@ -94,7 +102,7 @@ export const trackPurchase = (
 };
 
 export const trackViewContent = (product: { id: string; name: string; price: number; category: string }) => {
-  const event_id = eid("view_item");
+  const event_id = dedupKey("view_item", product.id);
   dlPush({
     event: "view_item",
     event_id,
@@ -126,7 +134,7 @@ export const trackInitiateCheckout = (
   items: { id: string; name: string; price: number; quantity: number }[],
   userData?: ServerTrackUserData,
 ) => {
-  const event_id = eid("begin_checkout");
+  const event_id = dedupKey("begin_checkout", items.map(i => i.id).sort().join("_").slice(0, 32));
   dlPush({
     event: "begin_checkout",
     event_id,
@@ -159,7 +167,7 @@ export const trackInitiateCheckout = (
 };
 
 export const trackSearch = (query: string) => {
-  const event_id = eid("search");
+  const event_id = dedupKey("search", query.slice(0, 24));
   dlPush({ event: "search", event_id, search_term: query });
   const w = window as any;
   if (w.gtag) w.gtag("event", "search", { search_term: query });
@@ -168,7 +176,7 @@ export const trackSearch = (query: string) => {
 };
 
 export const trackAddToWishlist = (product: { id: string; name: string; price: number }) => {
-  const event_id = eid("add_to_wishlist");
+  const event_id = dedupKey("add_to_wishlist", product.id);
   dlPush({
     event: "add_to_wishlist", event_id,
     ecommerce: {
@@ -195,7 +203,7 @@ export const trackAddToWishlist = (product: { id: string; name: string; price: n
 };
 
 export const trackLead = (source: string = "newsletter", userData?: ServerTrackUserData) => {
-  const event_id = eid("generate_lead");
+  const event_id = dedupKey("generate_lead", source);
   dlPush({ event: "generate_lead", event_id, user_data: userData || {}, method: source });
   const w = window as any;
   if (w.gtag) w.gtag("event", "generate_lead", { method: source });
@@ -252,7 +260,7 @@ const AnalyticsTracker = () => {
   }, [fbPixelId]);
 
   useEffect(() => {
-    const event_id = eid("page_view");
+    const event_id = dedupKey("page_view", location.pathname.replace(/\//g, "_"));
     // GTM dataLayer page_view (GA4 Configuration tag listens for this)
     dlPush({
       event: "page_view",
