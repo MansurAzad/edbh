@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, Star, Settings,
   LogOut, ChevronLeft, Tag, Mail, BarChart3, RotateCcw, Truck,
   FileText, Menu, X, MapPin, Bell, MessageCircle, Shield, Edit3, Route, Gift, ShoppingBag,
-  HardDrive, ScrollText, Cloud,
+  HardDrive, ScrollText, Cloud, Activity, BookOpen,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,6 +48,8 @@ const navItems = [
   { path: "/admin/cloudinary", icon: Cloud, label: "Cloudinary" },
   { path: "/admin/meta-pixel", icon: BarChart3, label: "Meta Pixel" },
   { path: "/admin/google-analytics", icon: BarChart3, label: "Google Analytics" },
+  { path: "/admin/tracking-audit", icon: Activity, label: "Tracking Audit" },
+  { path: "/admin/tracking-guide", icon: BookOpen, label: "Tracking Guide" },
   { path: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 
