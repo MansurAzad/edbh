@@ -71,6 +71,8 @@ const BackupRestore = lazy(() => import("./pages/admin/BackupRestore"));
 const SteadfastCourier = lazy(() => import("./pages/admin/SteadfastCourier"));
 const CourierAuditLogs = lazy(() => import("./pages/admin/CourierAuditLogs"));
 const CloudinarySettings = lazy(() => import("./pages/admin/CloudinarySettings"));
+const TrackingAudit = lazy(() => import("./pages/admin/TrackingAudit"));
+const TrackingGuide = lazy(() => import("./pages/admin/TrackingGuide"));
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
 // Marketing components - deferred to avoid query storms on initial load
@@ -150,6 +152,9 @@ const App = () => (
                   <Route path="/admin/social-proof" element={<PermissionGuard><SocialProofMessages /></PermissionGuard>} />
                   <Route path="/admin/backup" element={<PermissionGuard><BackupRestore /></PermissionGuard>} />
                   <Route path="/admin/cloudinary" element={<PermissionGuard><CloudinarySettings /></PermissionGuard>} />
+                  <Route path="/admin/tracking-audit" element={<PermissionGuard><TrackingAudit /></PermissionGuard>} />
+                  <Route path="/admin/tracking-guide" element={<PermissionGuard><TrackingGuide /></PermissionGuard>} />
+
 
                   <Route path="/return-policy" element={<ReturnPolicy />} />
                   <Route path="/faq" element={<FAQ />} />

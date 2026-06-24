@@ -3,42 +3,54 @@ import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { serverTrack, type ServerTrackUserData } from "@/lib/server-tracking";
 
-// Generate dedup event_id shared between browser pixel and server CAPI
+// Generate dedup event_id shared between browser pixel, GTM dataLayer, and server CAPI
 const eid = (name: string) =>
   `${name}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-// Global tracking helpers — fire BOTH browser pixel (gtag/fbq) and server-side (CAPI/MP)
+// Push to GTM dataLayer (GTM tags use these to fire GA4/Meta/etc)
+const dlPush = (payload: Record<string, unknown>) => {
+  const w = window as any;
+  w.dataLayer = w.dataLayer || [];
+  // Reset ecommerce object before each push (GTM best practice)
+  if ((payload as any).ecommerce) w.dataLayer.push({ ecommerce: null });
+  w.dataLayer.push(payload);
+};
+
+// True if a GTM container has loaded — used to avoid double-loading direct pixels
+const gtmLoaded = () => {
+  const w = window as any;
+  return !!(w.google_tag_manager && Object.keys(w.google_tag_manager).length);
+};
+
+// Global tracking helpers — fire dataLayer (for GTM), browser pixel (fallback) and server CAPI
 export const trackAddToCart = (
   product: { id: string; name: string; price: number; category: string },
   quantity: number,
 ) => {
   const event_id = eid("add_to_cart");
-  const w = window as any;
-  if (w.gtag) {
-    w.gtag("event", "add_to_cart", {
-      currency: "BDT",
-      value: product.price * quantity,
-      items: [{ item_id: product.id, item_name: product.name, item_category: product.category, price: product.price, quantity }],
-    });
-  }
-  if (w.fbq) {
-    w.fbq("track", "AddToCart", {
-      content_ids: [product.id],
-      content_name: product.name,
-      content_type: "product",
-      value: product.price * quantity,
-      currency: "BDT",
-    }, { eventID: event_id });
-  }
-  serverTrack({
-    event_name: "add_to_cart",
+  const value = product.price * quantity;
+  dlPush({
+    event: "add_to_cart",
     event_id,
-    params: {
+    ecommerce: {
       currency: "BDT",
-      value: product.price * quantity,
-      content_ids: [product.id],
-      content_name: product.name,
-      content_type: "product",
+      value,
+      items: [{ item_id: product.id, item_name: product.name, item_category: product.category, price: product.price, quantity }],
+    },
+  });
+  const w = window as any;
+  if (w.gtag) w.gtag("event", "add_to_cart", {
+    currency: "BDT", value,
+    items: [{ item_id: product.id, item_name: product.name, item_category: product.category, price: product.price, quantity }],
+  });
+  if (w.fbq) w.fbq("track", "AddToCart", {
+    content_ids: [product.id], content_name: product.name, content_type: "product", value, currency: "BDT",
+  }, { eventID: event_id });
+  serverTrack({
+    event_name: "add_to_cart", event_id,
+    params: {
+      currency: "BDT", value,
+      content_ids: [product.id], content_name: product.name, content_type: "product",
       contents: [{ id: product.id, quantity, item_price: product.price }],
     },
   });
@@ -51,34 +63,30 @@ export const trackPurchase = (
   userData?: ServerTrackUserData,
 ) => {
   const event_id = `purchase-${orderId}`;
-  const w = window as any;
-  if (w.gtag) {
-    w.gtag("event", "purchase", {
-      transaction_id: orderId,
-      currency: "BDT",
-      value: total,
-      items: items.map(i => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })),
-    });
-  }
-  if (w.fbq) {
-    w.fbq("track", "Purchase", {
-      content_ids: items.map(i => i.id),
-      content_type: "product",
-      value: total,
-      currency: "BDT",
-      num_items: items.length,
-    }, { eventID: event_id });
-  }
-  serverTrack({
-    event_name: "purchase",
+  dlPush({
+    event: "purchase",
     event_id,
+    user_data: userData || {},
+    ecommerce: {
+      transaction_id: orderId, currency: "BDT", value: total,
+      items: items.map(i => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })),
+    },
+  });
+  const w = window as any;
+  if (w.gtag) w.gtag("event", "purchase", {
+    transaction_id: orderId, currency: "BDT", value: total,
+    items: items.map(i => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })),
+  });
+  if (w.fbq) w.fbq("track", "Purchase", {
+    content_ids: items.map(i => i.id), content_type: "product",
+    value: total, currency: "BDT", num_items: items.length,
+  }, { eventID: event_id });
+  serverTrack({
+    event_name: "purchase", event_id,
     user_data: { ...userData, external_id: orderId },
     params: {
-      currency: "BDT",
-      value: total,
-      transaction_id: orderId,
-      content_ids: items.map(i => i.id),
-      content_type: "product",
+      currency: "BDT", value: total, transaction_id: orderId,
+      content_ids: items.map(i => i.id), content_type: "product",
       contents: items.map(i => ({ id: i.id, quantity: i.quantity, item_price: i.price })),
       num_items: items.reduce((s, i) => s + i.quantity, 0),
     },
@@ -87,33 +95,28 @@ export const trackPurchase = (
 
 export const trackViewContent = (product: { id: string; name: string; price: number; category: string }) => {
   const event_id = eid("view_item");
-  const w = window as any;
-  if (w.gtag) {
-    w.gtag("event", "view_item", {
-      currency: "BDT",
-      value: product.price,
-      items: [{ item_id: product.id, item_name: product.name, item_category: product.category, price: product.price }],
-    });
-  }
-  if (w.fbq) {
-    w.fbq("track", "ViewContent", {
-      content_ids: [product.id],
-      content_name: product.name,
-      content_type: "product",
-      value: product.price,
-      currency: "BDT",
-    }, { eventID: event_id });
-  }
-  serverTrack({
-    event_name: "view_item",
+  dlPush({
+    event: "view_item",
     event_id,
+    ecommerce: {
+      currency: "BDT", value: product.price,
+      items: [{ item_id: product.id, item_name: product.name, item_category: product.category, price: product.price }],
+    },
+  });
+  const w = window as any;
+  if (w.gtag) w.gtag("event", "view_item", {
+    currency: "BDT", value: product.price,
+    items: [{ item_id: product.id, item_name: product.name, item_category: product.category, price: product.price }],
+  });
+  if (w.fbq) w.fbq("track", "ViewContent", {
+    content_ids: [product.id], content_name: product.name, content_type: "product",
+    value: product.price, currency: "BDT",
+  }, { eventID: event_id });
+  serverTrack({
+    event_name: "view_item", event_id,
     params: {
-      currency: "BDT",
-      value: product.price,
-      content_ids: [product.id],
-      content_name: product.name,
-      content_category: product.category,
-      content_type: "product",
+      currency: "BDT", value: product.price,
+      content_ids: [product.id], content_name: product.name, content_category: product.category, content_type: "product",
     },
   });
 };
@@ -124,32 +127,31 @@ export const trackInitiateCheckout = (
   userData?: ServerTrackUserData,
 ) => {
   const event_id = eid("begin_checkout");
-  const w = window as any;
-  if (w.gtag) {
-    w.gtag("event", "begin_checkout", {
-      currency: "BDT",
-      value: total,
-      items: items.map(i => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })),
-    });
-  }
-  if (w.fbq) {
-    w.fbq("track", "InitiateCheckout", {
-      content_ids: items.map(i => i.id),
-      content_type: "product",
-      value: total,
-      currency: "BDT",
-      num_items: items.reduce((s, i) => s + i.quantity, 0),
-    }, { eventID: event_id });
-  }
-  serverTrack({
-    event_name: "begin_checkout",
+  dlPush({
+    event: "begin_checkout",
     event_id,
+    user_data: userData || {},
+    ecommerce: {
+      currency: "BDT", value: total,
+      items: items.map(i => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })),
+    },
+  });
+  const w = window as any;
+  if (w.gtag) w.gtag("event", "begin_checkout", {
+    currency: "BDT", value: total,
+    items: items.map(i => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })),
+  });
+  if (w.fbq) w.fbq("track", "InitiateCheckout", {
+    content_ids: items.map(i => i.id), content_type: "product",
+    value: total, currency: "BDT",
+    num_items: items.reduce((s, i) => s + i.quantity, 0),
+  }, { eventID: event_id });
+  serverTrack({
+    event_name: "begin_checkout", event_id,
     user_data: userData,
     params: {
-      currency: "BDT",
-      value: total,
-      content_ids: items.map(i => i.id),
-      content_type: "product",
+      currency: "BDT", value: total,
+      content_ids: items.map(i => i.id), content_type: "product",
       contents: items.map(i => ({ id: i.id, quantity: i.quantity, item_price: i.price })),
       num_items: items.reduce((s, i) => s + i.quantity, 0),
     },
@@ -158,6 +160,7 @@ export const trackInitiateCheckout = (
 
 export const trackSearch = (query: string) => {
   const event_id = eid("search");
+  dlPush({ event: "search", event_id, search_term: query });
   const w = window as any;
   if (w.gtag) w.gtag("event", "search", { search_term: query });
   if (w.fbq) w.fbq("track", "Search", { search_string: query }, { eventID: event_id });
@@ -166,38 +169,34 @@ export const trackSearch = (query: string) => {
 
 export const trackAddToWishlist = (product: { id: string; name: string; price: number }) => {
   const event_id = eid("add_to_wishlist");
-  const w = window as any;
-  if (w.gtag) {
-    w.gtag("event", "add_to_wishlist", {
-      currency: "BDT",
-      value: product.price,
+  dlPush({
+    event: "add_to_wishlist", event_id,
+    ecommerce: {
+      currency: "BDT", value: product.price,
       items: [{ item_id: product.id, item_name: product.name, price: product.price }],
-    });
-  }
-  if (w.fbq) {
-    w.fbq("track", "AddToWishlist", {
-      content_ids: [product.id],
-      content_name: product.name,
-      content_type: "product",
-      value: product.price,
-      currency: "BDT",
-    }, { eventID: event_id });
-  }
+    },
+  });
+  const w = window as any;
+  if (w.gtag) w.gtag("event", "add_to_wishlist", {
+    currency: "BDT", value: product.price,
+    items: [{ item_id: product.id, item_name: product.name, price: product.price }],
+  });
+  if (w.fbq) w.fbq("track", "AddToWishlist", {
+    content_ids: [product.id], content_name: product.name, content_type: "product",
+    value: product.price, currency: "BDT",
+  }, { eventID: event_id });
   serverTrack({
-    event_name: "add_to_wishlist",
-    event_id,
+    event_name: "add_to_wishlist", event_id,
     params: {
-      currency: "BDT",
-      value: product.price,
-      content_ids: [product.id],
-      content_name: product.name,
-      content_type: "product",
+      currency: "BDT", value: product.price,
+      content_ids: [product.id], content_name: product.name, content_type: "product",
     },
   });
 };
 
 export const trackLead = (source: string = "newsletter", userData?: ServerTrackUserData) => {
   const event_id = eid("generate_lead");
+  dlPush({ event: "generate_lead", event_id, user_data: userData || {}, method: source });
   const w = window as any;
   if (w.gtag) w.gtag("event", "generate_lead", { method: source });
   if (w.fbq) w.fbq("track", "Lead", { content_name: source }, { eventID: event_id });
@@ -226,8 +225,10 @@ const AnalyticsTracker = () => {
     fetchIds();
   }, []);
 
+  // GA4 direct injection — skip if GTM is loaded (GTM will manage it)
   useEffect(() => {
     if (!gaId) return;
+    if (gtmLoaded()) return;
     if (document.getElementById("ga-script")) return;
     const script = document.createElement("script");
     script.id = "ga-script";
@@ -239,8 +240,10 @@ const AnalyticsTracker = () => {
     document.head.appendChild(inlineScript);
   }, [gaId]);
 
+  // Meta Pixel direct injection — skip if GTM is loaded (GTM will manage it)
   useEffect(() => {
     if (!fbPixelId) return;
+    if (gtmLoaded()) return;
     if (document.getElementById("fb-pixel-script")) return;
     const script = document.createElement("script");
     script.id = "fb-pixel-script";
@@ -250,6 +253,14 @@ const AnalyticsTracker = () => {
 
   useEffect(() => {
     const event_id = eid("page_view");
+    // GTM dataLayer page_view (GA4 Configuration tag listens for this)
+    dlPush({
+      event: "page_view",
+      event_id,
+      page_path: location.pathname,
+      page_location: window.location.href,
+      page_title: document.title,
+    });
     if (gaId && (window as any).gtag) {
       (window as any).gtag("config", gaId, { page_path: location.pathname });
     }
@@ -258,8 +269,7 @@ const AnalyticsTracker = () => {
     }
     // Server-side PageView (fires even when ad blockers strip pixel)
     serverTrack({
-      event_name: "page_view",
-      event_id,
+      event_name: "page_view", event_id,
       params: { page_path: location.pathname, page_location: window.location.href, page_title: document.title },
     });
   }, [location.pathname, gaId, fbPixelId]);
