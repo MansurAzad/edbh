@@ -157,7 +157,7 @@ const ProductDetail = () => {
       return;
     }
     await addToCart(product.id, quantity, selectedSize || undefined, selectedColor || undefined);
-    trackAddToCart({ id: product.id, name: product.name, price: currentPrice, category: product.category }, quantity);
+    // trackAddToCart is fired inside CartContext.addToCart now (covers all callers)
   };
 
   const getProductImage = () => {
