@@ -51,6 +51,7 @@ const navItems = [
   { path: "/admin/tracking-audit", icon: Activity, label: "Tracking Audit" },
   { path: "/admin/tracking-funnel", icon: TrendingUp, label: "Conversion Funnel" },
   { path: "/admin/tracking-guide", icon: BookOpen, label: "Tracking Guide" },
+  { path: "/admin/sgtm-setup", icon: Server, label: "sGTM Setup Guide" },
   { path: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 
