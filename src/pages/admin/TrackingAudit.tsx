@@ -134,6 +134,38 @@ const TrackingAudit = () => {
     }
   };
 
+  const runGa4DebugTest = async () => {
+    setGa4Testing(true);
+    setGa4Test({ status: "loading", detail: "GA4 MP /debug endpoint-এ পাঠানো হচ্ছে..." });
+    try {
+      const { data, error } = await supabase.functions.invoke("ga4-debug-test", {
+        body: { event_name: "admin_debug_test", params: { source: "tracking_audit_page" } },
+      });
+      if (error) throw error;
+      if (!data?.ok) {
+        setGa4Test({ status: "fail", detail: data?.error || "GA4 not configured", payload: data });
+        return;
+      }
+      if (data.valid) {
+        setGa4Test({
+          status: "ok",
+          detail: `✅ Valid payload! GA4 DebugView-এ এখনই দেখা যাবে (Measurement ID: ${data.measurement_id})`,
+          payload: data,
+        });
+      } else {
+        setGa4Test({
+          status: "warn",
+          detail: `⚠️ ${data.validation_messages?.length || 0}টি validation issue পাওয়া গেছে`,
+          payload: data,
+        });
+      }
+    } catch (err: any) {
+      setGa4Test({ status: "fail", detail: err?.message || "Test failed" });
+    } finally {
+      setGa4Testing(false);
+    }
+  };
+
   const okCount = browserChecks.filter(c => c.status === "ok").length;
   const totalCount = browserChecks.length;
 
