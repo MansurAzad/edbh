@@ -9,7 +9,7 @@ import { AlertCircle, CheckCircle2, TrendingDown, TrendingUp, Activity, Download
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
   LineChart, Line, CartesianGrid, Legend, PieChart, Pie,
 } from "recharts";
 
