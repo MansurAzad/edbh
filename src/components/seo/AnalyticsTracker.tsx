@@ -176,7 +176,7 @@ export const trackSearch = (query: string) => {
 };
 
 export const trackAddToWishlist = (product: { id: string; name: string; price: number }) => {
-  const event_id = eid("add_to_wishlist");
+  const event_id = dedupKey("add_to_wishlist", product.id);
   dlPush({
     event: "add_to_wishlist", event_id,
     ecommerce: {
