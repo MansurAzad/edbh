@@ -297,6 +297,31 @@ const TrackingAudit = () => {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">Server-Side GTM (sGTM)</CardTitle>
+            <Button onClick={runSgtmHealthCheck} disabled={sgtmTesting} size="sm" variant="secondary">
+              {sgtmTesting ? "Pinging..." : "Re-check Health"}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+              <StatusIcon s={sgtmCheck.status} />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">Tagging Server <code className="text-xs">/healthz</code> ping</div>
+                <div className="text-sm text-muted-foreground break-all">{sgtmCheck.detail}</div>
+              </div>
+            </div>
+            {!sgtmCheck.url && (
+              <p className="text-xs text-muted-foreground mt-3">
+                sGTM setup করা হয়নি? <a href="/admin/sgtm-setup" className="text-primary underline">Setup Guide দেখুন →</a>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+
+
 
         <Card>
           <CardHeader><CardTitle>Native Analytics (analytics_events table)</CardTitle></CardHeader>
