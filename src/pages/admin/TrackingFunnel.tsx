@@ -437,13 +437,112 @@ const TrackingFunnel = () => {
           </CardContent>
         </Card>
 
+        {/* Revenue Breakdown — by Category and Device */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader><CardTitle>💰 Revenue by Category</CardTitle></CardHeader>
+            <CardContent>
+              {!revenueBreakdown?.categories?.length ? (
+                <p className="text-sm text-muted-foreground">No purchase data yet</p>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={revenueBreakdown.categories.slice(0, 8)} layout="vertical" margin={{ left: 10, right: 40 }}>
+                      <XAxis type="number" tickFormatter={(v) => `৳${(v / 1000).toFixed(0)}k`} />
+                      <YAxis type="category" dataKey="name" width={100} />
+                      <Tooltip formatter={(v: number) => [`৳${v.toLocaleString()}`, "Revenue"]} />
+                      <Bar dataKey="revenue" fill="#10b981" radius={[0, 6, 6, 0]}>
+                        <LabelList dataKey="revenue" position="right" formatter={(v: number) => `৳${v.toLocaleString()}`} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Total: ৳{revenueBreakdown.categories.reduce((s, c) => s + c.revenue, 0).toLocaleString()} · {revenueBreakdown.categories.length} categories
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>📱 Revenue by Device</CardTitle></CardHeader>
+            <CardContent>
+              {!revenueBreakdown?.devices?.length ? (
+                <p className="text-sm text-muted-foreground">No purchase data yet</p>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie
+                        data={revenueBreakdown.devices}
+                        dataKey="revenue"
+                        nameKey="name"
+                        cx="50%" cy="50%"
+                        outerRadius={80}
+                        label={(entry: any) => `${entry.name}: ৳${(entry.revenue / 1000).toFixed(1)}k`}
+                      >
+                        {revenueBreakdown.devices.map((_, i) => (
+                          <Cell key={i} fill={DEVICE_COLORS[i % DEVICE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => [`৳${v.toLocaleString()}`, "Revenue"]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="mt-2 space-y-1 text-xs">
+                    {revenueBreakdown.devices.map((d, i) => (
+                      <div key={d.name} className="flex justify-between">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full" style={{ background: DEVICE_COLORS[i % DEVICE_COLORS.length] }} />
+                          {d.name} ({d.orders} orders)
+                        </span>
+                        <span className="font-semibold">৳{d.revenue.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Automated Recommendations */}
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-amber-500" />
+              Smart Recommendations — Weakest Funnel Step
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recommendations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">যথেষ্ট data নেই, অথবা funnel-এর সব ধাপ healthy। আরও traffic আসলে suggestion দেখানো হবে।</p>
+            ) : (
+              <div className="space-y-4">
+                {recommendations.map((r, i) => (
+                  <div key={i}>
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <Badge variant="destructive">{r.priority} Priority</Badge>
+                      <Badge variant="outline">{r.step}</Badge>
+                      <Badge variant="secondary">Current: {r.currentRate}%</Badge>
+                    </div>
+                    <div className="font-semibold mb-2">{r.title}</div>
+                    <ul className="text-sm space-y-1.5 text-muted-foreground list-disc pl-5">
+                      {r.actions.map((a, j) => <li key={j}>{a}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Optimization tips */}
         <Card>
-          <CardHeader><CardTitle>💡 Funnel Optimization Tips</CardTitle></CardHeader>
+          <CardHeader><CardTitle>💡 General Funnel Optimization Tips</CardTitle></CardHeader>
           <CardContent className="text-sm space-y-2 text-muted-foreground">
-            <p>• <b>View → Add to Cart কম?</b> Price, stock badge, "Buy Now" CTA prominent করুন। Variant selector simplify করুন।</p>
-            <p>• <b>Cart → Checkout drop?</b> Free shipping threshold show করুন। Trust badges, return policy visible রাখুন।</p>
-            <p>• <b>Checkout → Purchase drop?</b> Form fields কমান। COD option highlight করুন। OTP delay কমান।</p>
+            <p>• <b>View → Add to Cart কম?</b> Price, stock badge, "Buy Now" CTA prominent করুন।</p>
+            <p>• <b>Cart → Checkout drop?</b> Free shipping threshold show করুন। Trust badges visible রাখুন।</p>
+            <p>• <b>Checkout → Purchase drop?</b> Form fields কমান। COD option highlight করুন।</p>
             <p>• <b>Abandoned cart recovery</b> automation on করুন (Admin → Email Campaigns)।</p>
           </CardContent>
         </Card>
