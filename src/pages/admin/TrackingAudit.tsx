@@ -29,6 +29,8 @@ const TrackingAudit = () => {
   const [browserChecks, setBrowserChecks] = useState<{ key: string; label: string; status: Status; detail: string }[]>([]);
   const [capiTest, setCapiTest] = useState<{ status: Status; detail: string }>({ status: "loading", detail: "Click 'Run Test Event'" });
   const [testing, setTesting] = useState(false);
+  const [ga4Test, setGa4Test] = useState<{ status: Status; detail: string; payload?: any }>({ status: "loading", detail: "Click 'Run GA4 DebugView Test'" });
+  const [ga4Testing, setGa4Testing] = useState(false);
 
   const refreshBrowserChecks = () => {
     const w = window as any;
