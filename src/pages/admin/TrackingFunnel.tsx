@@ -206,6 +206,116 @@ const TrackingFunnel = () => {
 
   const funnelChartData = funnelData?.map(d => ({ name: d.label, value: d.sessions, fill: d.color })) || [];
 
+  // Automated recommendations — figure out the WEAKEST step and recommend fixes for it
+  const recommendations = useMemo(() => {
+    if (!funnelData || funnelData.length < 2) return [];
+    const steps: { from: string; to: string; rate: number; key: string }[] = [];
+    for (let i = 1; i < funnelData.length; i++) {
+      const fromN = funnelData[i - 1].sessions;
+      const toN = funnelData[i].sessions;
+      if (fromN < 5) continue; // skip noise
+      steps.push({
+        from: funnelData[i - 1].label,
+        to: funnelData[i].label,
+        rate: fromN > 0 ? (toN / fromN) * 100 : 0,
+        key: `${funnelData[i - 1].key}__${funnelData[i].key}`,
+      });
+    }
+    if (steps.length === 0) return [];
+    const weakest = [...steps].sort((a, b) => a.rate - b.rate)[0];
+
+    const RECS: Record<string, { title: string; priority: "High" | "Medium"; actions: string[] }[]> = {
+      page_view__view_item: [{
+        title: "Homepage / Shop → Product page CTR কম", priority: "High",
+        actions: [
+          "Product card-এ Quick View button যোগ করুন",
+          "Hero banner-এ best seller products feature করুন",
+          "Category navigation মোবাইলে আরও visible করুন",
+          "Product card image quality + price visibility বাড়ান",
+        ],
+      }],
+      view_item__add_to_cart: [{
+        title: "Product → Cart conversion দুর্বল", priority: "High",
+        actions: [
+          'Sticky "Add to Cart" bar মোবাইলে যোগ করুন',
+          "Stock urgency badge দেখান (e.g. \"মাত্র ৩টি বাকি\")",
+          'Variant (size/color) selector default-এ একটি pre-selected রাখুন',
+          "Social proof: \"X জন এই পণ্য কিনেছেন আজ\"",
+          "Cash on Delivery badge prominent করুন",
+        ],
+      }],
+      add_to_cart__begin_checkout: [{
+        title: "Cart drawer থেকে Checkout-এ যাচ্ছে না", priority: "High",
+        actions: [
+          'Cart drawer-এ "Free Shipping" progress bar দেখান (e.g. "৳150 আরও কিনলে ফ্রি ডেলিভারি")',
+          'Coupon code input cart drawer-এ direct দিন',
+          'Estimated delivery date দেখান',
+          'Trust badge: "Cash on Delivery", "Easy Return", "100% Authentic"',
+          'Exit-intent popup-এ discount offer দিন',
+        ],
+      }],
+      begin_checkout__purchase: [{
+        title: "Checkout abandon হচ্ছে", priority: "High",
+        actions: [
+          "Form field সংখ্যা কমান — শুধু Name, Phone, Address রাখুন",
+          "Guest checkout button আরও prominent করুন",
+          "Payment options (bKash, Nagad, COD) early step-এ দেখান",
+          "OTP verification delay কমান বা skip করার option দিন",
+          "Order summary সবসময় visible রাখুন (sticky sidebar)",
+        ],
+      }],
+    };
+
+    const recs = RECS[weakest.key] || [];
+    return recs.map(r => ({
+      ...r,
+      step: `${weakest.from} → ${weakest.to}`,
+      currentRate: weakest.rate.toFixed(1),
+    }));
+  }, [funnelData]);
+
+  const downloadCSV = () => {
+    if (!funnelData) return;
+    const rows: string[] = [];
+    rows.push("Section,Metric,Value");
+    rows.push(`Meta,Range,"Last ${days} days"`);
+    rows.push(`Meta,Generated,"${new Date().toISOString()}"`);
+    rows.push("");
+    rows.push("Funnel Step,Events,Sessions,Unique Users");
+    funnelData.forEach(d => rows.push(`"${d.label}",${d.events},${d.sessions},${d.users}`));
+    rows.push("");
+    rows.push("From Step,To Step,Conversion %,Dropped Sessions");
+    conversionRates.forEach(c => rows.push(`"${c.from}","${c.to}",${c.rate},${c.dropped}`));
+    rows.push("");
+    if (revenueBreakdown) {
+      rows.push("Revenue by Category,Revenue (BDT),Orders");
+      revenueBreakdown.categories.forEach(c => rows.push(`"${c.name}",${c.revenue},${c.orders}`));
+      rows.push("");
+      rows.push("Revenue by Device,Revenue (BDT),Orders");
+      revenueBreakdown.devices.forEach(d => rows.push(`"${d.name}",${d.revenue},${d.orders}`));
+      rows.push("");
+    }
+    if (dailyData && dailyData.length) {
+      rows.push("Daily Trend");
+      rows.push(["Date", ...FUNNEL_STEPS.map(s => s.label)].join(","));
+      dailyData.forEach((row: any) => {
+        rows.push([row.date, ...FUNNEL_STEPS.map(s => row[s.key] || 0)].join(","));
+      });
+    }
+    const csv = rows.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `funnel-report-${days}d-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const DEVICE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#94a3b8"];
+
   return (
     <AdminLayout>
       <div className="space-y-6 max-w-6xl">
