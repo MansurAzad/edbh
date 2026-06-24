@@ -108,6 +108,63 @@ const TrackingFunnel = () => {
     refetchInterval: 60000,
   });
 
+  // Purchase revenue breakdown — by product category and by device
+  const { data: revenueBreakdown } = useQuery({
+    queryKey: ["funnel-revenue", days],
+    queryFn: async () => {
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const byCategory: Record<string, { revenue: number; orders: number }> = {};
+      const byDevice: Record<string, { revenue: number; orders: number }> = {};
+      let from = 0;
+      const PAGE = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("analytics_events")
+          .select("device_type, value, metadata")
+          .eq("event_name", "purchase")
+          .gte("created_at", since)
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const row of data) {
+          const value = Number(row.value || 0);
+          const device = row.device_type || "unknown";
+          if (!byDevice[device]) byDevice[device] = { revenue: 0, orders: 0 };
+          byDevice[device].revenue += value;
+          byDevice[device].orders += 1;
+
+          // Extract categories from items in metadata
+          const items = (row.metadata as any)?.items || (row.metadata as any)?.contents || [];
+          if (Array.isArray(items) && items.length > 0) {
+            // Distribute order value across item categories proportionally
+            const totalItems = items.length;
+            for (const it of items) {
+              const cat = it.item_category || it.category || "Uncategorized";
+              if (!byCategory[cat]) byCategory[cat] = { revenue: 0, orders: 0 };
+              byCategory[cat].revenue += value / totalItems;
+              byCategory[cat].orders += 1 / totalItems;
+            }
+          } else {
+            if (!byCategory["Uncategorized"]) byCategory["Uncategorized"] = { revenue: 0, orders: 0 };
+            byCategory["Uncategorized"].revenue += value;
+            byCategory["Uncategorized"].orders += 1;
+          }
+        }
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return {
+        categories: Object.entries(byCategory)
+          .map(([name, v]) => ({ name, revenue: Math.round(v.revenue), orders: Math.round(v.orders) }))
+          .sort((a, b) => b.revenue - a.revenue),
+        devices: Object.entries(byDevice)
+          .map(([name, v]) => ({ name, revenue: Math.round(v.revenue), orders: v.orders }))
+          .sort((a, b) => b.revenue - a.revenue),
+      };
+    },
+    refetchInterval: 60000,
+  });
+
   const alerts = useMemo(() => {
     if (!funnelData) return [];
     const a: { severity: "error" | "warning" | "ok"; title: string; msg: string }[] = [];
