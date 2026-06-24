@@ -102,7 +102,7 @@ export const trackPurchase = (
 };
 
 export const trackViewContent = (product: { id: string; name: string; price: number; category: string }) => {
-  const event_id = eid("view_item");
+  const event_id = dedupKey("view_item", product.id);
   dlPush({
     event: "view_item",
     event_id,
