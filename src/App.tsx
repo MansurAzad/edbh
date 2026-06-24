@@ -74,6 +74,7 @@ const CloudinarySettings = lazy(() => import("./pages/admin/CloudinarySettings")
 const TrackingAudit = lazy(() => import("./pages/admin/TrackingAudit"));
 const TrackingGuide = lazy(() => import("./pages/admin/TrackingGuide"));
 const TrackingFunnel = lazy(() => import("./pages/admin/TrackingFunnel"));
+const SgtmSetupGuide = lazy(() => import("./pages/admin/SgtmSetupGuide"));
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
 // Marketing components - deferred to avoid query storms on initial load
