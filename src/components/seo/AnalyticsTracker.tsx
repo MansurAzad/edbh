@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { serverTrack, type ServerTrackUserData } from "@/lib/server-tracking";
+import { serverTrack, getTrackingSessionId, type ServerTrackUserData } from "@/lib/server-tracking";
 
-// Generate dedup event_id shared between browser pixel, GTM dataLayer, and server CAPI
-const eid = (name: string) =>
-  `${name}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+// Deterministic dedup key shared between browser pixel, GTM dataLayer, and server CAPI.
+// Same (event + session + primary id + 1-min bucket) → identical event_id everywhere,
+// so Meta Events Manager dedups Pixel↔CAPI and GA4 won't double-count.
+const dedupKey = (event: string, primaryId: string = "") => {
+  const sid = (getTrackingSessionId() || "anon").slice(0, 8);
+  const bucket = Math.floor(Date.now() / 60000); // 60s window
+  const key = primaryId ? primaryId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) : "_";
+  return `${event}-${sid}-${key}-${bucket}`;
+};
+// Backwards-compat alias
+const eid = (name: string) => dedupKey(name);
 
 // Push to GTM dataLayer (GTM tags use these to fire GA4/Meta/etc)
 const dlPush = (payload: Record<string, unknown>) => {
