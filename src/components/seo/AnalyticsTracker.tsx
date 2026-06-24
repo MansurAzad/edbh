@@ -203,7 +203,7 @@ export const trackAddToWishlist = (product: { id: string; name: string; price: n
 };
 
 export const trackLead = (source: string = "newsletter", userData?: ServerTrackUserData) => {
-  const event_id = eid("generate_lead");
+  const event_id = dedupKey("generate_lead", source);
   dlPush({ event: "generate_lead", event_id, user_data: userData || {}, method: source });
   const w = window as any;
   if (w.gtag) w.gtag("event", "generate_lead", { method: source });
