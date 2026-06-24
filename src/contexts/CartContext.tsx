@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo, R
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { trackAddToCart } from "@/components/seo/AnalyticsTracker";
 
 interface CartItem {
   id: string;
@@ -140,6 +141,29 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const addToCart = useCallback(async (productId: string, quantity: number, size?: string, color?: string) => {
+    // Fire analytics for EVERY add to cart (guest + logged-in) — funnel tracking
+    const fireTracking = async () => {
+      try {
+        // Try from current items first
+        let p: { id: string; name: string; price: number; sale_price: number | null; category: string } | undefined =
+          items.find(i => i.product_id === productId)?.product as any;
+        if (!p) {
+          const { data } = await supabase
+            .from("products")
+            .select("id, name, price, sale_price, category")
+            .eq("id", productId)
+            .maybeSingle();
+          if (data) p = data as any;
+        }
+        if (p) {
+          const price = p.sale_price ?? p.price;
+          trackAddToCart({ id: p.id, name: p.name, price, category: p.category }, quantity);
+        }
+      } catch (err) {
+        console.warn("AddToCart tracking failed:", err);
+      }
+    };
+
     if (!user) {
       // Guest: use localStorage
       const entries = getGuestCart();
@@ -156,6 +180,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       setItems(hydrated);
       toast({ title: "Added to cart", description: "Item has been added to your cart" });
       setCartOpen(true);
+      void fireTracking();
       return;
     }
 
@@ -174,6 +199,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       }
       toast({ title: "Added to cart", description: "Item has been added to your cart" });
       setCartOpen(true);
+      void fireTracking();
     } catch (error) {
       console.error("Error adding to cart:", error);
       toast({ title: "Error", description: "Failed to add item to cart", variant: "destructive" });
