@@ -167,7 +167,7 @@ export const trackInitiateCheckout = (
 };
 
 export const trackSearch = (query: string) => {
-  const event_id = eid("search");
+  const event_id = dedupKey("search", query.slice(0, 24));
   dlPush({ event: "search", event_id, search_term: query });
   const w = window as any;
   if (w.gtag) w.gtag("event", "search", { search_term: query });
