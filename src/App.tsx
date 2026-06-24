@@ -157,6 +157,7 @@ const App = () => (
                   <Route path="/admin/tracking-audit" element={<PermissionGuard><TrackingAudit /></PermissionGuard>} />
                   <Route path="/admin/tracking-guide" element={<PermissionGuard><TrackingGuide /></PermissionGuard>} />
                   <Route path="/admin/tracking-funnel" element={<PermissionGuard><TrackingFunnel /></PermissionGuard>} />
+                  <Route path="/admin/sgtm-setup" element={<PermissionGuard><SgtmSetupGuide /></PermissionGuard>} />
 
 
 
