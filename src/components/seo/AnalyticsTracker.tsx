@@ -260,7 +260,7 @@ const AnalyticsTracker = () => {
   }, [fbPixelId]);
 
   useEffect(() => {
-    const event_id = eid("page_view");
+    const event_id = dedupKey("page_view", location.pathname.replace(/\//g, "_"));
     // GTM dataLayer page_view (GA4 Configuration tag listens for this)
     dlPush({
       event: "page_view",
