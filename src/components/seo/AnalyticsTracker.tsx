@@ -35,7 +35,7 @@ export const trackAddToCart = (
   product: { id: string; name: string; price: number; category: string },
   quantity: number,
 ) => {
-  const event_id = eid("add_to_cart");
+  const event_id = dedupKey("add_to_cart", `${product.id}-${quantity}`);
   const value = product.price * quantity;
   dlPush({
     event: "add_to_cart",
