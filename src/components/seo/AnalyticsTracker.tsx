@@ -134,7 +134,7 @@ export const trackInitiateCheckout = (
   items: { id: string; name: string; price: number; quantity: number }[],
   userData?: ServerTrackUserData,
 ) => {
-  const event_id = eid("begin_checkout");
+  const event_id = dedupKey("begin_checkout", items.map(i => i.id).sort().join("_").slice(0, 32));
   dlPush({
     event: "begin_checkout",
     event_id,
