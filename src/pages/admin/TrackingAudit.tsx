@@ -122,6 +122,7 @@ const TrackingAudit = () => {
   useEffect(() => {
     refreshBrowserChecks();
     const t = setInterval(refreshBrowserChecks, 3000);
+    runSgtmHealthCheck();
     return () => clearInterval(t);
   }, []);
 
