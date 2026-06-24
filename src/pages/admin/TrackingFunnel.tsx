@@ -331,6 +331,9 @@ const TrackingFunnel = () => {
               ))}
             </TabsList>
           </Tabs>
+          <Button onClick={downloadCSV} variant="outline" size="sm" disabled={!funnelData}>
+            <Download className="w-4 h-4 mr-2" /> Export CSV
+          </Button>
         </div>
 
         {/* Alerts */}
