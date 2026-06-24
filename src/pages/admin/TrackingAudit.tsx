@@ -25,12 +25,50 @@ function getCookie(name: string) {
   return m ? decodeURIComponent(m[1]) : "";
 }
 
+const SGTM_URL_KEY = "sgtm_tagging_server_url";
+
 const TrackingAudit = () => {
   const [browserChecks, setBrowserChecks] = useState<{ key: string; label: string; status: Status; detail: string }[]>([]);
   const [capiTest, setCapiTest] = useState<{ status: Status; detail: string }>({ status: "loading", detail: "Click 'Run Test Event'" });
   const [testing, setTesting] = useState(false);
   const [ga4Test, setGa4Test] = useState<{ status: Status; detail: string; payload?: any }>({ status: "loading", detail: "Click 'Run GA4 DebugView Test'" });
   const [ga4Testing, setGa4Testing] = useState(false);
+  const [sgtmCheck, setSgtmCheck] = useState<{ status: Status; detail: string; url: string }>({
+    status: "loading",
+    detail: "sGTM URL configured নেই",
+    url: "",
+  });
+  const [sgtmTesting, setSgtmTesting] = useState(false);
+
+  const runSgtmHealthCheck = async () => {
+    const url = (localStorage.getItem(SGTM_URL_KEY) || "").trim().replace(/\/$/, "");
+    if (!url) {
+      setSgtmCheck({
+        status: "warn",
+        detail: "sGTM Setup Guide page-এ আপনার Tagging Server URL save করুন",
+        url: "",
+      });
+      return;
+    }
+    setSgtmTesting(true);
+    setSgtmCheck({ status: "loading", detail: "Pinging /healthz...", url });
+    try {
+      const t0 = performance.now();
+      const res = await fetch(`${url}/healthz`, { method: "GET", mode: "cors" }).catch(() => null);
+      const latency = Math.round(performance.now() - t0);
+      if (!res) {
+        setSgtmCheck({ status: "fail", detail: "Network error / CORS blocked — DNS propagation চলছে?", url });
+      } else if (res.ok) {
+        setSgtmCheck({ status: "ok", detail: `${url} → 200 OK (${latency}ms)`, url });
+      } else {
+        setSgtmCheck({ status: "fail", detail: `HTTP ${res.status} — Cloud Run container running কিনা check করুন`, url });
+      }
+    } catch (err: any) {
+      setSgtmCheck({ status: "fail", detail: err?.message || "Unknown error", url });
+    } finally {
+      setSgtmTesting(false);
+    }
+  };
 
   const refreshBrowserChecks = () => {
     const w = window as any;
@@ -84,6 +122,7 @@ const TrackingAudit = () => {
   useEffect(() => {
     refreshBrowserChecks();
     const t = setInterval(refreshBrowserChecks, 3000);
+    runSgtmHealthCheck();
     return () => clearInterval(t);
   }, []);
 
@@ -257,6 +296,31 @@ const TrackingAudit = () => {
             </p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">Server-Side GTM (sGTM)</CardTitle>
+            <Button onClick={runSgtmHealthCheck} disabled={sgtmTesting} size="sm" variant="secondary">
+              {sgtmTesting ? "Pinging..." : "Re-check Health"}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+              <StatusIcon s={sgtmCheck.status} />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">Tagging Server <code className="text-xs">/healthz</code> ping</div>
+                <div className="text-sm text-muted-foreground break-all">{sgtmCheck.detail}</div>
+              </div>
+            </div>
+            {!sgtmCheck.url && (
+              <p className="text-xs text-muted-foreground mt-3">
+                sGTM setup করা হয়নি? <a href="/admin/sgtm-setup" className="text-primary underline">Setup Guide দেখুন →</a>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+
 
 
         <Card>
