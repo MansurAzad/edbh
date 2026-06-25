@@ -48,11 +48,15 @@ const SgtmSetupGuide = () => {
   }, []);
 
   const saveUrl = () => {
-    const cleaned = sgtmUrl.trim().replace(/\/$/, "");
+    let cleaned = sgtmUrl.trim().replace(/\/$/, "");
+    // Auto-prefix https:// so a bare domain like "metrics.dubaiborkahouse.com"
+    // doesn't make fetch() throw "Invalid URL" in the health check.
+    if (cleaned && !/^https?:\/\//i.test(cleaned)) cleaned = `https://${cleaned}`;
     localStorage.setItem(SGTM_URL_KEY, cleaned);
     setSgtmUrl(cleaned);
     toast({ title: "Saved", description: "sGTM URL saved। এখন Tracking Audit page থেকে health check হবে।" });
   };
+
 
   return (
     <AdminLayout>
