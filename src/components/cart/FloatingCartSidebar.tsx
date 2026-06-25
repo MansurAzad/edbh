@@ -39,6 +39,8 @@ import { Button } from "@/components/ui/button";
 import CouponInput from "@/components/checkout/CouponInput";
 import { trackPurchase } from "@/components/seo/AnalyticsTracker";
 import { placeOrder } from "@/lib/order-placement";
+import { shippingInfoSchema } from "@/lib/validation/schemas";
+import { getFriendlyError } from "@/lib/error/getFriendlyError";
 
 import CartLineItem from "@/components/cart/CartLineItem";
 import EmptyCart from "@/components/cart/EmptyCart";
