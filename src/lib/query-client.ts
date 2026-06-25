@@ -55,13 +55,23 @@ export const queryClient = new QueryClient({
       staleTime: 10 * 60 * 1000,
       gcTime: 30 * 60 * 1000,
       refetchOnWindowFocus: false,
+      // Critical for rapid navigation (shop → product → shop): without this,
+      // every remount re-triggers the queryFn even when data is still fresh.
+      // TanStack already dedupes IN-FLIGHT requests for identical keys, but
+      // disabling refetchOnMount/Reconnect prevents the second redundant fetch
+      // a few hundred ms later when the user lands back on the same route.
+      refetchOnMount: false,
+      refetchOnReconnect: false,
       // Retry only network-class failures; 4xx/auth errors fail fast.
       retry: (failureCount, error) => {
         const msg = (error as Error)?.message || "";
         if (/4\d{2}|unauthor|forbid|not found/i.test(msg)) return false;
         return failureCount < 1;
       },
-      refetchOnMount: false,
+      // structuralSharing is on by default — explicitly noted here so future
+      // maintainers don't disable it: it lets React skip re-renders when a
+      // refetch returns data that is deep-equal to the cached value.
+      structuralSharing: true,
     },
   },
 });
