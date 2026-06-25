@@ -1,17 +1,15 @@
 // Server-Side Tracking: forwards events to GA4 + Meta CAPI AND logs to analytics_events table
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsPreflight, jsonResponse, errorResponse } from "../_shared/cors.ts";
+import { adminClient } from "../_shared/supabase.ts";
+import { log } from "../_shared/log.ts";
 
 const GA4_MEASUREMENT_ID = Deno.env.get("GA4_MEASUREMENT_ID");
 const GA4_API_SECRET = Deno.env.get("GA4_API_SECRET");
 const META_PIXEL_ID = Deno.env.get("META_PIXEL_ID");
 const META_ACCESS_TOKEN = Deno.env.get("META_ACCESS_TOKEN");
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
-  auth: { persistSession: false },
-});
+const admin = adminClient();
+
 
 async function sha256(value: string): Promise<string> {
   const data = new TextEncoder().encode(value.trim().toLowerCase());
@@ -154,14 +152,11 @@ async function logToDb(body: TrackEventBody, clientIp: string) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return corsPreflight();
   try {
     const body = (await req.json()) as TrackEventBody;
-    if (!body?.event_name) {
-      return new Response(JSON.stringify({ error: "event_name required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!body?.event_name) return errorResponse("event_name required", 400, "missing_event_name");
+
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim()
       || req.headers.get("cf-connecting-ip") || "";
     body.user_agent = body.user_agent || req.headers.get("user-agent") || "";
@@ -172,13 +167,10 @@ Deno.serve(async (req) => {
       logToDb(body, clientIp),
     ]);
 
-    return new Response(JSON.stringify({ ok: true, ga, meta, db }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ ok: true, ga, meta, db });
   } catch (err) {
-    console.error("server-tracking error:", err);
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    log("error", "server-tracking", "unhandled", { err: String(err) });
+    return errorResponse(String(err), 500, "internal_error");
   }
 });
+
