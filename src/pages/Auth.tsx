@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { loginSchema, signupSchema, resetPasswordSchema } from "@/lib/validation/schemas";
+import { getFriendlyError } from "@/lib/error/getFriendlyError";
 
 
 type AuthView = "login" | "signup" | "forgot-password";
