@@ -24,12 +24,20 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile || bun install
 
+      - name: Type-check
+        run: bunx tsgo --noEmit
+
+      - name: Lint
+        run: bunx eslint . --max-warnings 0
+        continue-on-error: true
+
       - name: Build project
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
         run: bun run build
+
 
       - name: Upload build artifacts on failure
         if: failure()
