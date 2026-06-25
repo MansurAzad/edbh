@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Input } from "@/components/ui/input";
 import SEOHead from "@/components/seo/SEOHead";
+import { buildBlogListSeo } from "@/lib/seo/config";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import StructuredData, { articleSchema } from "@/components/seo/StructuredData";
 import { supabase } from "@/integrations/supabase/client";
