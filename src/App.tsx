@@ -38,6 +38,8 @@ const OrderTracking = lazy(() => import("./pages/OrderTracking"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ReturnPolicy = lazy(() => import("./pages/ReturnPolicy"));
 const FAQ = lazy(() => import("./pages/FAQ"));
+const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+const DeveloperDocs = lazy(() => import("./pages/DeveloperDocs"));
 
 // Admin pages - lazy loaded
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
