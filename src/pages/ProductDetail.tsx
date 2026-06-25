@@ -23,7 +23,7 @@ import StockCountdown from "@/components/marketing/StockCountdown";
 import WhatsAppOrderButton from "@/components/marketing/WhatsAppOrderButton";
 import FlashSaleTimer from "@/components/marketing/FlashSaleTimer";
 import SEOHead from "@/components/seo/SEOHead";
-import { buildProductSeo } from "@/lib/seo/config";
+import { buildProductSeo, buildProductJsonLd } from "@/lib/seo/config";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import StructuredData, { productSchema } from "@/components/seo/StructuredData";
 import { trackAddToCart, trackViewContent } from "@/components/seo/AnalyticsTracker";
