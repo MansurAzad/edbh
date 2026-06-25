@@ -1,3 +1,46 @@
+/**
+ * @module customer-chat
+ * @description Deno Edge Function — Dubai Borka House AI customer-chat endpoint.
+ *
+ * ─── HTTP CONTRACT ────────────────────────────────────────────────────────────
+ * Method : POST  /functions/v1/customer-chat
+ * Headers: Content-Type: application/json
+ *          Authorization: Bearer <supabase-anon-key>   (optional — no auth gate)
+ * Body   : {
+ *            messages           : ChatMessage[]  // full conversation history (max 50)
+ *            stream?            : boolean        // request SSE streaming
+ *            save_chat_history? : boolean        // hint; handled server-side
+ *          }
+ * Response (non-stream): { message, products?, orders?, order_result?,
+ *                          has_more?, search_context? }
+ * Response (stream)    : SSE — first event type='metadata' (JSON w/ products etc.),
+ *                        then raw OpenAI-compatible delta chunks, finally [DONE].
+ * HTTP 400 — invalid / empty messages array (> 50 messages rejected)
+ * HTTP 429 — rate limit exceeded (20 req / 60 s per source IP)
+ * HTTP 503 — all configured AI providers failed
+ *
+ * ─── ENVIRONMENT VARIABLES ────────────────────────────────────────────────────
+ * SUPABASE_URL              : Supabase project URL (also used for image URL normalisation)
+ * SUPABASE_SERVICE_ROLE_KEY : Service-role key — full DB access, kept server-side only
+ * LOVABLE_API_KEY           : Lovable AI Gateway bearer token (last-resort fallback)
+ * (Additional provider credentials live in the `ai_providers` DB table, fetched via RPC)
+ *
+ * ─── AUTHENTICATION ───────────────────────────────────────────────────────────
+ * No user-level auth check. Supabase RLS is bypassed by the service-role key.
+ * Rate limiting is enforced per source IP via an in-process Map (resets on cold-start).
+ *
+ * ─── DOWNSTREAM SIDE EFFECTS ──────────────────────────────────────────────────
+ * Reads   : products, product_variants, product_images, product_reviews,
+ *           orders, order_items, delivery_zones, coupons, bundle_deals,
+ *           ai_providers (via RPC get_ai_providers_for_scope), chat_histories
+ * Writes  : orders                  (INSERT  — create_order)
+ *           order_items             (INSERT  — create_order)
+ *           orders.status='cancelled' (UPDATE — cancel_order)
+ *           coupons.current_uses++  (UPDATE  — coupon application inside create_order)
+ *           chat_histories          (INSERT/UPDATE — when _save_chat flag is set)
+ *           ai_usage counter        (RPC increment_ai_usage, fire-and-forget)
+ * External: AI provider REST APIs (Gemini 2.5 Pro via Lovable Gateway or custom)
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -6,8 +49,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ─── Rate limiter ────────────────────────────────────────────────────────────
+// Simple in-process sliding-window counter keyed on client IP address.
+// Limit: 20 requests per 60-second window per IP.
+// The Map is module-level so it persists across requests on the same isolate
+// instance, but resets on cold-start — no cross-instance coordination.
 // Rate limiter
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+// Returns true when the caller has exceeded the 20-req/min threshold.
+// Side-effect: increments (or initialises) the counter for the given key.
 function isRateLimited(key: string): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(key);
@@ -19,22 +69,39 @@ function isRateLimited(key: string): boolean {
   return entry.count > 20;
 }
 
+// ─── Input sanitizers ────────────────────────────────────────────────────────
+// All user-supplied strings pass through these helpers before touching the DB
+// or being forwarded to the AI, defending against prompt injection and
+// unexpectedly long inputs.
 // Sanitizers
+// sanitize(): trim whitespace and hard-cap length (default 200 chars).
+// Returns empty string for non-string inputs.
 function sanitize(input: unknown, maxLen = 200): string {
   if (typeof input !== "string") return "";
   return input.trim().slice(0, maxLen);
 }
+// sanitizePhone(): strips all non-digit/'+' chars, then validates
+// Bangladeshi-style numbers (+?[0-9]{10,15}).  Returns null on mismatch.
 function sanitizePhone(input: unknown): string | null {
   if (typeof input !== "string") return null;
   const cleaned = input.replace(/[^0-9+]/g, "");
   if (!/^\+?[0-9]{10,15}$/.test(cleaned)) return null;
   return cleaned;
 }
+// isValidUUID(): guards against AI-hallucinated or user-supplied IDs before
+// they are used in DB equality lookups.
 function isValidUUID(input: unknown): boolean {
   if (typeof input !== "string") return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input);
 }
 
+// ─── Dice-coefficient string similarity ─────────────────────────────────────
+// Computes the Sørensen–Dice coefficient over character bigrams.
+// Formula: 2 * |A ∩ B| / (|A| + |B|)  where |X| = number of bigrams in X.
+// Range: 0.0 (no overlap) → 1.0 (identical).  Used to score how well a
+// search query matches a product name/description returned from the DB,
+// producing the `confidence` / `confident_match` fields that the AI uses to
+// decide whether to confirm a product or ask the customer to clarify.
 // Lightweight similarity (Dice coefficient on bigrams) — used for product-match confidence.
 function similarity(a: string, b: string): number {
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
@@ -42,6 +109,7 @@ function similarity(a: string, b: string): number {
   if (!a || !b) return 0;
   if (a === b) return 1;
   if (a.length < 2 || b.length < 2) return a === b ? 1 : 0;
+    // Build a frequency map of all overlapping 2-character substrings (bigrams).
   const bigrams = (s: string) => {
     const m = new Map<string, number>();
     for (let i = 0; i < s.length - 1; i++) {
@@ -50,12 +118,17 @@ function similarity(a: string, b: string): number {
     }
     return m;
   };
+    // Count the intersection: for each bigram in A, add min(countA, countB) to inter.
   const A = bigrams(a), B = bigrams(b);
   let inter = 0;
   for (const [g, c] of A) if (B.has(g)) inter += Math.min(c, B.get(g)!);
   return (2 * inter) / (a.length - 1 + b.length - 1);
 }
 
+// ─── Ambiguous product-query detector ───────────────────────────────────────
+// Catches vague messages like 'দাম কত?' or 'show this' that carry no product
+// context. When detected AND no prior product context exists in the thread,
+// the serve() handler returns a quick-reply UI immediately — no AI round-trip.
 // Detect ambiguous product reference ("show this", "price?") with no concrete product context.
 function isAmbiguousProductQuery(text: string): boolean {
   if (!text) return false;
@@ -64,6 +137,8 @@ function isAmbiguousProductQuery(text: string): boolean {
   // Words that indicate a specific product is named (category names, brand-ish nouns)
   const namedProduct = /(ফারাশা|কোট কলার|কালারিং|নিদা|জার্সি|শিফন|সিল্ক|abaya zoom|stone|premium|deluxe)/i;
   if (namedProduct.test(t)) return false;
+    // Regex patterns covering common Bengali/English ambiguous phrasings.
+    // Each pattern matches a message that refers to an unspecified product.
   const patterns = [
     /এই.{0,15}(দেখান|দেখাও|দেখাবেন|দেখতে চাই|পাঠান|দিন|দাও)/,
     /^দাম\s*(কত|কতো|জানতে)?\s*\??$/,
@@ -672,9 +747,34 @@ const SYSTEM_PROMPT = `আপনি **এরশাদ হোসেন**, Dubai B
 
 Dubai Borka House হলো বাংলাদেশের প্রিমিয়াম দুবাই ইম্পোর্টেড বোরকা, আবায়া, হিজাব ও ইসলামিক ফ্যাশন ব্র্যান্ড। আমরা সরাসরি দুবাই থেকে সেরা মানের প্রোডাক্ট তৈরি করে আমাদের বাংলাদেশের শোরুমগুলোতে নিয়ে আসি।`;
 
+// ─── Tool executor ───────────────────────────────────────────────────────────
+// Central dispatch for every tool the AI can call.
+// Each case validates inputs (using the sanitizers above), queries Supabase,
+// and returns a plain-object result that is JSON-serialised into the
+// tool-result message appended to aiMessages for the next AI turn.
+//
+// Cases (in order):
+//   search_products      — paginated full-text + category/price filter search
+//   get_product_details  — single product with variants, images, reviews
+//   get_categories       — category list with counts
+//   check_stock          — variant-level stock for one product
+//   track_order          — order lookup by phone or ID (full + short UUID)
+//   create_order         — INSERT order + items, apply coupon, lookup shipping
+//   cancel_order         — soft-cancel within 15-minute window
+//   get_delivery_info    — delivery zones + shipping charges
+//   get_active_offers    — active coupons + bundle deals
+//   validate_coupon      — coupon validity + discount preview (no DB mutation)
+//   get_store_info       — static store info keyed by topic string
+//   find_matching_products — visual/descriptive search for image matching
 // Tool execution
 async function executeTool(supabase: any, name: string, args: any): Promise<any> {
   switch (name) {
+    // ── search_products ───────────────────────────────────────────────────────
+    // Returns up to 5 products per page (offset-based pagination).
+    // Runs a parallel COUNT query so the caller knows the total result set size
+    // and can provide has_more / next_offset for the AI to use when paginating.
+    // After fetching, attaches a Dice-coefficient _match_score to each product
+    // and surfaces the top score as `confidence` / `confident_match`.
     case "search_products": {
       const offset = Math.max(Number(args?.offset) || 0, 0);
       const pageSize = 5;
@@ -720,6 +820,8 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       if (error) return { error: error.message };
       if (!data || data.length === 0) return { products: [], total_found: 0, has_more: false, message: offset > 0 ? "এই ক্যাটেগরিতে এগুলোই আছে। অন্য ক্যাটেগরি দেখুন!" : "এই কীওয়ার্ডে সরাসরি ম্যাচ হচ্ছে না। ক্যাটেগরি ফিল্টার দিয়ে বা query ছাড়া আবার চেষ্টা করুন।", retry_without_query: true };
       
+    // Products stored without a primary image_url fall back to the first
+    // entry in product_images, fetched in a single batched query.
       // Fetch first gallery image for products missing image_url
       const missingImageIds = data.filter((p: any) => !p.image_url).map((p: any) => p.id);
       if (missingImageIds.length > 0) {
@@ -748,6 +850,9 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       const hasMore = (offset + data.length) < total;
       const normalizedCategory = args?.category ? (categoryMap[sanitize(args.category, 50).toLowerCase().trim()] || sanitize(args.category, 50).toLowerCase().trim()) : undefined;
       // Normalize image URLs to absolute
+    // Score each returned product against the search query using Dice similarity.
+    // The score drives `confident_match` which the AI uses to avoid presenting
+    // wrong products with high confidence.
       for (const p of data) { p.image_url = normalizeImageUrl(p.image_url); }
       const queryStr = sanitize(args?.query, 100);
       const productsWithScore = data.map((p: any) => {
@@ -759,6 +864,11 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       console.log(`[CONFIDENCE] search_products query="${queryStr}" top="${top?.name}" score=${confidence}`);
       return { products: productsWithScore, total_found: total, showing_from: offset + 1, showing_to: offset + data.length, has_more: hasMore, next_offset: hasMore ? offset + pageSize : null, search_context: { category: normalizedCategory || null, query: queryStr || null, offset }, confidence, confident_match: confidence >= 0.6 };
     }
+    // ── get_product_details ───────────────────────────────────────────────────
+    // Fetches a single product by UUID (preferred) or partial name match.
+    // Joins variants (size/color/stock/price_adjustment), gallery images,
+    // and up to 5 reviews; derives available_sizes / available_colors from
+    // in-stock variants only so the AI never suggests unavailable options.
     case "get_product_details": {
       let product;
       if (args?.product_id && isValidUUID(args.product_id)) {
@@ -775,6 +885,7 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       const { data: reviews } = await supabase.from("product_reviews").select("rating, comment, title").eq("product_id", product.id).limit(5);
       const avgRating = reviews?.length ? (reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length).toFixed(1) : null;
       
+    // Only variants with stock > 0 contribute to the displayed size/color lists.
       // Build available sizes/colors from variants
       const availableSizes = [...new Set((variants || []).filter((v: any) => v.stock > 0 && v.size).map((v: any) => v.size))];
       const availableColors = [...new Set((variants || []).filter((v: any) => v.stock > 0 && v.color).map((v: any) => v.color))];
@@ -801,6 +912,9 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
         confident_match: confident,
       };
     }
+    // ── get_categories ────────────────────────────────────────────────────────
+    // Aggregates product counts per category from the full products table and
+    // maps English DB keys to Bengali display names.
     case "get_categories": {
       const { data } = await supabase.from("products").select("category");
       const counts: Record<string, number> = {};
@@ -808,6 +922,9 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       const categoryNames: Record<string, string> = { borka: "বোরকা", abaya: "আবায়া", hijab: "হিজাব", kaftan: "কাফতান", scarf: "স্কার্ফ", fabric: "ফেব্রিক" };
       return { categories: Object.entries(counts).map(([name, count]) => ({ name, bengali_name: categoryNames[name] || name, count })) };
     }
+    // ── check_stock ───────────────────────────────────────────────────────────
+    // Quick variant-level stock lookup — used when the AI needs to confirm
+    // availability before creating an order without fetching full product details.
     case "check_stock": {
       if (!isValidUUID(args?.product_id)) return { error: "Invalid product ID" };
       const { data: product } = await supabase.from("products").select("id, name, stock, sizes, colors").eq("id", args.product_id).maybeSingle();
@@ -815,12 +932,20 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       const { data: variants } = await supabase.from("product_variants").select("size, color, stock").eq("product_id", args.product_id);
       return { product_name: product.name, total_stock: product.stock, available_sizes: product.sizes, available_colors: product.colors, variant_stock: variants || [] };
     }
+    // ── track_order ───────────────────────────────────────────────────────────
+    // Accepts either a phone number or an order ID (full UUID or short prefix).
+    // Phone normalisation: tries both '0' prefix and '+880' prefix so customers
+    // can paste numbers in any common Bangladeshi format.
+    // Short ID lookup uses ilike '%prefix%' — safe because non-hex chars are
+    // stripped before the query, limiting the attack surface.
     case "track_order": {
       let orders: any[] = [];
       const selectCols = "id, status, total, created_at, shipping_city, payment_method, payment_status, tracking_number, courier_name, estimated_delivery, notes, guest_name, shipping_phone";
       const input = sanitize(args?.order_id || args?.phone || "", 36);
       if (!input) return { error: "অর্ডার ID অথবা মোবাইল নম্বর দিন।" };
 
+    // Distinguish phone vs. order-ID by regex rather than asking the customer
+    // which type of identifier they have.
       // Detect if input is a phone number (starts with 0 or +8, 11+ digits)
       const cleanedPhone = input.replace(/[^0-9+]/g, "");
       const isPhone = /^(\+?880|0)1[0-9]{9}$/.test(cleanedPhone);
@@ -861,6 +986,17 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       const statusMap: Record<string, string> = { pending: "⏳ পেন্ডিং", processing: "🔄 প্রসেসিং", shipped: "🚚 শিপড", delivered: "✅ ডেলিভারড", cancelled: "❌ ক্যান্সেলড" };
       return { orders: orders.map(o => ({ ...o, status_text: statusMap[o.status] || o.status, order_short_id: o.id.slice(0, 8).toUpperCase() })) };
     }
+    // ── create_order ──────────────────────────────────────────────────────────
+    // Main transactional tool — the only tool that performs multiple DB writes.
+    // Steps:
+    //   1. Sanitise and validate all customer fields.
+    //   2. For each item: validate UUID, fetch live price, check stock ≥ qty.
+    //      Name-based fallback catches cases where the AI hallucinated a UUID.
+    //   3. Validate & apply coupon (if provided): expiry, max-uses, min-order,
+    //      percentage or flat discount; increments coupons.current_uses.
+    //   4. Look up shipping charge from delivery_zones by city name.
+    //   5. INSERT into orders then order_items.
+    //   6. Return result with _save_chat=true to trigger chat-history persistence.
     case "create_order": {
       const customerName = sanitize(args?.customer_name, 100);
       const phone = sanitizePhone(args?.phone);
@@ -909,6 +1045,9 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       
       if (orderItems.length === 0) return { error: "কোনো সঠিক প্রোডাক্ট পাওয়া যায়নি।" };
       
+    // ── Coupon validation inside create_order ─────────────────────────────────
+    // Re-validates here even if validate_coupon was called earlier, because
+    // conditions may have changed (e.g. another request used the last slot).
       // Validate and apply coupon if provided
       let discountAmount = 0;
       let couponId: string | null = null;
@@ -936,6 +1075,7 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
           return { error: `এই কুপন ব্যবহার করতে সর্বনিম্ন ৳${coupon.minimum_order_amount} অর্ডার করতে হবে। আপনার সাবটোটাল ৳${total}।` };
         }
         
+    // Apply either a percentage or flat discount; cap flat discount at subtotal.
         // Calculate discount
         if (coupon.discount_type === "percentage") {
           discountAmount = Math.round(total * coupon.discount_value / 100);
@@ -949,6 +1089,8 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
         await supabase.from("coupons").update({ current_uses: coupon.current_uses + 1 }).eq("id", coupon.id);
       }
       
+    // Resolve shipping charge from the delivery_zones table by city name.
+    // Falls back to 120 BDT if no matching zone is found.
       // Get shipping charge
       let shippingCharge = 120; // default
       const effectiveCity = city || "N/A";
@@ -981,6 +1123,8 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
         return { error: "অর্ডার তৈরি করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।" };
       }
       
+    // Insert each line item; errors are logged but don't roll back the order
+    // (Supabase does not expose transactions in edge functions).
       // Insert order items
       for (const item of orderItems) {
         const { error: itemError } = await supabase.from("order_items").insert({ order_id: order.id, ...item });
@@ -1010,6 +1154,12 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       }
       return result;
     }
+    // ── cancel_order ──────────────────────────────────────────────────────────
+    // Soft-cancel: sets order status to 'cancelled'.
+    // Enforces a strict 15-minute cancellation window measured against the
+    // DB-stored created_at timestamp (UTC) to prevent timezone ambiguities.
+    // Only pending orders can be cancelled — already-shipped orders are rejected.
+    // Sets _cancel=true in the result so serve() updates the chat history.
     case "cancel_order": {
       const selectCols = "id, status, total, created_at, shipping_phone, guest_name";
       const input = sanitize(args?.order_id || args?.phone || "", 36);
@@ -1044,6 +1194,7 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       
       if (!order) return { error: "পেন্ডিং অর্ডার পাওয়া যায়নি। অর্ডার ইতিমধ্যে প্রসেস/শিপ/ক্যান্সেল হয়ে থাকতে পারে।" };
       
+    // Compute elapsed time in UTC — both DB timestamp and Date.now() are UTC.
       // Check 15-minute window using DB timestamp (UTC) consistently
       const createdAtUTC = new Date(order.created_at).getTime();
       const nowUTC = Date.now(); // Edge function Date.now() is also UTC
@@ -1070,17 +1221,28 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       };
       return result;
     }
+    // ── get_delivery_info ─────────────────────────────────────────────────────
+    // Returns delivery zones filtered by city (ilike) if provided, or all zones.
+    // The general_info fallback is shown when no zone matches the customer city.
     case "get_delivery_info": {
       let q = supabase.from("delivery_zones").select("zone_name, city, shipping_charge, estimated_days, areas").eq("is_active", true);
       if (args?.city) q = q.ilike("city", `%${sanitize(args.city, 50)}%`);
       const { data } = await q.order("shipping_charge");
       return { zones: data || [], general_info: "ঢাকার ভেতরে ১-২ দিন, ঢাকার বাইরে ৩-৫ দিনে ডেলিভারি। ঢাকায় শিপিং ৬০-৮০ টাকা, ঢাকার বাইরে ১২০-১৫০ টাকা।" };
     }
+    // ── get_active_offers ─────────────────────────────────────────────────────
+    // Returns all active coupons and bundle deals for the AI to display to
+    // customers asking about discounts — no DB mutation.
     case "get_active_offers": {
       const { data: coupons } = await supabase.from("coupons").select("code, description, discount_type, discount_value, minimum_order_amount, valid_until").eq("is_active", true).limit(10);
       const { data: bundles } = await supabase.from("bundle_deals").select("name, description, discount_percent, min_items, category").eq("is_active", true).limit(5);
       return { coupons: coupons || [], bundle_deals: bundles || [] };
     }
+    // ── validate_coupon ───────────────────────────────────────────────────────
+    // Validates a coupon code without mutating the DB (unlike create_order).
+    // Returns a discount preview when order_total is supplied so the AI can
+    // show the customer the exact saving before they confirm.
+    // Checks: active flag, expiry date, max-uses limit, minimum order amount.
     case "validate_coupon": {
       const code = sanitize(args?.code, 50).toUpperCase();
       if (!code) return { valid: false, error: "কুপন কোড দিন।" };
@@ -1091,6 +1253,7 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
         .ilike("code", code)
         .maybeSingle();
       if (!coupon) return { valid: false, error: `"${code}" কুপন কোডটি সঠিক নয় বা মেয়াদ শেষ হয়ে গেছে।` };
+    // Guard order: expiry → then max-uses → then minimum order amount.
       // Check expiry
       if (coupon.valid_until && new Date(coupon.valid_until) < new Date()) {
         return { valid: false, error: `"${coupon.code}" কুপনের মেয়াদ শেষ হয়ে গেছে।` };
@@ -1104,6 +1267,7 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       if (coupon.minimum_order_amount && orderTotal > 0 && orderTotal < coupon.minimum_order_amount) {
         return { valid: false, error: `এই কুপন ব্যবহার করতে সর্বনিম্ন ৳${coupon.minimum_order_amount} অর্ডার করতে হবে। আপনার বর্তমান অর্ডার ৳${orderTotal}।` };
       }
+    // Compute preview only when order_total > 0; percentage vs. flat branching.
       // Calculate discount preview
       let discountAmount = 0;
       if (orderTotal > 0) {
@@ -1126,6 +1290,14 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
         message: `✅ "${coupon.code}" কুপন সফলভাবে যাচাই হয়েছে! ${coupon.discount_type === "percentage" ? `${coupon.discount_value}% ডিসকাউন্ট` : `৳${coupon.discount_value} ছাড়`} পাবেন।`,
       };
     }
+    // ── get_store_info ────────────────────────────────────────────────────────
+    // Returns static store knowledge keyed by topic string.
+    // All human-facing strings are in Bengali — these are the canonical
+    // templates the AI copies verbatim rather than hallucinating store details.
+    // Topics: about | return_policy | faq | contact | payment_methods
+    // The `contact` topic includes branch addresses for walk-in customers.
+    // The `faq` entry uses Bengali Q&A pairs so the AI responds consistently
+    // to common questions about shipping charges, payment, and delivery time.
     case "get_store_info": {
       const infoMap: Record<string, any> = {
         about: { name: "Dubai Borka House", description: "বাংলাদেশের প্রিমিয়াম দুবাই ইম্পোর্টেড ইসলামিক ফ্যাশন ব্র্যান্ড।", speciality: "দুবাই থেকে সরাসরি আমদানিকৃত প্রিমিয়াম কোয়ালিটি বোরকা, আবায়া, হিজাব ও কাফতান। প্রতিটি পণ্য হাতে বাছাই করা এবং গুণগত মান নিশ্চিত।" },
@@ -1151,6 +1323,13 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       };
       return infoMap[args?.topic] || { error: "এই বিষয়ে তথ্য পাওয়া যায়নি।" };
     }
+    // ── find_matching_products ────────────────────────────────────────────────
+    // Used when a customer sends a product photo or describes a visual style.
+    // Fetches up to 50 products (filtered by category if given) and returns
+    // them with their gallery images and variant data so the AI — which has
+    // multimodal vision — can rank the closest visual matches itself.
+    // The `instruction` field in the result tells the AI exactly how to present
+    // matches: explain which visual features (fabric, colour, embroidery) align.
     case "find_matching_products": {
       const description = sanitize(args?.description, 500);
       const color = sanitize(args?.color, 50);
@@ -1176,6 +1355,8 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
       if (error) return { error: error.message };
       if (!products || products.length === 0) return { products: [], message: "এই বিবরণে সরাসরি ম্যাচ হচ্ছে না। ক্যাটেগরি দিয়ে আবার চেষ্টা করুন।", retry_without_query: true };
       
+    // Batch-fetch gallery images and variants for all candidate products in two
+    // queries (one for images, one for variants) rather than N+1 queries.
       // Fetch additional images for all products
       const productIds = products.map((p: any) => p.id);
       const { data: allImages } = await supabase
@@ -1190,6 +1371,7 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
         .select("product_id, size, color, stock")
         .in("product_id", productIds);
       
+    // Build O(1) lookup maps: product_id → [image_urls] and product_id → [variants].
       // Build image map and variant map
       const imageMap = new Map<string, string[]>();
       for (const img of (allImages || [])) {
@@ -1203,6 +1385,8 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
         variantMap.get(v.product_id)!.push(v);
       }
       
+    // Enrich each product with its resolved image URLs, in-stock sizes/colours,
+    // and variant stock levels — everything the AI needs for a visual comparison.
       // Normalize and enrich product data
       const enrichedProducts = products.map((p: any) => {
         p.image_url = normalizeImageUrl(p.image_url);
@@ -1246,12 +1430,24 @@ async function executeTool(supabase: any, name: string, args: any): Promise<any>
   }
 }
 
+// ─── HTTP handler ────────────────────────────────────────────────────────────
+// Entry point for every request.  Responsibilities (in order):
+//   1. Handle CORS pre-flight OPTIONS.
+//   2. Enforce per-IP rate limit.
+//   3. Resolve AI provider candidates from DB (with Lovable Gateway fallback).
+//   4. Validate the request body (messages array).
+//   5. Ambiguous-query short-circuit — fast path, no AI call.
+//   6. Two-phase agentic loop (Phase 1: tool-calling; Phase 2: final reply).
+//   7. Persist chat history when an order is created or cancelled.
+//   8. Return SSE stream or JSON response.
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Extract the real client IP from the X-Forwarded-For header (set by the
+    // Supabase edge network) and check it against the in-process rate-limit Map.
     const clientIP = req.headers.get("x-forwarded-for") || "unknown";
     if (isRateLimited(clientIP)) {
       return new Response(JSON.stringify({ error: "অনুগ্রহ করে কিছুক্ষণ পর চেষ্টা করুন।" }),
@@ -1264,6 +1460,10 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // ── AI provider resolution ────────────────────────────────────────────────
+    // Queries the `ai_providers` table for providers scoped to 'customer'.
+    // Providers are returned in priority order by the RPC.  The Lovable Gateway
+    // is always appended last as a guaranteed-available fallback.
     // Build ordered AI provider candidates (active -> fallbacks -> Lovable Gateway)
     type Candidate = { name: string; url: string; headers: Record<string, string>; model: string };
     const candidates: Candidate[] = [];
@@ -1335,6 +1535,12 @@ serve(async (req) => {
     // Track AI usage (best-effort, fire-and-forget)
     supabase.rpc("increment_ai_usage").then(() => {}).catch((e) => console.error("usage increment failed", e));
 
+    // ── Ambiguous-query short-circuit ─────────────────────────────────────────
+    // Detect vague messages like 'দাম কত?' with no prior product context.
+    // hasPriorProductContext scans earlier messages for UUID patterns or
+    // tool-result keywords — a cheap heuristic that avoids a full AI round-trip.
+    // When triggered: fetch up to 6 featured in-stock products and return them
+    // as quick-reply cards so the customer can tap to select a product.
     // Ambiguous query short-circuit: if last user message is "এই প্রোডাক্ট দেখান / দাম কত?" with no
     // prior product context in the conversation, return a quick-reply UI instead of guessing.
     const lastUserMsg = [...messages].reverse().find((m: any) => m?.role === "user");
@@ -1366,6 +1572,21 @@ serve(async (req) => {
     const aiMessages: any[] = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
     const AI_MODEL = AI_MODEL_OVERRIDE || "google/gemini-2.5-pro";
 
+    // ── Phase 1: Agentic tool-calling loop ────────────────────────────────────
+    // Runs up to 5 iterations.  Each iteration:
+    //   a) Sends aiMessages (system prompt + conversation + tool results so far)
+    //      to the AI with the full tools schema — always non-streaming so we can
+    //      parse tool_calls from the JSON response.
+    //   b) If the AI returns tool_calls: execute each via executeTool(), append
+    //      role='tool' messages, and loop for the next AI turn.
+    //   c) If the AI returns plain text (finish_reason='stop'): either return
+    //      immediately (non-stream) or break and hand off to Phase 2 (stream).
+    // Side-accumulators updated each iteration:
+    //   collectedProducts — deduplicated later with Map keyed on product.id
+    //   collectedOrders   — orders returned by track_order
+    //   orderResult       — the single result from create_order / cancel_order
+    //   hasMoreProducts   — pagination flag forwarded to the client
+    //   lastSearchContext — category/query/offset for 'show more' continuation
     // Phase 1: Tool-calling loop (always non-streaming)
     let collectedProducts: any[] = [];
     let collectedOrders: any[] = [];
@@ -1390,6 +1611,15 @@ serve(async (req) => {
       const msg = choice.message;
       aiMessages.push(msg);
 
+    // ── Text-based tool-call fallback parser ──────────────────────────────────
+    // Some model variants emit tool calls as prose rather than the structured
+    // tool_calls JSON field, e.g.:
+    //   create_order(customer_name='Fatima', phone='01712345678', ...)
+    // The regex matches any tool name followed by a parenthesised argument list.
+    // Arguments are parsed as key=value pairs; quoted strings are unquoted;
+    // numeric literals are cast to Number.  The synthetic text-based call is
+    // then replayed as if it were a proper tool_call so the loop continues
+    // normally without the AI generating a hallucinated free-text response.
       // Detect tool calls written as text (e.g. "tools.create_order(...)" or "create_order(...)")
       if ((!msg.tool_calls || msg.tool_calls.length === 0) && msg.content) {
         const textToolMatch = msg.content.match(/(?:tools?\.)?(create_order|search_products|get_product_details|check_stock|track_order|cancel_order|get_delivery_info|get_active_offers|validate_coupon|get_categories|get_store_info|find_matching_products)\s*\(([^)]*)\)/s);
@@ -1413,6 +1643,8 @@ serve(async (req) => {
               parsedArgs[key.trim()] = val;
             }
           }
+    // create_order requires an 'items' array; if the AI passed flat fields
+    // (product_id, quantity, size, color) instead, reshape them into the array.
           // Handle items array for create_order - build from context
           if (fnName === "create_order" && parsedArgs.product_id && !parsedArgs.items) {
             parsedArgs.items = [{
@@ -1426,6 +1658,8 @@ serve(async (req) => {
             delete parsedArgs.size;
             delete parsedArgs.color;
           }
+    // Normalise field aliases the AI sometimes uses (customer_address → address,
+    // customer_phone → phone) and strip extraneous computed fields.
           // Rename fields
           if (parsedArgs.customer_address) { parsedArgs.address = parsedArgs.address || parsedArgs.customer_address; delete parsedArgs.customer_address; }
           if (parsedArgs.customer_phone) { parsedArgs.phone = parsedArgs.phone || parsedArgs.customer_phone; delete parsedArgs.customer_phone; }
@@ -1472,6 +1706,7 @@ serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+    // Standard (structured) tool_calls path — parse arguments JSON and dispatch.
       // Execute tool calls
       for (const tc of msg.tool_calls) {
         const fnName = tc.function.name;
@@ -1491,6 +1726,14 @@ serve(async (req) => {
       }
     }
 
+    // ── Chat history persistence ──────────────────────────────────────────────
+    // Triggered when executeTool set _save_chat=true on the result (only
+    // create_order and cancel_order do this).
+    // For cancellations: UPDATE existing row; INSERT if no prior history.
+    // For new orders: INSERT with full message log + products_discussed list
+    //   (ordered items first, then other products browsed during the session).
+    // _save_chat and _cancel flags are deleted from orderResult before the
+    // payload is forwarded to the client to avoid leaking internal markers.
     // Save chat history if order was created or cancelled
     if (orderResult?._save_chat) {
       try {
@@ -1554,6 +1797,12 @@ serve(async (req) => {
       delete orderResult._cancel;
     }
 
+    // ── Phase 2: Final reply ──────────────────────────────────────────────────
+    // Deduplicate collected products (Map on id) and cap at 10 for the client.
+    // If the tool-calling loop already received a plain-text assistant message
+    // (alreadyHasText), emit it as a fake SSE chunk rather than making another
+    // AI call — avoids a redundant round-trip when the AI gave text in the last
+    // iteration of the loop.
     // Phase 2: Final response (streaming if requested)
     const uniqueProducts = Array.from(new Map(collectedProducts.map(p => [p.id, p])).values()).slice(0, 10);
 
@@ -1561,6 +1810,10 @@ serve(async (req) => {
     const lastMsg = aiMessages[aiMessages.length - 1];
     const alreadyHasText = lastMsg?.role === "assistant" && lastMsg?.content && !lastMsg?.tool_calls;
 
+    // SSE streaming path:
+    //   1. Send a 'metadata' event immediately with products, orders, etc.
+    //   2. Either replay alreadyHasText as a fake delta chunk + [DONE],
+    //      or open a real streaming call to the AI and pipe chunks through.
     if (wantStream) {
       const { readable, writable } = new TransformStream();
       const writer = writable.getWriter();
@@ -1605,6 +1858,8 @@ serve(async (req) => {
       });
     }
 
+    // Non-streaming path: one more AI call with the full message history
+    // (including all tool results) to get the final assistant reply as JSON.
     // Non-streaming final call
     const finalResponse = await aiFetch({ messages: aiMessages, temperature: 0.1, max_tokens: 4000 });
 
