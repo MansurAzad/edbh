@@ -1,3 +1,52 @@
+/**
+ * @file google-merchant-feed/index.ts
+ *
+ * @purpose
+ *   Generates and serves a Google Merchant Center product feed in RSS 2.0
+ *   format with the `g:` (Google Base) namespace.  Google Shopping crawlers
+ *   fetch this feed on a schedule to keep the Merchant Center catalogue in
+ *   sync with the live product database.
+ *
+ *   Each <item> includes: id, title, description, link, image_link,
+ *   availability (in_stock/out_of_stock), price, sale_price, brand,
+ *   condition (new), google_product_category, product_type, material,
+ *   color, size, and a flat 60 BDT shipping entry for Bangladesh.
+ *
+ * @http
+ *   Method : GET (OPTIONS also handled for CORS pre-flight)
+ *   Body   : None
+ *
+ * @response
+ *   200 OK : Content-Type: application/xml; charset=utf-8
+ *            Cache-Control: public, max-age=3600
+ *            Body: RSS 2.0 XML with <channel> and one <item> per product.
+ *   500    : "Error generating product feed" (plain text)
+ *
+ * @auth
+ *   None — publicly accessible (submit this URL to Google Merchant Center).
+ *   Uses the service-role key internally for DB reads only.
+ *
+ * @env
+ *   SUPABASE_URL              – Supabase project URL
+ *   SUPABASE_SERVICE_ROLE_KEY – Read-only access to the products table
+ *
+ * @sideEffects
+ *   Read-only. Queries:
+ *     - `products` → id, name, description, price, sale_price, image_url,
+ *       category, stock, slug, material, sizes, colors  (all products, DESC)
+ *
+ * @notes
+ *   BASE_URL is hardcoded to "https://dubaiborkahouse.com".
+ *   categoryMapping translates DB category slugs to Google taxonomy paths.
+ *   If a product has no image_url (or uses "/placeholder.svg"), a fallback
+ *   image "${BASE_URL}/favicon.jpg" is used.
+ *   Products with `stock == null` are treated as in_stock (conservative).
+ *
+ * @bilingual
+ *   Feed description is in Bengali (বাংলা):
+ *   "দুবাই বোরকা হাউস — বাংলাদেশের সেরা প্রিমিয়াম বোরকা, আবায়া ও ইসলামিক ফ্যাশন শপ।"
+ */
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {

@@ -1,7 +1,32 @@
-// Centralized permission registry for admin routes & nav menus.
-// Used by AdminLayout (menu filtering), PermissionGuard (route protection),
-// and RoleManagement matrix preview.
+/**
+ * @file permissions.ts
+ * @description Centralized permission registry for admin routes & nav menus.
+ *
+ * Used by:
+ *  - `AdminLayout`        — filters sidebar nav items the current user can see.
+ *  - `PermissionGuard`    — blocks route rendering for insufficient roles.
+ *  - `RoleManagement`     — renders the permission matrix preview table.
+ *
+ * Role hierarchy:
+ *  admin     → all permissions implicitly (no DB row needed)
+ *  moderator → subset defined in `MODERATOR_DEFAULT_PERMISSIONS` + any
+ *              overrides stored in `admin_permissions` DB table
+ *  user      → no admin access at all
+ *
+ * Cross-module assumption: the DB trigger `on_moderator_promote` inserts rows
+ * into `admin_permissions` matching `MODERATOR_DEFAULT_PERMISSIONS` when a
+ * user's role is set to "moderator". Keeping this constant in sync with that
+ * trigger is the developer's responsibility.
+ */
 
+/**
+ * Exhaustive union of every granular permission key used by the admin panel.
+ * Adding a new permission here requires updating:
+ *  1. `ALL_PERMISSIONS` (label + group)
+ *  2. `PERMISSION_ACCESS_MAP` (pages / actions / RLS policies)
+ *  3. `ROUTE_PERMISSIONS` (if a new route is gated by it)
+ *  4. The DB `admin_permissions.permission` check constraint
+ */
 export type PermissionKey =
   | "orders.manage"
   | "orders.update_status"
@@ -15,6 +40,11 @@ export type PermissionKey =
   | "reports.view"
   | "settings.manage";
 
+/**
+ * Master list of all permissions with display metadata.
+ * Consumed by the RoleManagement matrix to render permission checkboxes grouped
+ * by functional area. Labels are bilingual (English key + Bengali description).
+ */
 export const ALL_PERMISSIONS: { key: PermissionKey; label: string; group: string }[] = [
   { key: "orders.manage", label: "Orders ম্যানেজ", group: "Orders" },
   { key: "orders.update_status", label: "Order Status আপডেট", group: "Orders" },
@@ -29,7 +59,11 @@ export const ALL_PERMISSIONS: { key: PermissionKey; label: string; group: string
   { key: "settings.manage", label: "Settings", group: "Operations" },
 ];
 
-// Default permissions auto-granted on moderator promotion (mirrors DB trigger).
+/**
+ * Permissions auto-granted when a user is promoted to "moderator".
+ * Mirrors the DB trigger `on_moderator_promote` — keep them in sync.
+ * Note: `settings.manage` is intentionally absent (admin-only).
+ */
 export const MODERATOR_DEFAULT_PERMISSIONS: PermissionKey[] = [
   "orders.manage",
   "orders.update_status",
@@ -43,9 +77,21 @@ export const MODERATOR_DEFAULT_PERMISSIONS: PermissionKey[] = [
   "reports.view",
 ];
 
-// Admin-only — moderators never get these even if toggled off in trigger.
+/**
+ * Permissions that can never be assigned to a moderator, even via the UI.
+ * The RoleManagement component disables checkboxes for these when editing a
+ * moderator row.
+ */
 export const ADMIN_ONLY_PERMISSIONS: PermissionKey[] = ["settings.manage"];
 
+/**
+ * Detailed capability map for each permission key.
+ * Used by the RoleManagement detail panel to explain to admins *exactly* what
+ * each permission unlocks (pages, UI actions, and Supabase RLS policies).
+ *
+ * `rls` entries are informational only — they document the server-side policies
+ * that enforce the permission; they do not drive client-side logic.
+ */
 export const PERMISSION_ACCESS_MAP: Record<PermissionKey, { pages: string[]; actions: string[]; rls: string[] }> = {
   "orders.manage": {
     pages: ["/admin/orders", "/admin/returns"],
@@ -59,7 +105,7 @@ export const PERMISSION_ACCESS_MAP: Record<PermissionKey, { pages: string[]; act
   },
   "products.manage": {
     pages: ["/admin/products", "/admin/categories", "/admin/bulk-edit", "/admin/bulk-add"],
-    actions: ["প্রোডাক্ট/ক্যাটাগরি CRUD", "ভ্যারিয়েন্ট ও মিডিয়া ম্যানেজ", "Bulk add/edit"],
+    actions: ["প্রোডাক্ট/ক্যাটাগরি CRUD", "ভ্যারিয়েন্ট ও মিডিয়া ম্যানেজ", "Bulk add/edit"],
     rls: ["products: manage", "product_variants: manage", "product_images: manage", "categories: manage"],
   },
   "customers.view": {
@@ -104,7 +150,14 @@ export const PERMISSION_ACCESS_MAP: Record<PermissionKey, { pages: string[]; act
   },
 };
 
-// Map of admin route path → required permission. Routes not listed are admin-only.
+/**
+ * Maps every admin route path to the permission required to access it.
+ * The sentinel value `"admin_only"` means *only* users with `role === "admin"`
+ * may access the route — no moderator override is possible.
+ *
+ * Routes not listed here are considered admin-only by convention.
+ * `PermissionGuard` and `AdminLayout` both reference this map.
+ */
 export const ROUTE_PERMISSIONS: Record<string, PermissionKey | "admin_only"> = {
   "/admin": "reports.view",
   "/admin/homepage": "content.manage",
@@ -139,8 +192,29 @@ export const ROUTE_PERMISSIONS: Record<string, PermissionKey | "admin_only"> = {
   "/admin/settings": "admin_only",
 };
 
+/**
+ * UI display state for a permission in the RoleManagement matrix.
+ *
+ * - `"allow"`     – explicitly granted (moderator has a DB row for it)
+ * - `"deny"`      – not granted
+ * - `"inherited"` – the role gets it implicitly (admins always get this)
+ */
 export type PermissionStatus = "allow" | "deny" | "inherited";
 
+/**
+ * Computes the effective display status of a single permission for a given role.
+ *
+ * Logic:
+ *  - `admin`     → always `"inherited"` (implicit super-access, no DB row needed)
+ *  - `user`      → always `"deny"`
+ *  - `moderator` → `"allow"` if `granted` includes the permission, else `"deny"`
+ *
+ * @param role       - The user's role string from the `profiles` table.
+ * @param permission - The permission key to evaluate.
+ * @param granted    - Array of permission keys currently granted to this user
+ *                     (sourced from the `admin_permissions` table).
+ * @returns          The display status for the permission matrix cell.
+ */
 export const getPermissionStatus = (
   role: "admin" | "moderator" | "user",
   permission: PermissionKey,
@@ -148,6 +222,6 @@ export const getPermissionStatus = (
 ): PermissionStatus => {
   if (role === "admin") return "inherited"; // admin gets everything implicitly
   if (role === "user") return "deny";
-  // moderator
+  // moderator: check explicit grant list from DB
   return granted.includes(permission) ? "allow" : "deny";
 };
