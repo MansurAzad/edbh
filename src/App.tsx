@@ -123,6 +123,8 @@ const App = () => (
                   <Route path="/p/:id" element={<ProductDetail />} />
                   <Route path="/wishlist" element={<Wishlist />} />
                   <Route path="/blog" element={<Blog />} />
+                  <Route path="/help" element={<HelpCenter />} />
+                  <Route path="/developers" element={<DeveloperDocs />} />
                   <Route path="/track/:id?" element={<OrderTracking />} />
                   <Route path="/order-tracking" element={<OrderTracking />} />
                   <Route path="/admin" element={<PermissionGuard><AdminDashboard /></PermissionGuard>} />
