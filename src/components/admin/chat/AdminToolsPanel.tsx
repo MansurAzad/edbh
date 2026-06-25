@@ -1,3 +1,33 @@
+/**
+ * @file AdminToolsPanel.tsx
+ * @description A collapsible, tabbed admin toolkit that sits inside a chat thread.
+ *
+ * Tabs:
+ *   1. প্রোডাক্ট (Products) — live product search + cart builder → send catalogue
+ *      message OR place a real `orders` DB row directly from the chat.
+ *   2. অর্ডার (Order)       — shows the linked order, quick status change, tracking.
+ *   3. ট্র্যাকিং (Tracking) — set tracking number / courier and auto-notify customer.
+ *
+ * All async DB mutations are delegated to `useChatAdminActions`; this component
+ * owns only local UI state (open dialogs, search text, cart, form values).
+ *
+ * Bengali UI strings used here (with English translations):
+ *   প্রোডাক্ট            = Product
+ *   অর্ডার               = Order
+ *   ট্র্যাকিং            = Tracking
+ *   স্টক                  = Stock
+ *   নির্বাচিত             = Selected
+ *   পরিমাণ               = Quantity
+ *   সাইজ / কালার         = Size / Color
+ *   মোট                   = Total
+ *   প্রোডাক্ট পাঠান       = Send products (chat message)
+ *   অর্ডার নিন            = Take order (opens shipping dialog)
+ *   ট্র্যাকিং আপডেট ও
+ *     কাস্টমারকে জানান   = Update tracking & notify customer
+ *   ক্যাশ অন ডেলিভারি    = Cash on Delivery (cod)
+ *   বিকাশ / নগদ / রকেট  = Bangladeshi mobile-wallet payment providers
+ *   ঐচ্ছিক               = Optional
+ */
 import { useState } from "react";
 import {
   CheckCircle, Image as ImageIcon, Package, Plus, RefreshCw, Search, Send,
