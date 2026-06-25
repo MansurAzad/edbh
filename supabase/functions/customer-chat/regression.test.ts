@@ -1,3 +1,41 @@
+/**
+ * @file customer-chat/regression.test.ts
+ *
+ * @purpose
+ *   Live regression suite for the `customer-chat` edge function.
+ *   Calls the deployed function against the real database to guard against
+ *   three high-risk AI failure modes:
+ *
+ *   1. **Price hallucination** – the AI must quote the exact price stored in
+ *      the database (±1 BDT rounding tolerance), not an invented number.
+ *   2. **Image/video sharing** – when a customer asks "ছবি দেখান" the AI must
+ *      return a markdown image or a product with an image_url, and must NEVER
+ *      say it cannot share links.
+ *   3. **Ambiguous product reference** – if no specific product is named, the
+ *      AI must ask for clarification rather than hallucinating a product or
+ *      quoting a random price.
+ *
+ * @runtime
+ *   Deno std test runner (`Deno.test`).
+ *   Run via: `supabase functions deploy customer-chat --verify-jwt=false`
+ *   then `deno test supabase/functions/customer-chat/regression.test.ts`
+ *   (or via the Lovable test harness: `lovable-exec test`)
+ *
+ * @env
+ *   VITE_SUPABASE_URL | SUPABASE_URL             – Supabase project URL
+ *   VITE_SUPABASE_PUBLISHABLE_KEY |
+ *     SUPABASE_PUBLISHABLE_KEY | SUPABASE_ANON_KEY – Anon/publishable key
+ *
+ * @dependencies
+ *   deno.land/std@0.224.0/assert  – assertEquals, assert
+ *   deno.land/std@0.224.0/dotenv  – loads .env for local runs
+ *
+ * @sideEffects
+ *   - Makes real HTTP calls to the deployed `customer-chat` function.
+ *   - Makes a REST call to `products` to pick a real in-stock product for tests.
+ *   - Does NOT create orders or mutate any data.
+ */
+
 // Regression tests for customer-chat edge function
 // Covers: (1) price hallucination prevention, (2) image/video sharing, (3) ambiguous product clarification.
 //
@@ -15,6 +53,12 @@ const SUPABASE_KEY =
 
 const FN_URL = `${SUPABASE_URL}/functions/v1/customer-chat`;
 
+/**
+ * Sends a chat request to the live customer-chat edge function.
+ *
+ * @param messages - Array of OpenAI-style chat messages to send.
+ * @returns        Parsed JSON response body, or `{ _raw, _status }` on parse failure.
+ */
 async function chat(messages: any[]): Promise<any> {
   const r = await fetch(FN_URL, {
     method: "POST",
@@ -33,6 +77,11 @@ async function chat(messages: any[]): Promise<any> {
   }
 }
 
+/**
+ * Fetches a single in-stock product from the REST API for use as a test fixture.
+ *
+ * @returns First in-stock product object, or `null` if none found.
+ */
 async function pickProduct() {
   const r = await fetch(
     `${SUPABASE_URL}/rest/v1/products?select=id,name,price,sale_price,image_url,video_url&stock=gt.0&limit=1`,

@@ -1,3 +1,47 @@
+/**
+ * @file generate-invoice/index.ts
+ *
+ * @purpose
+ *   Generates a formatted A4 PDF invoice for a given order using the jsPDF
+ *   library and streams it as a binary download.  The invoice includes:
+ *   store branding, invoice number (INV-{first8ofOrderId}), bill-to details,
+ *   order status/payment summary, a line-item table with alternating row
+ *   shading, subtotal/discount/shipping/grand total breakdown, and advance-paid
+ *   / due-on-delivery figures for advance+COD orders.
+ *
+ * @http
+ *   Method : POST  (OPTIONS also handled)
+ *   Body   : { orderId: string }
+ *
+ * @response
+ *   200 OK : Content-Type: application/pdf
+ *            Content-Disposition: attachment; filename="INV-{SHORT_ID}.pdf"
+ *            Body: raw PDF bytes (ArrayBuffer)
+ *   500    : { error: string }  (JSON, Content-Type: application/json)
+ *
+ * @auth
+ *   None enforced — relies on the caller passing a valid orderId that exists.
+ *   In practice, only called from the authenticated admin order-detail page.
+ *   Uses the service-role key internally.
+ *
+ * @env
+ *   SUPABASE_URL              – Supabase project URL
+ *   SUPABASE_SERVICE_ROLE_KEY – Required for DB access
+ *
+ * @sideEffects
+ *   Read-only — queries:
+ *     - `orders` (with nested `order_items` join) by `id`
+ *     - `profiles` by `user_id` (only for registered-user orders; guest
+ *       orders use `orders.guest_name` instead)
+ *   No writes to the database.
+ *
+ * @layout
+ *   Gold accent colour: RGB(212,175,55)
+ *   Fonts  : jsPDF built-in (Helvetica)
+ *   Columns: # | Product | Qty | Unit Price | Total
+ *   Shipping is back-calculated: total - subtotal + discount_amount
+ */
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
