@@ -386,16 +386,15 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
 
       // "অর্ডার সফল! ✅" — "Order successful!" — সফল অর্ডারের টোস্ট বার্তা
       toast({ title: "অর্ডার সফল! ✅", description: "আপনার অর্ডারটি সফলভাবে সম্পন্ন হয়েছে।" });
-    } catch (err: any) {
+    } catch (err) {
       console.error("Order error:", err);
-      const msg = err?.message || err?.details || "";
-      // Detect Bengali rate-limit messages returned by the edge function.
-      // These contain time-duration strings like "১০ মিনিট" or "২৪ ঘণ্টা".
-      const isRateLimit = msg.includes("১০ মিনিট") || msg.includes("২৪ ঘণ্টা") || msg.includes("সর্বোচ্চ");
+      const msg = getFriendlyError(err, "অর্ডার দিতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+      // Detect Bengali rate-limit messages returned by the DB trigger.
+      const isRateLimit =
+        msg.includes("১০ মিনিট") || msg.includes("২৪ ঘণ্টা") || msg.includes("সর্বোচ্চ");
       toast({
-        // "অপেক্ষা করুন" — "Please wait" — রেট লিমিট টোস্ট
         title: isRateLimit ? "অপেক্ষা করুন" : "Error",
-        description: isRateLimit ? msg : "অর্ডার দিতে সমস্যা হয়েছে। আবার চেষ্টা করুন।",
+        description: msg,
         variant: "destructive",
       });
     } finally {
