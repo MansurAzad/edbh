@@ -39,6 +39,8 @@ import { Button } from "@/components/ui/button";
 import CouponInput from "@/components/checkout/CouponInput";
 import { trackPurchase } from "@/components/seo/AnalyticsTracker";
 import { placeOrder } from "@/lib/order-placement";
+import { shippingInfoSchema } from "@/lib/validation/schemas";
+import { getFriendlyError } from "@/lib/error/getFriendlyError";
 
 import CartLineItem from "@/components/cart/CartLineItem";
 import EmptyCart from "@/components/cart/EmptyCart";
@@ -297,9 +299,10 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
   const validate = (): string | null => {
     // Guard against race condition where auth session is still resolving.
     if (authLoading) return "সেশন যাচাই হচ্ছে, আবার চেষ্টা করুন"; // "Session verifying, please try again"
-    // Core shipping fields are mandatory regardless of payment method.
-    if (!shippingInfo.fullName || !shippingInfo.phone || !shippingInfo.address) {
-      return "নাম, মোবাইল নম্বর এবং ঠিকানা অবশ্যই পূরণ করুন"; // "Name, phone and address are required"
+    // Schema-driven validation: required fields + phone format + email shape.
+    const parsed = shippingInfoSchema.safeParse(shippingInfo);
+    if (!parsed.success) {
+      return getFriendlyError(parsed.error);
     }
     // Prevent submitting an empty cart (shouldn't normally reach here).
     if (items.length === 0) return "কার্টে পণ্য যোগ করুন"; // "Add items to cart"
@@ -383,16 +386,15 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
 
       // "অর্ডার সফল! ✅" — "Order successful!" — সফল অর্ডারের টোস্ট বার্তা
       toast({ title: "অর্ডার সফল! ✅", description: "আপনার অর্ডারটি সফলভাবে সম্পন্ন হয়েছে।" });
-    } catch (err: any) {
+    } catch (err) {
       console.error("Order error:", err);
-      const msg = err?.message || err?.details || "";
-      // Detect Bengali rate-limit messages returned by the edge function.
-      // These contain time-duration strings like "১০ মিনিট" or "২৪ ঘণ্টা".
-      const isRateLimit = msg.includes("১০ মিনিট") || msg.includes("২৪ ঘণ্টা") || msg.includes("সর্বোচ্চ");
+      const msg = getFriendlyError(err, "অর্ডার দিতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+      // Detect Bengali rate-limit messages returned by the DB trigger.
+      const isRateLimit =
+        msg.includes("১০ মিনিট") || msg.includes("২৪ ঘণ্টা") || msg.includes("সর্বোচ্চ");
       toast({
-        // "অপেক্ষা করুন" — "Please wait" — রেট লিমিট টোস্ট
         title: isRateLimit ? "অপেক্ষা করুন" : "Error",
-        description: isRateLimit ? msg : "অর্ডার দিতে সমস্যা হয়েছে। আবার চেষ্টা করুন।",
+        description: msg,
         variant: "destructive",
       });
     } finally {

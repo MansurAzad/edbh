@@ -13,6 +13,7 @@ import FloatingCartSidebar from "@/components/cart/FloatingCartSidebar";
 import { useCart } from "@/contexts/CartContext";
 import { queryClient } from "@/lib/query-client";
 import { prefetchFeaturedProducts } from "@/hooks/useFeaturedProducts";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Kick off the products fetch at JS-parse time, BEFORE React mounts.
 // By the time the homepage section renders, data is usually already cached.
@@ -109,66 +110,66 @@ const App = () => (
               <AnalyticsTracker />
               <ScrollToTop />
               <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/shop" element={<Shop />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/categories" element={<Categories />} />
-                  <Route path="/cart" element={<Cart />} />
-                  <Route path="/checkout" element={<Checkout />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/product/:id" element={<ProductDetail />} />
-                  <Route path="/p/:id" element={<ProductDetail />} />
-                  <Route path="/wishlist" element={<Wishlist />} />
-                  <Route path="/blog" element={<Blog />} />
-                  <Route path="/help" element={<HelpCenter />} />
-                  <Route path="/developers" element={<DeveloperDocs />} />
-                  <Route path="/track/:id?" element={<OrderTracking />} />
-                  <Route path="/order-tracking" element={<OrderTracking />} />
-                  <Route path="/admin" element={<PermissionGuard><AdminDashboard /></PermissionGuard>} />
-                  <Route path="/admin/homepage" element={<PermissionGuard><HomepageSections /></PermissionGuard>} />
-                  <Route path="/admin/categories" element={<PermissionGuard><AdminCategories /></PermissionGuard>} />
-                  <Route path="/admin/blog" element={<PermissionGuard><BlogPosts /></PermissionGuard>} />
-                  <Route path="/admin/products" element={<PermissionGuard><AdminProducts /></PermissionGuard>} />
-                  <Route path="/admin/orders" element={<PermissionGuard><AdminOrders /></PermissionGuard>} />
-                  <Route path="/admin/customers" element={<PermissionGuard><AdminCustomers /></PermissionGuard>} />
-                  <Route path="/admin/reviews" element={<PermissionGuard><AdminReviews /></PermissionGuard>} />
-                  <Route path="/admin/settings" element={<PermissionGuard><AdminSettings /></PermissionGuard>} />
-                  <Route path="/admin/coupons" element={<PermissionGuard><AdminCoupons /></PermissionGuard>} />
-                  <Route path="/admin/email-campaigns" element={<PermissionGuard><EmailCampaigns /></PermissionGuard>} />
-                  <Route path="/admin/reports" element={<PermissionGuard><AdvancedReports /></PermissionGuard>} />
-                  <Route path="/admin/returns" element={<PermissionGuard><AdminReturns /></PermissionGuard>} />
-                  <Route path="/admin/shipping" element={<PermissionGuard><AdminShipping /></PermissionGuard>} />
-                  <Route path="/admin/content" element={<PermissionGuard><ContentEditor /></PermissionGuard>} />
-                  <Route path="/admin/segments" element={<PermissionGuard><CustomerSegments /></PermissionGuard>} />
-                  <Route path="/admin/delivery-zones" element={<PermissionGuard><DeliveryZones /></PermissionGuard>} />
-                  <Route path="/admin/notifications" element={<PermissionGuard><AdminNotifications /></PermissionGuard>} />
-                  <Route path="/admin/chat-histories" element={<PermissionGuard><ChatHistories /></PermissionGuard>} />
-                  <Route path="/admin/bulk-edit" element={<PermissionGuard><BulkProductEdit /></PermissionGuard>} />
-                  <Route path="/admin/bulk-add" element={<PermissionGuard><BulkAddProducts /></PermissionGuard>} />
-                  <Route path="/admin/staff-permissions" element={<PermissionGuard><StaffPermissions /></PermissionGuard>} />
-                  <Route path="/admin/courier-integration" element={<PermissionGuard><CourierIntegration /></PermissionGuard>} />
-                  <Route path="/admin/steadfast" element={<PermissionGuard><SteadfastCourier /></PermissionGuard>} />
-                  <Route path="/admin/courier-audit" element={<PermissionGuard><CourierAuditLogs /></PermissionGuard>} />
-                  <Route path="/admin/referrals" element={<PermissionGuard><ReferralDashboard /></PermissionGuard>} />
-                  <Route path="/admin/meta-pixel" element={<PermissionGuard><MetaPixel /></PermissionGuard>} />
-                  <Route path="/admin/google-analytics" element={<PermissionGuard><GoogleAnalytics /></PermissionGuard>} />
-                  <Route path="/admin/social-proof" element={<PermissionGuard><SocialProofMessages /></PermissionGuard>} />
-                  <Route path="/admin/backup" element={<PermissionGuard><BackupRestore /></PermissionGuard>} />
-                  <Route path="/admin/cloudinary" element={<PermissionGuard><CloudinarySettings /></PermissionGuard>} />
-                  <Route path="/admin/tracking-audit" element={<PermissionGuard><TrackingAudit /></PermissionGuard>} />
-                  <Route path="/admin/tracking-guide" element={<PermissionGuard><TrackingGuide /></PermissionGuard>} />
-                  <Route path="/admin/tracking-funnel" element={<PermissionGuard><TrackingFunnel /></PermissionGuard>} />
-                  <Route path="/admin/sgtm-setup" element={<PermissionGuard><SgtmSetupGuide /></PermissionGuard>} />
+                <ErrorBoundary>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/shop" element={<Shop />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/categories" element={<Categories />} />
+                    <Route path="/cart" element={<Cart />} />
+                    <Route path="/checkout" element={<Checkout />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/product/:id" element={<ProductDetail />} />
+                    <Route path="/p/:id" element={<ProductDetail />} />
+                    <Route path="/wishlist" element={<Wishlist />} />
+                    <Route path="/blog" element={<Blog />} />
+                    <Route path="/help" element={<HelpCenter />} />
+                    <Route path="/developers" element={<DeveloperDocs />} />
+                    <Route path="/track/:id?" element={<OrderTracking />} />
+                    <Route path="/order-tracking" element={<OrderTracking />} />
+                    <Route path="/admin" element={<PermissionGuard><AdminDashboard /></PermissionGuard>} />
+                    <Route path="/admin/homepage" element={<PermissionGuard><HomepageSections /></PermissionGuard>} />
+                    <Route path="/admin/categories" element={<PermissionGuard><AdminCategories /></PermissionGuard>} />
+                    <Route path="/admin/blog" element={<PermissionGuard><BlogPosts /></PermissionGuard>} />
+                    <Route path="/admin/products" element={<PermissionGuard><AdminProducts /></PermissionGuard>} />
+                    <Route path="/admin/orders" element={<PermissionGuard><AdminOrders /></PermissionGuard>} />
+                    <Route path="/admin/customers" element={<PermissionGuard><AdminCustomers /></PermissionGuard>} />
+                    <Route path="/admin/reviews" element={<PermissionGuard><AdminReviews /></PermissionGuard>} />
+                    <Route path="/admin/settings" element={<PermissionGuard><AdminSettings /></PermissionGuard>} />
+                    <Route path="/admin/coupons" element={<PermissionGuard><AdminCoupons /></PermissionGuard>} />
+                    <Route path="/admin/email-campaigns" element={<PermissionGuard><EmailCampaigns /></PermissionGuard>} />
+                    <Route path="/admin/reports" element={<PermissionGuard><AdvancedReports /></PermissionGuard>} />
+                    <Route path="/admin/returns" element={<PermissionGuard><AdminReturns /></PermissionGuard>} />
+                    <Route path="/admin/shipping" element={<PermissionGuard><AdminShipping /></PermissionGuard>} />
+                    <Route path="/admin/content" element={<PermissionGuard><ContentEditor /></PermissionGuard>} />
+                    <Route path="/admin/segments" element={<PermissionGuard><CustomerSegments /></PermissionGuard>} />
+                    <Route path="/admin/delivery-zones" element={<PermissionGuard><DeliveryZones /></PermissionGuard>} />
+                    <Route path="/admin/notifications" element={<PermissionGuard><AdminNotifications /></PermissionGuard>} />
+                    <Route path="/admin/chat-histories" element={<PermissionGuard><ChatHistories /></PermissionGuard>} />
+                    <Route path="/admin/bulk-edit" element={<PermissionGuard><BulkProductEdit /></PermissionGuard>} />
+                    <Route path="/admin/bulk-add" element={<PermissionGuard><BulkAddProducts /></PermissionGuard>} />
+                    <Route path="/admin/staff-permissions" element={<PermissionGuard><StaffPermissions /></PermissionGuard>} />
+                    <Route path="/admin/courier-integration" element={<PermissionGuard><CourierIntegration /></PermissionGuard>} />
+                    <Route path="/admin/steadfast" element={<PermissionGuard><SteadfastCourier /></PermissionGuard>} />
+                    <Route path="/admin/courier-audit" element={<PermissionGuard><CourierAuditLogs /></PermissionGuard>} />
+                    <Route path="/admin/referrals" element={<PermissionGuard><ReferralDashboard /></PermissionGuard>} />
+                    <Route path="/admin/meta-pixel" element={<PermissionGuard><MetaPixel /></PermissionGuard>} />
+                    <Route path="/admin/google-analytics" element={<PermissionGuard><GoogleAnalytics /></PermissionGuard>} />
+                    <Route path="/admin/social-proof" element={<PermissionGuard><SocialProofMessages /></PermissionGuard>} />
+                    <Route path="/admin/backup" element={<PermissionGuard><BackupRestore /></PermissionGuard>} />
+                    <Route path="/admin/cloudinary" element={<PermissionGuard><CloudinarySettings /></PermissionGuard>} />
+                    <Route path="/admin/tracking-audit" element={<PermissionGuard><TrackingAudit /></PermissionGuard>} />
+                    <Route path="/admin/tracking-guide" element={<PermissionGuard><TrackingGuide /></PermissionGuard>} />
+                    <Route path="/admin/tracking-funnel" element={<PermissionGuard><TrackingFunnel /></PermissionGuard>} />
+                    <Route path="/admin/sgtm-setup" element={<PermissionGuard><SgtmSetupGuide /></PermissionGuard>} />
 
-
-
-                  <Route path="/return-policy" element={<ReturnPolicy />} />
-                  <Route path="/faq" element={<FAQ />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
+                    <Route path="/return-policy" element={<ReturnPolicy />} />
+                    <Route path="/faq" element={<FAQ />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </ErrorBoundary>
               </Suspense>
 
               {/* Floating Cart Sidebar */}

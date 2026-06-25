@@ -2,82 +2,57 @@
  * @file query-client.ts
  * @module lib/query-client
  *
- * Singleton TanStack Query (`@tanstack/react-query`) client shared across the
- * entire application.  A single instance is mandatory — multiple QueryClient
- * instances would create isolated caches and duplicate in-flight requests.
+ * Singleton TanStack Query client. In addition to default cache options, it
+ * installs global QueryCache / MutationCache error handlers that automatically
+ * surface a friendly bilingual toast for any unhandled error — so individual
+ * call-sites don't need to remember a try/catch + toast for the common case.
  *
- * ## Default options (rationale)
- *
- * | Option                | Value      | Why                                                             |
- * |-----------------------|------------|-----------------------------------------------------------------|
- * | `staleTime`           | 5 min      | Avoids redundant re-fetches while users navigate between pages. |
- * | `gcTime`              | 15 min     | Keeps data in memory long enough for back-navigation to feel    |
- * |                       |            | instant while still eventually freeing memory.                  |
- * | `refetchOnWindowFocus`| false      | Products / content don't change every focus; prevents flicker.  |
- * | `retry`               | 1          | One retry handles transient network glitches without hammering   |
- * |                       |            | the API on hard failures (e.g. 4xx, auth errors).              |
- * | `refetchOnMount`      | false      | Respects `staleTime`; don't re-fetch when navigating back to a  |
- * |                       |            | page whose data is still fresh.                                 |
- *
- * ## Cross-module contract
- * - Import `queryClient` wherever programmatic cache manipulation is needed
- *   (e.g. `queryClient.invalidateQueries`, `queryClient.setQueryData`).
- * - Never create a second `new QueryClient()` elsewhere in the codebase.
- * - Use the keys from `@/lib/query-keys` so invalidation is type-safe.
- *
- * @example
- * // Invalidate all product queries after a mutation
- * import { queryClient } from "@/lib/query-client";
- * import { queryKeys } from "@/lib/query-keys";
- * await queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+ * Per-call sites can still opt out by setting `meta.silent = true` on their
+ * useQuery / useMutation, e.g. when they show inline errors instead.
  */
 
-import { QueryClient } from "@tanstack/react-query";
+import { QueryCache, QueryClient, MutationCache } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { getFriendlyError } from "@/lib/error/getFriendlyError";
 
 /**
- * Application-wide TanStack Query client.
- *
- * Exported as a named singleton so that both the React provider
- * (`<QueryClientProvider client={queryClient}>`) and imperative call sites
- * (mutations, Supabase real-time handlers) share the exact same cache.
+ * Shared helper: decide whether to swallow the auto-toast for a given query
+ * or mutation. Set `meta: { silent: true }` to opt out.
  */
+const isSilent = (meta: Record<string, unknown> | undefined) =>
+  Boolean(meta && meta.silent === true);
+
 export const queryClient = new QueryClient({
+  /** Global handler for query errors (e.g. background refetches). */
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      // eslint-disable-next-line no-console
+      console.error("[query]", query.queryKey, error);
+      if (isSilent(query.meta)) return;
+      // Only show a toast if the query has observers actively waiting on it —
+      // avoids noisy toasts for background prefetches that nobody is watching.
+      if (query.getObserversCount() === 0) return;
+      toast.error(getFriendlyError(error));
+    },
+  }),
+
+  /** Global handler for mutation errors not caught by the caller. */
+  mutationCache: new MutationCache({
+    onError: (error, _vars, _ctx, mutation) => {
+      // eslint-disable-next-line no-console
+      console.error("[mutation]", mutation.options.mutationKey, error);
+      if (isSilent(mutation.meta)) return;
+      toast.error(getFriendlyError(error));
+    },
+  }),
+
   defaultOptions: {
     queries: {
-      /**
-       * Data is considered fresh for 5 minutes after it was fetched.
-       * Within this window, `useQuery` will **not** trigger a background
-       * re-fetch even if the component re-mounts.
-       */
-      staleTime: 5 * 60 * 1000, // 5 minutes in milliseconds
-
-      /**
-       * Inactive query results are kept in memory for 15 minutes before the
-       * garbage collector removes them.  Setting this higher than `staleTime`
-       * lets users navigate back to a page and see cached data immediately
-       * while a background fetch runs.
-       */
-      gcTime: 15 * 60 * 1000, // 15 minutes in milliseconds
-
-      /**
-       * Disable automatic re-fetch when the browser window regains focus.
-       * Content (products, categories) changes infrequently; enabling this
-       * would cause jarring re-renders while users tab back to the store.
-       */
+      // See file header for rationale on each value.
+      staleTime: 5 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
       refetchOnWindowFocus: false,
-
-      /**
-       * Retry once on failure.  A single retry covers transient network drops
-       * without looping indefinitely on genuine server errors (40x / 50x).
-       * Individual queries can override this per-call via `{ retry: N }`.
-       */
       retry: 1,
-
-      /**
-       * When a component that already has cached data re-mounts, do NOT
-       * automatically kick off a background fetch.  Combined with `staleTime`,
-       * this prevents double-fetches on route transitions.
-       */
       refetchOnMount: false,
     },
   },
