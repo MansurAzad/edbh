@@ -1,6 +1,11 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { initWebVitals } from "@/lib/perf/webVitals";
+
+// Boot the Core Web Vitals collector before React renders so we capture
+// the very first paint/LCP entries. No-op outside the browser.
+initWebVitals();
 
 // Auto-recover from stale chunk errors after a new deploy.
 // When the browser has cached an old index.html that references hashed
