@@ -77,6 +77,8 @@ const CloudinarySettings = lazy(() => import("./pages/admin/CloudinarySettings")
 const TrackingAudit = lazy(() => import("./pages/admin/TrackingAudit"));
 const TrackingGuide = lazy(() => import("./pages/admin/TrackingGuide"));
 const TrackingFunnel = lazy(() => import("./pages/admin/TrackingFunnel"));
+// Performance Budget dashboard — Core Web Vitals + bundle + render counts.
+const PerformanceBudget = lazy(() => import("./pages/admin/PerformanceBudget"));
 const SgtmSetupGuide = lazy(() => import("./pages/admin/SgtmSetupGuide"));
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
@@ -164,6 +166,7 @@ const App = () => (
                     <Route path="/admin/tracking-guide" element={<PermissionGuard><TrackingGuide /></PermissionGuard>} />
                     <Route path="/admin/tracking-funnel" element={<PermissionGuard><TrackingFunnel /></PermissionGuard>} />
                     <Route path="/admin/sgtm-setup" element={<PermissionGuard><SgtmSetupGuide /></PermissionGuard>} />
+                    <Route path="/admin/performance" element={<PermissionGuard><PerformanceBudget /></PermissionGuard>} />
 
                     <Route path="/return-policy" element={<ReturnPolicy />} />
                     <Route path="/faq" element={<FAQ />} />
