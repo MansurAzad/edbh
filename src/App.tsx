@@ -13,6 +13,7 @@ import FloatingCartSidebar from "@/components/cart/FloatingCartSidebar";
 import { useCart } from "@/contexts/CartContext";
 import { queryClient } from "@/lib/query-client";
 import { prefetchFeaturedProducts } from "@/hooks/useFeaturedProducts";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Kick off the products fetch at JS-parse time, BEFORE React mounts.
 // By the time the homepage section renders, data is usually already cached.
