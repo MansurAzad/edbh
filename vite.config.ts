@@ -35,9 +35,13 @@ export default defineConfig(({ mode }) => ({
             "@radix-ui/react-tabs",
           ],
           "vendor-supabase": ["@supabase/supabase-js"],
+          // Recharts is heavy (~90KB) and used only in admin reports — keep it
+          // in its own chunk so the storefront never downloads it.
+          "vendor-charts": ["recharts"],
         },
       },
     },
     chunkSizeWarningLimit: 600,
+
   },
 }));
