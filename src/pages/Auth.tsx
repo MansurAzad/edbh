@@ -38,61 +38,110 @@ const Auth = () => {
     }
   }, [user, navigate, redirectTo]);
 
+  /**
+   * Kick off Google OAuth. On failure we surface a friendly bilingual toast
+   * — most failures here are "Unsupported provider" before Google is enabled.
+   */
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      const { error } = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+      const { error } = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
       if (error) throw error;
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Google sign in failed", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Google sign-in failed",
+        description: getFriendlyError(error),
+        variant: "destructive",
+      });
       setGoogleLoading(false);
     }
   };
 
+  /**
+   * Forgot-password flow: validate the email with Zod first, then trigger
+   * Supabase's password reset email. Any thrown error is normalised.
+   */
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email) {
-      toast({ title: "Error", description: "Please enter your email address", variant: "destructive" });
+    const parsed = resetPasswordSchema.safeParse({ email: formData.email });
+    if (!parsed.success) {
+      toast({
+        title: "তথ্য অসম্পূর্ণ / Invalid input",
+        description: getFriendlyError(parsed.error),
+        variant: "destructive",
+      });
       return;
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
         redirectTo: `${window.location.origin}/auth?redirect=/profile`,
       });
       if (error) throw error;
       setResetSent(true);
       toast({ title: "✅ Email Sent!", description: "Check your inbox for the password reset link" });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to send reset email", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: getFriendlyError(error, "Failed to send reset email"),
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  /**
+   * Unified login / signup submit handler.
+   * 1. Validate the relevant Zod schema (login vs signup).
+   * 2. Call the appropriate auth method.
+   * 3. Map any error to a friendly bilingual toast.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // Pre-flight client-side validation — saves a network round-trip.
+    const schema = view === "login" ? loginSchema : signupSchema;
+    const parsed = schema.safeParse(formData);
+    if (!parsed.success) {
+      toast({
+        title: "তথ্য অসম্পূর্ণ / Invalid input",
+        description: getFriendlyError(parsed.error),
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
       if (view === "login") {
         const { error } = await signIn(formData.email, formData.password);
         if (error) throw error;
-        // Check if user is blocked after login
+        // Post-login: surface a friendly block message instead of letting the
+        // user bounce around with no feedback.
         const { data: { user: loggedUser } } = await supabase.auth.getUser();
         if (loggedUser) {
           const blockStatus = await checkIfBlocked(loggedUser.id);
           if (blockStatus.isBlocked) {
-            toast({ title: "অ্যাকাউন্ট বন্ধ", description: blockStatus.reason, variant: "destructive" });
-            // Don't navigate — BlockedUserWarning overlay will handle
-            return;
+            toast({
+              title: "অ্যাকাউন্ট বন্ধ",
+              description: blockStatus.reason,
+              variant: "destructive",
+            });
+            return; // BlockedUserWarning overlay takes over.
           }
         }
         toast({ title: "Welcome!", description: "Successfully signed in" });
         navigate(redirectTo || "/");
       } else {
-        const { error, session } = await signUp(formData.email, formData.password, formData.fullName, formData.phone);
+        const { error, session } = await signUp(
+          formData.email,
+          formData.password,
+          formData.fullName,
+          formData.phone,
+        );
         if (error) throw error;
         if (session) {
           toast({ title: "Welcome!", description: "Your account has been created" });
@@ -101,8 +150,12 @@ const Auth = () => {
           toast({ title: "Account Created!", description: "Please verify your email" });
         }
       }
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Authentication failed", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: getFriendlyError(error, "Authentication failed"),
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
