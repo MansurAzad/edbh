@@ -54,14 +54,17 @@ const TrackingAudit = () => {
     setSgtmCheck({ status: "loading", detail: "Pinging /healthz...", url });
     try {
       const t0 = performance.now();
-      const res = await fetch(`${url}/healthz`, { method: "GET", mode: "cors" }).catch(() => null);
+      // sGTM stock image doesn't return CORS headers on /healthz, so a normal
+      // `cors` fetch is rejected by the browser even when the server is healthy.
+      // Use `no-cors` to confirm reachability via an opaque response; if the
+      // request resolves at all, DNS + SSL + Cloud Run are working.
+      const res = await fetch(`${url}/healthz`, { method: "GET", mode: "no-cors" }).catch(() => null);
       const latency = Math.round(performance.now() - t0);
       if (!res) {
-        setSgtmCheck({ status: "fail", detail: "Network error / CORS blocked — DNS propagation চলছে?", url });
-      } else if (res.ok) {
-        setSgtmCheck({ status: "ok", detail: `${url} → 200 OK (${latency}ms)`, url });
+        setSgtmCheck({ status: "fail", detail: "Network error — DNS propagation চলছে বা Cloud Run service down", url });
       } else {
-        setSgtmCheck({ status: "fail", detail: `HTTP ${res.status} — Cloud Run container running কিনা check করুন`, url });
+        // Opaque responses always have status 0 + type "opaque" — that's expected and means OK.
+        setSgtmCheck({ status: "ok", detail: `${url} reachable (${latency}ms, opaque response)`, url });
       }
     } catch (err: any) {
       setSgtmCheck({ status: "fail", detail: err?.message || "Unknown error", url });
@@ -69,6 +72,7 @@ const TrackingAudit = () => {
       setSgtmTesting(false);
     }
   };
+
 
   const refreshBrowserChecks = () => {
     const w = window as any;
