@@ -4,7 +4,7 @@ import { useAuth } from "./AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { trackAddToCart } from "@/components/seo/AnalyticsTracker";
 
-interface CartItem {
+export interface CartItem {
   id: string;
   product_id: string;
   quantity: number;
