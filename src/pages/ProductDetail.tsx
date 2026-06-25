@@ -25,7 +25,7 @@ import FlashSaleTimer from "@/components/marketing/FlashSaleTimer";
 import SEOHead from "@/components/seo/SEOHead";
 import { buildProductSeo, buildProductJsonLd } from "@/lib/seo/config";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
-import StructuredData, { productSchema } from "@/components/seo/StructuredData";
+import StructuredData from "@/components/seo/StructuredData";
 import { trackAddToCart, trackViewContent } from "@/components/seo/AnalyticsTracker";
 import PersonalizedRecommendations from "@/components/shop/PersonalizedRecommendations";
 import { type Product, getProductImage as getProductImg, defaultFallbackImage } from "@/types/product";
