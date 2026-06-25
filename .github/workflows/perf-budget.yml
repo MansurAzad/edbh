@@ -1,0 +1,33 @@
+name: Performance Budget
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+# Builds the storefront and fails CI if any manualChunk exceeds the
+# gzipped budget defined in scripts/check-bundle-budget.mjs.
+jobs:
+  budget:
+    name: Bundle size check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile || bun install
+
+      - name: Build (production)
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+        run: bun run build
+
+      - name: Enforce bundle budgets
+        run: node scripts/check-bundle-budget.mjs | tee -a $GITHUB_STEP_SUMMARY
