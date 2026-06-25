@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { buildCloudinaryUrl } from "@/lib/cloudinary";
 
 interface LazyImageProps {
   src: string;
@@ -14,6 +15,13 @@ const LazyImage = ({ src, alt, className = "", width, height, priority = false, 
   const [loaded, setLoaded] = useState(false);
   const [inView, setInView] = useState(priority);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Always run Cloudinary URLs through the transform helper so we get
+  // f_auto,q_auto,dpr_auto + width-bounded delivery. No-op for other CDNs.
+  const optimizedSrc = useMemo(
+    () => buildCloudinaryUrl(src, { width: width || 800 }),
+    [src, width],
+  );
 
   useEffect(() => {
     if (priority) return;
@@ -39,7 +47,7 @@ const LazyImage = ({ src, alt, className = "", width, height, priority = false, 
       )}
       {inView && (
         <img
-          src={src}
+          src={optimizedSrc}
           alt={alt}
           width={width}
           height={height}
@@ -56,3 +64,4 @@ const LazyImage = ({ src, alt, className = "", width, height, priority = false, 
 };
 
 export default LazyImage;
+
