@@ -10,7 +10,7 @@ interface TrackingFormProps {
     tracking_number: string | null;
     courier_name: string | null;
     estimated_delivery: string | null;
-  }) => Promise<boolean> | void;
+  }) => Promise<unknown> | void;
 }
 
 /** Inline form to edit courier/tracking number/ETA on an order. */
