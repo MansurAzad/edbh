@@ -12,6 +12,7 @@
  * Returns `null` when `count === 0` so callers never see an empty star row.
  */
 
+import { memo } from "react";
 import { Star } from "lucide-react";
 
 // ---------------------------------------------------------------------------
