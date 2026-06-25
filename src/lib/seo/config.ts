@@ -153,3 +153,102 @@ export function buildBlogListSeo(): SeoMeta {
       "বোরকা স্টাইলিং, আবায়া ফ্যাশন টিপস, হিজাব স্টাইল গাইড, ইসলামিক ফ্যাশন ব্লগ, borka styling tips, abaya fashion blog",
   };
 }
+
+// ---------- JSON-LD (Schema.org) structured data builders ----------
+//
+// কেন (Why): Rich snippets (Google product cards, article previews) require
+// schema.org markup. Centralizing the builders here keeps the Product/Article
+// shapes consistent with the meta builders above — same SITE_URL, same
+// canonical paths, same image resolution rules.
+
+/** Schema.org @id / url for a product page. */
+function productUrl(p: { slug?: string | null; id: string }): string {
+  return `${SITE_URL}/product/${p.slug || p.id}`;
+}
+
+/**
+ * Build a schema.org Product JSON-LD object for a product detail page.
+ * Use with <StructuredData data={buildProductJsonLd(...)} />.
+ *
+ * @param p Product fields (subset of DB row).
+ * @returns JSON-LD-ready Product object including Offer + optional AggregateRating.
+ */
+export interface ProductJsonLdInput extends ProductSeoInput {
+  stock?: number | null;
+  reviewCount?: number;
+  averageRating?: number;
+}
+
+export function buildProductJsonLd(p: ProductJsonLdInput): Record<string, unknown> {
+  const effectivePrice = p.salePrice ?? p.price ?? 0;
+  const inStock = typeof p.stock === "number" ? p.stock > 0 : true;
+  const schema: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: p.name,
+    description: p.description?.trim() || `${p.name} — ${SITE_NAME}`,
+    image: absoluteUrl(p.image),
+    category: p.category || undefined,
+    url: productUrl(p),
+    brand: { "@type": "Brand", name: SITE_NAME },
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "BDT",
+      price: effectivePrice,
+      url: productUrl(p),
+      availability: inStock
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
+      seller: { "@type": "Organization", name: SITE_NAME },
+      // Sale prices are only valid for ~30 days per Google guidelines.
+      ...(p.salePrice
+        ? { priceValidUntil: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0] }
+        : {}),
+    },
+  };
+
+  // AggregateRating drives the star snippet — only emit when we have real data.
+  if (p.reviewCount && p.reviewCount > 0 && p.averageRating) {
+    schema.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: p.averageRating.toFixed(1),
+      reviewCount: p.reviewCount,
+      bestRating: "5",
+      worstRating: "1",
+    };
+  }
+
+  return schema;
+}
+
+/**
+ * Build a schema.org Article JSON-LD object for a blog post.
+ *
+ * @param post Blog post fields.
+ * @returns Article schema with publisher + image.
+ */
+export interface BlogPostJsonLdInput extends BlogPostSeoInput {
+  publishedAt?: string;
+  updatedAt?: string;
+  author?: string;
+}
+
+export function buildBlogPostJsonLd(post: BlogPostJsonLdInput): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.excerpt?.trim() || `${post.title} — ${SITE_NAME}`,
+    image: absoluteUrl(post.image),
+    url: `${SITE_URL}/blog/${post.slug}`,
+    ...(post.publishedAt ? { datePublished: post.publishedAt } : {}),
+    ...(post.updatedAt ? { dateModified: post.updatedAt } : {}),
+    author: { "@type": "Organization", name: post.author || SITE_NAME },
+    publisher: {
+      "@type": "Organization",
+      name: SITE_NAME,
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.jpg` },
+    },
+    mainEntityOfPage: { "@type": "WebPage", "@id": `${SITE_URL}/blog/${post.slug}` },
+  };
+}
