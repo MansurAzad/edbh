@@ -11,34 +11,63 @@ import InlineImageUpload from "./InlineImageUpload";
 import CategorySelectContent from "./CategorySelectContent";
 import { COMMON_MATERIALS, type ProductRow } from "@/lib/admin/bulkProducts/types";
 
+/**
+ * Props for the ProductRowCard component.
+ * প্রোডাক্ট রো কার্ড উপাদানের প্রপস।
+ */
 interface Props {
+  /** Product data | প্রোডাক্টের ডাটা */
   product: ProductRow;
+  /** Index in the list | লিস্টে ইনডেক্স */
   index: number;
+  /** Whether the app is in edit mode | অ্যাপটি এডিট মোডে আছে কিনা */
   isEdit: boolean;
+  /** Available categories | উপলব্ধ ক্যাটাগরিগুলো */
   categories: string[];
+  /** Whether this product is a duplicate | প্রোডাক্টটি ডুপ্লিকেট কিনা */
   isDuplicate?: boolean;
+  /** Whether this product is selected for bulk action | বাল্ক অ্যাকশনের জন্য সিলেক্ট করা হয়েছে কিনা */
   isBulkSelected?: boolean;
+  /** Toggle bulk selection callback | বাল্ক সিলেকশন পরিবর্তনের কলব্যাক */
   onToggleBulk?: (id: string) => void;
+  /** Update product field callback | প্রোডাক্টের ফিল্ড আপডেটের কলব্যাক */
   onUpdate: (id: string, field: string, value: any) => void;
+  /** Toggle expansion of details | ডিটেইলস সেকশন প্রসারণের কলব্যাক */
   onExpand: (id: string) => void;
+  /** Add a new variant | নতুন ভেরিয়েন্ট যুক্ত করার কলব্যাক */
   onAddVariant: (id: string) => void;
+  /** Update a specific variant | নির্দিষ্ট ভেরিয়েন্ট আপডেটের কলব্যাক */
   onUpdateVariant: (pid: string, vid: string, f: string, v: any) => void;
+  /** Remove a specific variant | নির্দিষ্ট ভেরিয়েন্ট মুছে ফেলার কলব্যাক */
   onRemoveVariant: (pid: string, vid: string) => void;
+  /** Auto-generate variants based on sizes/colors | সাইজ/কালারের ভিত্তিতে অটো ভেরিয়েন্ট জেনারেট */
   onAutoVariants: (id: string) => void;
+  /** Duplicate the entire product row | পুরো প্রোডাক্ট রো কপি করা */
   onDuplicate?: (p: ProductRow) => void;
+  /** Remove the product row | প্রোডাক্ট রো মুছে ফেলা */
   onRemove: (id: string) => void;
 }
 
+/**
+ * ProductRowCard Component
+ * Represents a single product row in the bulk editor, with mobile and desktop responsive views.
+ * বাল্ক এডিটরে একটি সিঙ্গেল প্রোডাক্ট রো রিপ্রেজেন্ট করে, মোবাইল এবং ডেস্কটপ রেসপন্সিভ ভিউ সহ।
+ * 
+ * @param {Props} props - Component properties.
+ */
 const ProductRowCard = ({
   product, index, isEdit, categories, isDuplicate, isBulkSelected,
   onToggleBulk, onUpdate, onExpand, onAddVariant, onUpdateVariant,
   onRemoveVariant, onAutoVariants, onDuplicate, onRemove,
 }: Props) => {
+  // Determine card styles based on state | স্টেটের উপর ভিত্তি করে কার্ড স্টাইল নির্ধারণ
   const cls = `border ${!isEdit && isDuplicate ? "border-destructive/50 bg-destructive/5" : ""} ${isEdit && product._dirty ? "border-primary/30 bg-primary/5" : ""}`;
+
   return (
     <Card className={cls}>
       <CardContent className="p-2 sm:p-3">
-        {/* Mobile */}
+        
+        {/* Mobile View | মোবাইল ভিউ */}
         <div className="block sm:hidden space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-muted-foreground font-mono w-5">#{index + 1}</span>
@@ -85,7 +114,7 @@ const ProductRowCard = ({
           </div>
         </div>
 
-        {/* Desktop */}
+        {/* Desktop View | ডেস্কটপ ভিউ */}
         <div className="hidden sm:grid grid-cols-12 gap-2 items-end">
           <div className="col-span-1 flex flex-col items-center gap-1">
             <span className="text-[10px] text-muted-foreground font-mono">#{index + 1}</span>
@@ -143,6 +172,7 @@ const ProductRowCard = ({
           </div>
         </div>
 
+        {/* Expanded Details Section | বিস্তারিত সেকশন (প্রসারিত হলে দেখা যাবে) */}
         {product.expanded && (
           <div className="mt-3 pt-3 border-t border-border space-y-3">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -179,6 +209,7 @@ const ProductRowCard = ({
               <Label className="text-xs">ফিচার্ড</Label>
             </div>
 
+            {/* Variants Management Section | ভেরিয়েন্ট ম্যানেজমেন্ট সেকশন */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label className="text-xs font-semibold">ভেরিয়েন্ট ({product.variants.length})</Label>
@@ -191,9 +222,11 @@ const ProductRowCard = ({
               </div>
               {product.variants.length > 0 && (
                 <div className="bg-muted/50 rounded-md p-2 space-y-1 overflow-x-auto">
+                  {/* Variant Table Header | ভেরিয়েন্ট টেবিল হেডার */}
                   <div className="hidden sm:grid grid-cols-[1fr_1fr_0.7fr_1fr_0.7fr_auto_auto] gap-1.5 text-[10px] text-muted-foreground font-medium px-1 min-w-[560px]">
                     <span>সাইজ</span><span>কালার</span><span>স্টক</span><span>SKU</span><span>± মূল্য</span><span>ইমেজ</span><span></span>
                   </div>
+                  {/* Variant List | ভেরিয়েন্ট তালিকা */}
                   {product.variants.map(v => (
                     <div key={v.id} className="grid grid-cols-[1fr_1fr_auto_auto] sm:grid-cols-[1fr_1fr_0.7fr_1fr_0.7fr_auto_auto] gap-1.5 items-center min-w-0">
                       <Input className="h-7 text-[11px]" placeholder="সাইজ" value={v.size}

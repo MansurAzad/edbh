@@ -1,3 +1,17 @@
+// =============================================================================
+// OrderDetailDialog.tsx
+// Full-screen order detail panel rendered as a modal Dialog.
+//
+// Sections inside the dialog:
+//   1. Shipping address block
+//   2. Order summary (date, status, total)
+//   3. Payment info panel (method, status, transaction ID, advance/due amounts,
+//      verify-payment button, COD-collect button)
+//   4. Tracking form (courier, tracking number, ETA)
+//   5. Optional notes
+//   6. Order items list with thumbnail, size/color chips, quantity, price
+// =============================================================================
+
 import { useEffect, useState } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -12,18 +26,67 @@ import {
   getPaymentStatusColor,
 } from "@/lib/admin/orderHelpers";
 
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+/**
+ * Props for {@link OrderDetailDialog}.
+ */
 interface OrderDetailDialogProps {
+  /**
+   * The order to display. Pass `null` to keep the dialog mounted but hidden
+   * (avoids unmounting animations while the dialog closes).
+   */
   order: AdminOrder | null;
+  /** Called when the dialog should be dismissed (e.g. clicking the X). */
   onClose: () => void;
+  /**
+   * Marks `orders.payment_verified = true` and sets `payment_status = "verified"`.
+   * Only visible when the order has a `transaction_id` but is not yet verified.
+   */
   onVerifyPayment: (orderId: string) => Promise<boolean> | void;
+  /**
+   * Marks `orders.cod_collected = true` and zeroes `due_amount`.
+   * Only visible when `due_amount > 0` and `cod_collected` is false.
+   */
   onCollectCOD: (orderId: string) => Promise<boolean> | void;
+  /**
+   * Saves courier / tracking / ETA fields on the order.
+   * Closes the dialog after a successful save.
+   */
   onUpdateTracking: (
     orderId: string,
     tracking: { tracking_number: string | null; courier_name: string | null; estimated_delivery: string | null }
   ) => Promise<boolean> | void;
 }
 
-/** Read-only-ish detail panel: address, payment, tracking edit, items list. */
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+/**
+ * **OrderDetailDialog** — Read-mostly order detail panel.
+ *
+ * Items are loaded lazily from `order_items` each time a different order is
+ * selected (or on mount). This avoids over-fetching items in the main orders
+ * list query.
+ *
+ * ### Bengali UI labels used
+ * - "💳 পেমেন্ট তথ্য" = Payment Information
+ * - "মেথড" = Method
+ * - "স্ট্যাটাস" = Status
+ * - "পেমেন্ট ফোন" = Payment Phone
+ * - "অ্যাডভান্স" = Advance amount paid
+ * - "বাকি" = Due / remaining amount
+ * - "✅ পেমেন্ট ভেরিফাই" = Verify Payment
+ * - "✅ ভেরিফাইড" = Verified
+ * - "💰 COD কালেক্ট করুন" = Collect COD
+ * - "💰 COD কালেক্টেড" = COD Collected
+ * - "🚚 ট্র্যাকিং তথ্য" = Tracking Information
+ * - "📦 আইটেম তালিকা" = Item List
+ * - "সর্বমোট" = Grand Total
+ */
 const OrderDetailDialog = ({
   order,
   onClose,
@@ -31,13 +94,19 @@ const OrderDetailDialog = ({
   onCollectCOD,
   onUpdateTracking,
 }: OrderDetailDialogProps) => {
+  // Items belonging to the selected order — fetched on demand.
   const [items, setItems] = useState<AdminOrderItem[]>([]);
 
+  // -------------------------------------------------------------------------
+  // Fetch order items whenever the selected order changes.
+  // Resets to an empty array when the dialog closes (order === null).
+  // -------------------------------------------------------------------------
   useEffect(() => {
     if (!order) {
       setItems([]);
       return;
     }
+    // Direct Supabase query — items are small and don't need a React Query cache.
     supabase
       .from("order_items")
       .select("*")
@@ -46,14 +115,24 @@ const OrderDetailDialog = ({
   }, [order]);
 
   return (
+    // Dialog open state is derived from whether an order is selected.
+    // onOpenChange triggers onClose when the user presses Escape or the overlay.
     <Dialog open={!!order} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
+          {/* Show the first 8 chars of the UUID as a short order reference */}
           <DialogTitle>Order Details #{order?.id.slice(0, 8)}</DialogTitle>
         </DialogHeader>
+
+        {/* Only render body content once an order is available */}
         {order && (
           <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+
+            {/* ----------------------------------------------------------------
+                Section 1 — Shipping address + high-level order info
+            ---------------------------------------------------------------- */}
             <div className="grid grid-cols-2 gap-4">
+              {/* Left: recipient details */}
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground">Shipping Address</h4>
                 <p>{order.guest_name}</p>
@@ -61,11 +140,14 @@ const OrderDetailDialog = ({
                 <p>{order.shipping_city}</p>
                 <p>{order.shipping_phone}</p>
               </div>
+
+              {/* Right: date, status badge, total */}
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground">Order Info</h4>
                 <p>Date: {new Date(order.created_at).toLocaleString()}</p>
                 <p>
                   Status:{" "}
+                  {/* getStatusColor returns a Tailwind class string for the given status */}
                   <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.status)}`}>
                     {order.status}
                   </span>
@@ -74,20 +156,37 @@ const OrderDetailDialog = ({
               </div>
             </div>
 
+            {/* ----------------------------------------------------------------
+                Section 2 — Payment information panel
+                "💳 পেমেন্ট তথ্য" = Payment Information
+            ---------------------------------------------------------------- */}
             <div className="p-4 border rounded-lg bg-muted/50">
               <h4 className="text-sm font-medium text-muted-foreground mb-3">💳 পেমেন্ট তথ্য</h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
+                {/* Payment method (cod, bkash, nagad …) */}
+                {/* "মেথড" = Method */}
                 <p>মেথড: <span className="font-medium">{order.payment_method}</span></p>
+
+                {/* Payment status pill — getPaymentStatusColor maps to Tailwind classes */}
+                {/* "স্ট্যাটাস" = Status */}
                 <p>
                   স্ট্যাটাস:{" "}
                   <span className={`text-xs px-2 py-0.5 rounded-full ${getPaymentStatusColor(order.payment_status)}`}>
                     {order.payment_status}
                   </span>
                 </p>
+
+                {/* Transaction ID — only present for bKash/Nagad/Rocket/bank */}
                 {order.transaction_id && (
                   <p>TxID: <span className="font-mono font-medium">{order.transaction_id}</span></p>
                 )}
+
+                {/* Phone used for mobile payment */}
+                {/* "পেমেন্ট ফোন" = Payment Phone */}
                 {order.payment_phone && <p>পেমেন্ট ফোন: {order.payment_phone}</p>}
+
+                {/* Advance paid upfront (partial payment) */}
+                {/* "অ্যাডভান্স" = Advance amount */}
                 {Number(order.advance_amount) > 0 && (
                   <p>
                     অ্যাডভান্স:{" "}
@@ -96,6 +195,9 @@ const OrderDetailDialog = ({
                     </span>
                   </p>
                 )}
+
+                {/* Remaining amount due on delivery */}
+                {/* "বাকি" = Due / remaining */}
                 {Number(order.due_amount) > 0 && (
                   <p>
                     বাকি:{" "}
@@ -105,7 +207,11 @@ const OrderDetailDialog = ({
                   </p>
                 )}
               </div>
+
+              {/* ---- Action buttons for payment management ---- */}
               <div className="flex gap-2 mt-4">
+                {/* Verify payment — shown when a TxID exists but isn't verified yet */}
+                {/* "✅ পেমেন্ট ভেরিফাই" = Verify Payment */}
                 {!order.payment_verified && order.transaction_id && (
                   <Button
                     size="sm"
@@ -115,6 +221,9 @@ const OrderDetailDialog = ({
                     ✅ পেমেন্ট ভেরিফাই
                   </Button>
                 )}
+
+                {/* Verified badge + timestamp — shown after verification */}
+                {/* "✅ ভেরিফাইড" = Verified */}
                 {order.payment_verified && (
                   <span className="text-xs text-green-600 flex items-center gap-1">
                     ✅ ভেরিফাইড{" "}
@@ -122,11 +231,17 @@ const OrderDetailDialog = ({
                       `(${new Date(order.payment_verified_at).toLocaleDateString()})`}
                   </span>
                 )}
+
+                {/* Collect COD — shown when due_amount > 0 and not yet collected */}
+                {/* "💰 COD কালেক্ট করুন" = Collect COD */}
                 {Number(order.due_amount) > 0 && !order.cod_collected && (
                   <Button size="sm" variant="outline" onClick={() => onCollectCOD(order.id)}>
                     💰 COD কালেক্ট করুন (৳{Number(order.due_amount).toLocaleString()})
                   </Button>
                 )}
+
+                {/* COD collected badge + timestamp */}
+                {/* "💰 COD কালেক্টেড" = COD Collected */}
                 {order.cod_collected && (
                   <span className="text-xs text-green-600 flex items-center gap-1">
                     💰 COD কালেক্টেড{" "}
@@ -137,18 +252,28 @@ const OrderDetailDialog = ({
               </div>
             </div>
 
+            {/* ----------------------------------------------------------------
+                Section 3 — Tracking information
+                "🚚 ট্র্যাকিং তথ্য" = Tracking Information
+                TrackingForm manages its own local state pre-populated from the
+                order; saving calls onUpdateTracking and then closes the dialog.
+            ---------------------------------------------------------------- */}
             <div className="p-4 border rounded-lg bg-muted/50">
               <h4 className="text-sm font-medium text-muted-foreground mb-3">🚚 ট্র্যাকিং তথ্য</h4>
               <TrackingForm
                 order={order}
                 onSave={async (tracking) => {
                   const ok = await onUpdateTracking(order.id, tracking);
+                  // Close the detail dialog after a successful tracking update.
                   if (ok) onClose();
                   return ok;
                 }}
               />
             </div>
 
+            {/* ----------------------------------------------------------------
+                Section 4 — Optional order notes
+            ---------------------------------------------------------------- */}
             {order.notes && (
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground">Notes</h4>
@@ -156,6 +281,11 @@ const OrderDetailDialog = ({
               </div>
             )}
 
+            {/* ----------------------------------------------------------------
+                Section 5 — Order items list
+                "📦 আইটেম তালিকা" = Item List
+                Items are loaded asynchronously via the useEffect above.
+            ---------------------------------------------------------------- */}
             <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-2">
                 📦 আইটেম তালিকা ({items.length})
@@ -163,6 +293,7 @@ const OrderDetailDialog = ({
               <div className="border rounded-lg divide-y">
                 {items.map((item) => (
                   <div key={item.id} className="p-3 flex items-center gap-3">
+                    {/* Product thumbnail — placeholder used until real images are wired */}
                     <div className="w-14 h-14 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
                       <img
                         src="/placeholder.svg"
@@ -170,12 +301,16 @@ const OrderDetailDialog = ({
                         className="w-full h-full object-cover"
                       />
                     </div>
+
+                    {/* Product name + size/color chips + quantity */}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{item.product_name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
+                        {/* Size chip — only rendered when a size exists */}
                         {item.size && (
                           <span className="text-xs px-1.5 py-0.5 bg-muted rounded">{item.size}</span>
                         )}
+                        {/* Color chip with a small color swatch */}
                         {item.color && (
                           <span className="text-xs px-1.5 py-0.5 bg-muted rounded flex items-center gap-1">
                             <span
@@ -185,9 +320,12 @@ const OrderDetailDialog = ({
                             {item.color}
                           </span>
                         )}
+                        {/* Quantity multiplier */}
                         <span className="text-xs text-muted-foreground">×{item.quantity}</span>
                       </div>
                     </div>
+
+                    {/* Per-unit price + line total */}
                     <div className="text-right flex-shrink-0">
                       <p className="text-xs text-muted-foreground">
                         ৳{Number(item.price).toLocaleString()} each
@@ -199,6 +337,9 @@ const OrderDetailDialog = ({
                   </div>
                 ))}
               </div>
+
+              {/* Grand total footer — mirrors order.total */}
+              {/* "সর্বমোট" = Grand Total */}
               <div className="flex justify-between items-center mt-3 pt-3 border-t">
                 <span className="text-sm font-medium text-muted-foreground">সর্বমোট</span>
                 <span className="text-lg font-bold text-primary">

@@ -1,3 +1,44 @@
+/**
+ * @file dynamic-sitemap/index.ts
+ *
+ * @purpose
+ *   Generates and serves a fresh XML sitemap (Sitemap Protocol 0.9) that
+ *   includes every published product page and every published blog post, plus
+ *   a set of static pages (home, shop, categories, about, contact, faq, blog).
+ *   Intended to be fetched by search-engine crawlers via the site's
+ *   /sitemap.xml route (proxied or linked from robots.txt).
+ *
+ * @http
+ *   Method : GET (OPTIONS also handled for CORS pre-flight)
+ *   Body   : None
+ *
+ * @response
+ *   200 OK : Content-Type: application/xml; charset=utf-8
+ *            Cache-Control: public, max-age=3600 (1-hour CDN cache)
+ *            Body: well-formed <urlset> XML with <url> entries.
+ *   500    : "Error generating sitemap" (plain text)
+ *
+ * @auth
+ *   None — publicly accessible, no authentication required.
+ *   Uses service-role key only to read Supabase tables (no writes).
+ *
+ * @env
+ *   SUPABASE_URL              – Supabase project URL
+ *   SUPABASE_SERVICE_ROLE_KEY – Read-only access to products and blog_posts
+ *
+ * @sideEffects
+ *   Read-only. Queries:
+ *     - `products`   → slug, id, updated_at, category  (all products, DESC)
+ *     - `blog_posts` → slug, updated_at  (published only, DESC by published_at)
+ *
+ * @notes
+ *   BASE_URL is hardcoded to "https://dubaiborkahouse.com". Update this
+ *   constant if the domain changes.
+ *   Unique categories are extracted from products and each gets a
+ *   /shop?category=... entry with weekly changefreq and 0.7 priority.
+ *   Products use the `slug` field when available, falling back to `id`.
+ */
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {

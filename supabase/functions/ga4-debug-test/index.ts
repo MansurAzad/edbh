@@ -1,3 +1,49 @@
+/**
+ * @file ga4-debug-test/index.ts
+ *
+ * @purpose
+ *   Admin diagnostic tool that exercises the Google Analytics 4 Measurement
+ *   Protocol to verify that the configured GA4 credentials are valid and that
+ *   events reach DebugView.  Two requests are made:
+ *
+ *     1. POST /debug/mp/collect  – validates the event payload server-side
+ *        (returns validationMessages) but does NOT register the hit in GA.
+ *     2. POST /mp/collect        – actually sends the event so it appears
+ *        immediately in GA4 DebugView (real-time) for visual confirmation.
+ *
+ * @http
+ *   Method : POST (OPTIONS also handled for CORS pre-flight)
+ *   Body   : (all fields optional)
+ *     {
+ *       client_id?      : string  – GA4 client ID (random UUID generated if omitted)
+ *       event_name?     : string  – Event name (defaults to "admin_debug_test")
+ *       test_event_code?: string  – Shows in DebugView (defaults to "ADMIN_DEBUG")
+ *       params?         : object  – Additional event params merged into the payload
+ *     }
+ *
+ * @response
+ *   200 OK  : {
+ *     ok: true, valid: boolean, measurement_id: string, client_id: string,
+ *     event_name: string, payload: object, validation_messages: any[],
+ *     live_status: number, debug_status: number
+ *   }
+ *   200     : { ok: false, error: "GA4 not configured ..." }  – missing env vars
+ *   500     : { ok: false, error: string }
+ *
+ * @auth
+ *   None from the caller — should be called only from authenticated admin UI.
+ *   No Supabase auth enforced in this function (rely on frontend guards).
+ *
+ * @env
+ *   GA4_MEASUREMENT_ID – GA4 property measurement ID (e.g. "G-XXXXXXX")
+ *   GA4_API_SECRET     – Measurement Protocol API secret for the property
+ *
+ * @sideEffects
+ *   - Sends a LIVE event to the GA4 property (visible in DebugView for ~60s).
+ *     The event will NOT appear in standard GA4 reports (debug_mode=1).
+ *   - No database reads or writes.
+ */
+
 // GA4 DebugView validator — sends a test event to GA4 MP /debug endpoint
 // and returns the validation_messages so admins can verify their setup.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";

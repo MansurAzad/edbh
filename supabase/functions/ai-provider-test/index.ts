@@ -1,3 +1,45 @@
+/**
+ * @file ai-provider-test/index.ts
+ *
+ * @purpose
+ *   Admin utility that fires a single probe message at a stored AI-provider
+ *   configuration (row in `ai_provider_settings`) and records the outcome.
+ *   Use it from the admin panel to verify that an API key + model + base_url
+ *   combination actually works before activating it for production chat.
+ *
+ * @http
+ *   Method : POST
+ *   Body   : { id: string, prompt?: string }
+ *     - `id`     : UUID of the `ai_provider_settings` row to test.
+ *     - `prompt` : Optional custom probe text (defaults to "Reply with exactly: OK").
+ *   CORS   : Preflight OPTIONS → 200 "ok" with wildcard CORS headers.
+ *
+ * @response
+ *   200 OK  : { ok: boolean, status: number, latency_ms: number,
+ *               sample: string|null, error: string|null }
+ *   400     : { error: "id required" }
+ *   401     : { error: "Unauthorized" }        – no valid Supabase session
+ *   403     : { error: "Forbidden" }           – authenticated but not admin
+ *   404     : { error: "Provider not found" }
+ *   500     : { error: string }
+ *
+ * @auth
+ *   Requires a valid Supabase JWT (`Authorization: Bearer <token>`).
+ *   The user is additionally checked for the `admin` role via the
+ *   `has_role(_user_id, _role)` Postgres RPC.
+ *
+ * @env
+ *   SUPABASE_URL              – Supabase project URL
+ *   SUPABASE_ANON_KEY         – For user identity verification
+ *   SUPABASE_SERVICE_ROLE_KEY – For privileged DB reads/writes
+ *
+ * @sideEffects
+ *   - Sends one HTTP POST to the provider's `/chat/completions` endpoint.
+ *   - Updates the tested row in `ai_provider_settings`:
+ *       last_test_at, last_test_status ("ok"|"fail"), last_test_latency_ms,
+ *       last_test_error, last_test_sample.
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 

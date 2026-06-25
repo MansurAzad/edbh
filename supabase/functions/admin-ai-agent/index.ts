@@ -1,3 +1,58 @@
+/**
+ * @file admin-ai-agent/index.ts
+ * @overview  Admin-facing AI assistant Edge Function for Dubai Borka House.
+ *            Gives store admins a natural-language interface over their entire back-office.
+ *
+ * HTTP CONTRACT
+ * ─────────────
+ * Method : POST
+ * Auth   : None enforced at the Edge level — caller must be an authenticated admin
+ *          (enforced by the frontend before calling this function).
+ * Body   : { messages: OpenAI-style ChatMessage[] }
+ *          Each message: { role: "user" | "assistant" | "tool", content: string }
+ * Response (200):
+ *   { message: string }   — the AI's final text reply (Markdown, Bengali)
+ * Error (4xx/5xx):
+ *   { error: string, message?: string }
+ *
+ * ENV VARS USED
+ * ─────────────
+ * SUPABASE_URL              – Supabase project URL
+ * SUPABASE_SERVICE_ROLE_KEY – Service-role key for all DB reads/writes
+ * LOVABLE_API_KEY           – Fallback AI gateway key (Lovable → Gemini 2.5 Flash)
+ * CLOUDINARY_CLOUD_NAME     – Cloudinary account name  (image/video auto-upload)
+ * CLOUDINARY_API_KEY        – Cloudinary API key
+ * CLOUDINARY_API_SECRET     – Cloudinary API secret (used to sign upload requests)
+ *
+ * AI PROVIDER MODEL
+ * ─────────────────
+ * Providers are fetched dynamically from the DB via `get_ai_providers_for_scope("admin")`.
+ * Each provider is tried in order; on 429 or 5xx a single retry fires after 500 ms,
+ * then the next provider is tried. LOVABLE_API_KEY (Gemini 2.5 Flash) is always appended
+ * as the final fallback. If all providers fail → 503.
+ * Per-request timeout: 60 seconds per attempt.
+ *
+ * AGENTIC LOOP
+ * ────────────
+ * Max 10 iterations (tool-call → result → next call …).
+ * The loop exits early when the AI returns a message with no tool_calls.
+ * This supports multi-step admin requests like "add 5 products then show dashboard".
+ *
+ * DOWNSTREAM SIDE EFFECTS
+ * ────────────────────────
+ * All DB mutations go through `supabaseAdmin` (service-role).
+ * Image/video assets are auto-uploaded to Cloudinary on create_product / add_bulk_products.
+ * No email, WhatsApp, or Steadfast calls are made from this function.
+ *
+ * TOOLS EXPOSED (21 total)
+ * ────────────────────────
+ * get_dashboard_summary, search_products, update_product_stock, update_product_price,
+ * toggle_product_featured, get_orders, get_order_details, update_order_status,
+ * get_customers, get_revenue_report, manage_coupon, get_low_stock_alerts,
+ * bulk_update_stock, create_product, update_product, delete_product, add_bulk_products,
+ * manage_variants, get_reviews_summary, manage_delivery_zones, manage_blog_posts,
+ * get_newsletter_subscribers, manage_returns
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -468,6 +523,16 @@ const tools = [
   },
 ];
 
+/**
+ * System prompt injected as the first message in every AI conversation.
+ * Instructs the model to:
+ *   • Always respond in Bengali
+ *   • Use Markdown + emoji for data presentation (tables, bullets)
+ *   • Show prices with the ৳ symbol
+ *   • Support multi-task requests (multiple tool calls per iteration)
+ *   • Ask confirmation before delete_product
+ * Lists all 21 supported admin commands with their mapped tools.
+ */
 const SYSTEM_PROMPT = `আপনি **দুবাই বোরকা হাউজ** এর অ্যাডমিন AI এজেন্ট। আপনি অ্যাডমিনদের সম্পূর্ণ স্টোর ম্যানেজমেন্টে সাহায্য করেন।
 
 ## আপনার ক্ষমতা:
@@ -533,6 +598,20 @@ Borkas, Abayas, Hijabs, Kaftans, Scarves, Fabrics
 - যুক্ত হওয়ার পর সারাংশ দেখান
 `;
 
+/**
+ * Uploads a remote file URL to Cloudinary.
+ *
+ * @param fileUrl      - Source URL to upload (passed as `file` form param — Cloudinary fetches it)
+ * @param folder       - Destination folder in Cloudinary (default: "products")
+ * @param resourceType - "image" or "video"
+ * @returns            The Cloudinary `secure_url`, or the original `fileUrl` on failure.
+ *
+ * Signature: SHA-1 HMAC over `folder=…&overwrite=false&resource_type=…&timestamp=…&unique_filename=true` + API_SECRET
+ * Idempotency: already-Cloudinary URLs are returned as-is (skip-check via URL contains "cloudinary.com").
+ * Error handling: any upload failure logs a warning and returns the original URL — never throws.
+ *
+ * ENV VARS: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+ */
 // Auto-upload file URL to Cloudinary (image or video)
 async function uploadToCloudinary(fileUrl: string, folder: string = "products", resourceType: string = "image"): Promise<string> {
   const CLOUD_NAME = Deno.env.get("CLOUDINARY_CLOUD_NAME");
@@ -584,12 +663,21 @@ async function uploadToCloudinary(fileUrl: string, folder: string = "products", 
   }
 }
 
+/**
+ * Convenience wrapper around `uploadToCloudinary` for image assets.
+ * Returns null for blank/falsy inputs (no-op).
+ */
 // Auto-upload image if URL provided (non-Cloudinary)
 async function autoUploadImage(url: string | null | undefined, folder: string = "products"): Promise<string | null> {
   if (!url || url.trim() === "") return null;
   return await uploadToCloudinary(url, folder, "image");
 }
 
+/**
+ * Convenience wrapper for video assets.
+ * YouTube / Vimeo / Facebook embed URLs are stored directly without uploading
+ * (Cloudinary cannot re-upload social embeds). Only direct MP4/WebM files are uploaded.
+ */
 // Auto-upload video if URL provided (non-Cloudinary)
 async function autoUploadVideo(url: string | null | undefined, folder: string = "videos"): Promise<string | null> {
   if (!url || url.trim() === "") return null;
@@ -600,6 +688,12 @@ async function autoUploadVideo(url: string | null | undefined, folder: string = 
   return await uploadToCloudinary(url, folder, "video");
 }
 
+/**
+ * Resolves a product UUID from AI tool arguments.
+ * Priority: explicit `product_id` → ILIKE name search → null.
+ * Used in nearly every product-mutating tool to avoid requiring the AI to always
+ * have the UUID memorised — it can pass `product_name` instead.
+ */
 async function resolveProductId(supabaseAdmin: any, args: any) {
   if (args.product_id) return args.product_id;
   if (args.product_name) {
@@ -609,14 +703,33 @@ async function resolveProductId(supabaseAdmin: any, args: any) {
   return null;
 }
 
+/**
+ * Resolves a full order UUID from a short ID prefix (first 8 hex chars)
+ * or passes through a full UUID unchanged.
+ * The admin UI shows 8-char short IDs; the AI passes those back.
+ */
 async function resolveOrderId(supabaseAdmin: any, orderId: string) {
   if (orderId.length >= 36) return orderId;
   const { data } = await supabaseAdmin.from("orders").select("id").ilike("id", `${orderId.toLowerCase()}%`).limit(1);
   return data?.[0]?.id || null;
 }
 
+/**
+ * Dispatches an AI tool call to the appropriate DB logic.
+ *
+ * @param name         - Tool name (must match one of the `tools` array function names)
+ * @param args         - Parsed JSON arguments from the AI's tool_call
+ * @param supabaseAdmin - Service-role Supabase client
+ * @returns            Plain object — serialised to JSON and fed back to the AI as a tool result
+ *
+ * Each case documents its own DB tables and mutation behaviour.
+ * Error objects always include an `error` string in Bengali so the AI can relay them to the admin.
+ */
 async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
   switch (name) {
+    // ── get_dashboard_summary ──────────────────────────────────────────────────
+    // Parallel: products count, last-200 orders, low-stock products, reviews.
+    // Computes today's stats client-side (ISO date prefix match on created_at).
     case "get_dashboard_summary": {
       const [
         { count: productsCount },
@@ -656,6 +769,9 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       };
     }
 
+    // ── search_products ────────────────────────────────────────────────────────
+    // Supports free-text (name/description), category ILIKE, low_stock_only, out_of_stock_only.
+    // Returns up to 30 results ordered by newest first.
     case "search_products": {
       let query = supabaseAdmin.from("products").select("id, name, category, price, sale_price, stock, featured, image_url");
       if (args.query) query = query.or(`name.ilike.%${args.query}%,description.ilike.%${args.query}%`);
@@ -666,6 +782,9 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { products: data || [], count: (data || []).length };
     }
 
+    // ── update_product_stock ───────────────────────────────────────────────────
+    // Two modes: absolute `stock` value, or delta via `adjust` (+/-).
+    // When using `adjust`, fetches current stock first to compute new value (min 0).
     case "update_product_stock": {
       const productId = await resolveProductId(supabaseAdmin, args);
       if (!productId) return { error: "প্রোডাক্ট পাওয়া যায়নি। product_id বা product_name দিন" };
@@ -682,6 +801,8 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { success: true, product: data };
     }
 
+    // ── update_product_price ───────────────────────────────────────────────────
+    // Updates `price` and/or `sale_price`. Pass sale_price=null to remove a sale.
     case "update_product_price": {
       const productId = await resolveProductId(supabaseAdmin, args);
       if (!productId) return { error: "প্রোডাক্ট পাওয়া যায়নি" };
@@ -693,6 +814,8 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { success: true, product: data };
     }
 
+    // ── toggle_product_featured ────────────────────────────────────────────────
+    // Sets products.featured boolean. Defaults to true when args.featured is omitted.
     case "toggle_product_featured": {
       const productId = await resolveProductId(supabaseAdmin, args);
       if (!productId) return { error: "প্রোডাক্ট পাওয়া যায়নি" };
@@ -701,6 +824,9 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { success: true, product: data };
     }
 
+    // ── get_orders ─────────────────────────────────────────────────────────────
+    // Optional filters: status, phone (digits-only ILIKE), recent_days, limit (default 20).
+    // Phone is sanitised to digits only before the ILIKE query.
     case "get_orders": {
       let query = supabaseAdmin.from("orders").select("id, total, status, shipping_phone, shipping_city, guest_name, payment_method, payment_status, tracking_number, courier_name, created_at, notes");
       if (args.status) query = query.eq("status", args.status);
@@ -726,6 +852,9 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       };
     }
 
+    // ── get_order_details ──────────────────────────────────────────────────────
+    // Parallel: full order row + all order_items for that order.
+    // Resolves short IDs via resolveOrderId before the query.
     case "get_order_details": {
       const orderId = await resolveOrderId(supabaseAdmin, args.order_id);
       if (!orderId) return { error: "অর্ডার পাওয়া যায়নি" };
@@ -758,6 +887,9 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       };
     }
 
+    // ── update_order_status ────────────────────────────────────────────────────
+    // Optionally sets: tracking_number, courier_name, payment_verified (+ payment_verified_at), notes.
+    // payment_verified_at is set to now() in ISO format when payment_verified=true.
     case "update_order_status": {
       const orderId = await resolveOrderId(supabaseAdmin, args.order_id);
       if (!orderId) return { error: "অর্ডার পাওয়া যায়নি" };
@@ -776,6 +908,8 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { success: true, order: { ...data, short_id: data.id.slice(0, 8).toUpperCase() } };
     }
 
+    // ── get_customers ──────────────────────────────────────────────────────────
+    // Searches profiles table. ILIKE on full_name and phone simultaneously via .or().
     case "get_customers": {
       let query = supabaseAdmin.from("profiles").select("id, user_id, full_name, phone, city, created_at");
       if (args.search) query = query.or(`full_name.ilike.%${args.search}%,phone.ilike.%${args.search}%`);
@@ -783,6 +917,10 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { customers: data || [], count: (data || []).length };
     }
 
+    // ── get_revenue_report ─────────────────────────────────────────────────────
+    // Fetches all non-cancelled orders in the last N days.
+    // Computes totals, daily breakdown (last 7 days), top-5 cities, payment method split.
+    // All aggregation done in-memory (JS reduce/forEach) — no SQL GROUP BY.
     case "get_revenue_report": {
       const days = args.days || 30;
       const since = new Date(Date.now() - days * 86400000).toISOString();
@@ -809,6 +947,10 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       };
     }
 
+    // ── manage_coupon ──────────────────────────────────────────────────────────
+    // Actions: list | create | toggle | delete
+    // Codes are normalised to UPPERCASE before insert/query.
+    // `toggle` flips is_active; `delete` hard-deletes by code.
     case "manage_coupon": {
       if (args.action === "list") {
         const { data } = await supabaseAdmin.from("coupons").select("*").order("created_at", { ascending: false });
@@ -837,6 +979,8 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { error: "Invalid action" };
     }
 
+    // ── get_low_stock_alerts ───────────────────────────────────────────────────
+    // threshold default = 1; returns split: out_of_stock (stock=0) vs low_stock (0<stock≤threshold).
     case "get_low_stock_alerts": {
       const threshold = args.threshold || 1;
       const { data } = await supabaseAdmin.from("products").select("id, name, category, stock, price").lte("stock", threshold).order("stock", { ascending: true }).limit(50);
@@ -844,6 +988,8 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { total: products.length, out_of_stock: products.filter((p: any) => (p.stock || 0) === 0), low_stock: products.filter((p: any) => (p.stock || 0) > 0) };
     }
 
+    // ── bulk_update_stock ──────────────────────────────────────────────────────
+    // Sequential per-product updates (no batch upsert) — allows per-row error reporting.
     case "bulk_update_stock": {
       const results: any[] = [];
       for (const u of (args.updates || [])) {
@@ -853,6 +999,8 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { results, updated: results.filter((r: any) => r.success).length };
     }
 
+    // ── get_reviews_summary ────────────────────────────────────────────────────
+    // Optional product_id filter. Returns avg rating, 1-5 star distribution, last 5 reviews.
     case "get_reviews_summary": {
       let query = supabaseAdmin.from("product_reviews").select("id, rating, comment, title, created_at, product_id, verified_purchase");
       if (args.product_id) query = query.eq("product_id", args.product_id);
@@ -864,6 +1012,12 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { total: reviews.length, average_rating: avgRating, distribution, recent: reviews.slice(0, 5) };
     }
 
+    // ── create_product ─────────────────────────────────────────────────────────
+    // 1. Auto-uploads image_url + video_url to Cloudinary (skips if already Cloudinary).
+    // 2. Inserts the product row.
+    // 3. If `variants` array provided → inserts product_variants (each variant image also uploaded).
+    // 4. If `gallery_images` array provided → inserts product_images rows.
+    // Returns: { product, variants_added, gallery_images_added, cloudinary_auto_upload: true }
     case "create_product": {
       const product: any = { name: args.name, category: args.category, price: args.price };
       const optFields = ["sale_price", "description", "stock", "sizes", "colors", "material", "featured"];
@@ -908,6 +1062,9 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { success: true, product: data, variants_added: variantsAdded, gallery_images_added: galleryAdded, cloudinary_auto_upload: true };
     }
 
+    // ── update_product ─────────────────────────────────────────────────────────
+    // Builds a partial update object from whichever fields were provided.
+    // Returns early if no fields supplied.
     case "update_product": {
       const productId = await resolveProductId(supabaseAdmin, args);
       if (!productId) return { error: "প্রোডাক্ট পাওয়া যায়নি" };
@@ -920,6 +1077,9 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { success: true, product: data };
     }
 
+    // ── delete_product ─────────────────────────────────────────────────────────
+    // Cascades: deletes product_variants, product_images, back_in_stock_alerts first,
+    // then deletes the product row. Parallel deletes for the child tables.
     case "delete_product": {
       const productId = await resolveProductId(supabaseAdmin, args);
       if (!productId) return { error: "প্রোডাক্ট পাওয়া যায়নি" };
@@ -933,6 +1093,12 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { success: true, deleted_product: productId };
     }
 
+    // ── add_bulk_products ──────────────────────────────────────────────────────
+    // Processes up to 200 products in batches of 50.
+    // For each batch: auto-uploads images/videos to Cloudinary, then bulk-inserts.
+    // After all product rows are created: inserts variants (batches of 100) and
+    // gallery images (batches of 100) using name-matching to link rows.
+    // Returns partial success — errors array lists any failed batches.
     case "add_bulk_products": {
       const products = args.products || [];
       if (!products.length) return { error: "কোনো প্রোডাক্ট দেওয়া হয়নি" };
@@ -1033,6 +1199,13 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       };
     }
 
+    // ── manage_variants ────────────────────────────────────────────────────────
+    // Actions: list | add | bulk_add | update | delete
+    // `list`     → all variants for a product
+    // `add`      → single variant insert
+    // `bulk_add` → inserts array of variants in one DB call
+    // `update`   → partial update by variant_id
+    // `delete`   → hard delete by variant_id
     case "manage_variants": {
       const productId = await resolveProductId(supabaseAdmin, args);
       switch (args.action) {
@@ -1083,6 +1256,9 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       }
     }
 
+    // ── manage_delivery_zones ──────────────────────────────────────────────────
+    // Actions: list | create | update | toggle
+    // `toggle` reads current is_active and flips it (no arg needed).
     case "manage_delivery_zones": {
       if (args.action === "list") {
         const { data } = await supabaseAdmin.from("delivery_zones").select("*").order("zone_name");
@@ -1118,6 +1294,10 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { error: "Invalid action" };
     }
 
+    // ── manage_blog_posts ──────────────────────────────────────────────────────
+    // Actions: list | create | update | toggle_publish | delete
+    // Slug auto-generated from title (lowercase, strip non-ASCII, spaces → hyphens).
+    // published_at is set to now() when is_published flips to true.
     case "manage_blog_posts": {
       if (args.action === "list") {
         const { data } = await supabaseAdmin.from("blog_posts").select("id, title, slug, category, is_published, created_at, published_at").order("created_at", { ascending: false }).limit(20);
@@ -1165,11 +1345,16 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
       return { error: "Invalid action" };
     }
 
+    // ── get_newsletter_subscribers ─────────────────────────────────────────────
+    // Returns only subscribed=true rows ordered by newest first.
     case "get_newsletter_subscribers": {
       const { data, count } = await supabaseAdmin.from("newsletter_subscribers").select("*", { count: "exact" }).eq("subscribed", true).order("created_at", { ascending: false }).limit(args.limit || 20);
       return { subscribers: data || [], total: count || 0 };
     }
 
+    // ── manage_returns ─────────────────────────────────────────────────────────
+    // Actions: list | update
+    // `update` supports partial: status, refund_amount, admin_notes.
     case "manage_returns": {
       if (args.action === "list") {
         const { data } = await supabaseAdmin.from("returns").select("id, order_id, reason, status, refund_amount, admin_notes, created_at").order("created_at", { ascending: false }).limit(20);
@@ -1193,6 +1378,26 @@ async function handleToolCall(name: string, args: any, supabaseAdmin: any) {
   }
 }
 
+/**
+ * Main HTTP handler.
+ *
+ * Flow:
+ *  1. CORS preflight short-circuit
+ *  2. Parse { messages } from request body
+ *  3. Validate env vars
+ *  4. Build AI provider candidate list from DB (`get_ai_providers_for_scope("admin")`)
+ *     + append Lovable AI Gateway as final fallback
+ *  5. Run agentic tool-call loop (max 10 iterations):
+ *       a. POST to AI endpoint with current message history + tool definitions
+ *       b. If response has tool_calls → execute each via handleToolCall → append results
+ *       c. If no tool_calls → return final text response
+ *  6. If loop exhausts 10 iterations → return Bengali timeout message
+ *
+ * aiFetch retry policy:
+ *   • 2 attempts per provider (immediate retry on 429/5xx, 500 ms delay between attempts)
+ *   • Non-retriable errors (4xx except 429) skip to the next provider immediately
+ *   • 60-second AbortController timeout per attempt
+ */
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -1208,6 +1413,9 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // ── Build AI provider candidate list ─────────────────────────────────────
+    // DB RPC returns providers ordered by priority for the "admin" scope.
+    // Lovable Gateway (Gemini 2.5 Flash) is always appended as last-resort fallback.
     // Build ordered AI provider candidates (active -> fallbacks -> Lovable Gateway)
     type Candidate = { name: string; url: string; headers: Record<string, string>; model: string };
     const candidates: Candidate[] = [];
@@ -1242,6 +1450,11 @@ serve(async (req) => {
     }
     console.log(`[AI] admin candidates: ${candidates.map(c => c.name).join(" -> ")}`);
 
+    /**
+     * Internal retry/fallback helper.
+     * Iterates `candidates` in order; per candidate tries up to 2 times.
+     * Throws if all candidates exhausted.
+     */
     async function aiFetch(body: any): Promise<Response> {
       let lastErr: any = null;
       for (const c of candidates) {
@@ -1270,11 +1483,15 @@ serve(async (req) => {
       throw lastErr || new Error("All AI providers failed");
     }
 
+    // Prepend the system prompt so the AI always has the admin context.
     const allMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...(messages || [])];
 
     let currentMessages = allMessages;
     let maxIterations = 10;
 
+  // ── Agentic tool-call loop ────────────────────────────────────────────────
+  // Each iteration: call AI → execute tool_calls → append results → repeat.
+  // Exits when AI returns no tool_calls (final text) or after 10 iterations.
   while (maxIterations-- > 0) {
       // Log iteration for debugging multi-task operations
       console.log(`AI iteration ${6 - maxIterations}, remaining: ${maxIterations}`);

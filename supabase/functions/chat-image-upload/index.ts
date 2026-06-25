@@ -1,3 +1,42 @@
+/**
+ * @file chat-image-upload/index.ts
+ *
+ * @purpose
+ *   Accepts customer-submitted image uploads (for the customer chat widget),
+ *   stores them in the `chat-uploads` Supabase Storage bucket, records a
+ *   tracking row in `chat_uploads`, and returns a public URL with a 5-minute
+ *   TTL.  The companion `chat-image-cleanup` function later removes expired files.
+ *
+ * @http
+ *   Method      : POST  (OPTIONS pre-flight also handled)
+ *   Content-Type: multipart/form-data
+ *   Field       : `file`  – the image file (JPEG, PNG, WebP, or GIF; max 5 MB)
+ *
+ * @response
+ *   200 OK : { success: true, url: string, id: string, expires_at: string,
+ *              ttl_minutes: 5 }
+ *   400    : { error: "No file provided" | "Unsupported type: …" | "File too large (max 5MB)" }
+ *   405    : { error: "Method not allowed" }
+ *   429    : { error: "Too many uploads. Try again in an hour." }
+ *   500    : { error: string }
+ *
+ * @auth
+ *   None — accepts uploads from anonymous visitors.
+ *   Protected by an in-memory IP rate limiter: max 15 uploads per IP per hour.
+ *   IP is read from x-forwarded-for (first entry) or cf-connecting-ip.
+ *
+ * @env
+ *   SUPABASE_URL              – Supabase project URL
+ *   SUPABASE_SERVICE_ROLE_KEY – For Storage and DB access
+ *
+ * @sideEffects
+ *   1. Uploads the file to the `chat-uploads` Storage bucket at path `{uuid}.{ext}`.
+ *   2. Inserts a row in `chat_uploads`:
+ *        storage_path, public_url, ip_address, mime_type, size_bytes, expires_at.
+ *      If the DB insert fails it is logged but the URL is still returned.
+ *   3. The in-memory `rateMap` resets per Deno isolate restart (not persistent).
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -12,8 +51,16 @@ const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gi
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 const TTL_MINUTES = 5;
 
-// In-memory rate limiter (per IP)
+// In-memory rate limiter (per IP) — keyed by client IP string.
+// Window: 1 hour; limit: 15 uploads per window.
+// NOTE: state is lost on isolate cold-start; not suitable for distributed limiting.
 const rateMap = new Map<string, { count: number; resetAt: number }>();
+/**
+ * Returns true if the given IP has exceeded the upload rate limit.
+ * Mutates `rateMap` as a side-effect (increments counter / resets window).
+ *
+ * @param ip - Client IP address string.
+ */
 function rateLimited(ip: string): boolean {
   const now = Date.now();
   const e = rateMap.get(ip);

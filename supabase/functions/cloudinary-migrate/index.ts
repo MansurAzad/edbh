@@ -1,3 +1,57 @@
+/**
+ * @file cloudinary-migrate/index.ts
+ *
+ * @purpose
+ *   One-shot admin migration tool that re-hosts every non-Cloudinary image URL
+ *   stored in the database onto Cloudinary, then updates each row with the new
+ *   `res.cloudinary.com` URL.  Run once (or re-run safely — already-migrated
+ *   URLs are skipped via the `isCloudinary()` guard).
+ *
+ *   Tables migrated (in order):
+ *     1. products.image_url             → Cloudinary folder: "products"
+ *     2. product_images.image_url       → Cloudinary folder: "products/gallery"
+ *     3. product_variants.image_url     → Cloudinary folder: "products/variants"
+ *     4. categories.image_url           → Cloudinary folder: "categories"
+ *     5. blog_posts.image_url           → Cloudinary folder: "blog"
+ *     6. site_content.image_url         → Cloudinary folder: "site"
+ *
+ * @http
+ *   Method : POST  (OPTIONS also handled)
+ *   Body   : None required.
+ *
+ * @response
+ *   200 OK : { success: true, results: {
+ *               products_migrated, product_images_migrated,
+ *               variant_images_migrated, categories_migrated,
+ *               blog_posts_migrated, site_content_migrated,
+ *               skipped, errors: string[] } }
+ *   500    : { success: false, error: string }
+ *
+ * @auth
+ *   Requires a valid Supabase JWT (`Authorization: Bearer <token>`).
+ *   User must have the `admin` role (checked via `has_role` RPC).
+ *
+ * @env
+ *   CLOUDINARY_CLOUD_NAME  – Cloudinary cloud name
+ *   CLOUDINARY_API_KEY     – Cloudinary API key
+ *   CLOUDINARY_API_SECRET  – Used to sign upload requests
+ *   SUPABASE_URL           – Supabase project URL
+ *   SUPABASE_ANON_KEY      – For user authentication
+ *   SUPABASE_SERVICE_ROLE_KEY – For privileged DB reads/writes
+ *
+ * @sideEffects
+ *   - Sends one Cloudinary upload request per non-Cloudinary image URL found.
+ *     Network failures per image are logged and counted in `errors[]` but
+ *     do not abort the entire migration.
+ *   - Updates `image_url` columns across 6 database tables.
+ *   - Rows where `image_url` is already a Cloudinary URL or is
+ *     `/placeholder.svg` are counted in `skipped` and not re-uploaded.
+ *
+ * @signature
+ *   Each Cloudinary upload is signed with SHA-1 the same way as
+ *   cloudinary-upload/index.ts  (folder, overwrite=false, unique_filename=true).
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -37,6 +91,14 @@ serve(async (req) => {
     const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' });
     if (!isAdmin) throw new Error('Admin access required');
 
+    /**
+     * Uploads a single image (by URL) to Cloudinary and returns the
+     * resulting `secure_url`, or `null` on failure.
+     * Signing params: folder, overwrite=false, timestamp, unique_filename=true.
+     *
+     * @param imageUrl - Public URL of the image to re-host on Cloudinary.
+     * @param folder   - Target Cloudinary folder (e.g. "products", "blog").
+     */
     // Cloudinary upload helper
     async function uploadToCloudinary(imageUrl: string, folder: string): Promise<string | null> {
       try {

@@ -1,3 +1,50 @@
+/**
+ * @file cloudinary-upload/index.ts
+ *
+ * @purpose
+ *   Server-side proxy for Cloudinary uploads.  Keeps the API secret out of
+ *   the browser by generating the HMAC-SHA1 upload signature here.
+ *   Accepts either a raw binary file (from a file picker) or a remote URL
+ *   (Cloudinary's "upload by URL" / fetch feature).
+ *   Deduplication is enabled via `unique_filename=true, overwrite=false`.
+ *
+ * @http
+ *   Method      : POST  (OPTIONS also handled)
+ *   Content-Type: multipart/form-data
+ *   Fields:
+ *     file          – binary File object  (mutually exclusive with file_url)
+ *     file_url      – remote image/video URL to fetch into Cloudinary
+ *     folder        – Cloudinary folder path (default: "products")
+ *     resource_type – "image" | "video" | "raw"  (default: "image")
+ *
+ * @response
+ *   200 (success): { success: true, url: string, public_id: string,
+ *                    width: number, height: number, format: string,
+ *                    bytes: number, existing: boolean }
+ *   200 (failure): { success: false, error: string, reason: string,
+ *                    http_status?: number, cloud_name_configured: boolean }
+ *     reason values: "invalid_credentials" | "invalid_cloud_name" |
+ *                    "rate_limited" | "api_error" | "exception"
+ *   400           : { success: false, error: "No file or file_url provided" }
+ *
+ * @auth
+ *   None from the caller — admin UI only; no Supabase auth enforced here.
+ *   Security relies on the API secret being server-side only.
+ *
+ * @env
+ *   CLOUDINARY_CLOUD_NAME – Cloudinary cloud name
+ *   CLOUDINARY_API_KEY    – Cloudinary API key (sent in form data)
+ *   CLOUDINARY_API_SECRET – Used to sign requests (never sent to client)
+ *
+ * @sideEffects
+ *   One POST to https://api.cloudinary.com/v1_1/{cloud}/{resource_type}/upload.
+ *   No database reads or writes.
+ *
+ * @signature
+ *   Params signed: folder, overwrite=false, timestamp, unique_filename=true
+ *   Algorithm    : SHA-1(paramsString + API_SECRET)  → hex digest
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
