@@ -299,9 +299,10 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
   const validate = (): string | null => {
     // Guard against race condition where auth session is still resolving.
     if (authLoading) return "সেশন যাচাই হচ্ছে, আবার চেষ্টা করুন"; // "Session verifying, please try again"
-    // Core shipping fields are mandatory regardless of payment method.
-    if (!shippingInfo.fullName || !shippingInfo.phone || !shippingInfo.address) {
-      return "নাম, মোবাইল নম্বর এবং ঠিকানা অবশ্যই পূরণ করুন"; // "Name, phone and address are required"
+    // Schema-driven validation: required fields + phone format + email shape.
+    const parsed = shippingInfoSchema.safeParse(shippingInfo);
+    if (!parsed.success) {
+      return getFriendlyError(parsed.error);
     }
     // Prevent submitting an empty cart (shouldn't normally reach here).
     if (items.length === 0) return "কার্টে পণ্য যোগ করুন"; // "Add items to cart"
