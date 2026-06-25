@@ -5,7 +5,7 @@ import { queryKeys } from "@/lib/query-keys";
 /** Fetches the custom mobile logo image URL from `site_content`. */
 export const useMobileLogo = () => {
   return useQuery({
-    queryKey: queryKeys.siteContent("mobile_logo"),
+    queryKey: queryKeys.siteContent(["mobile_logo"]),
     queryFn: async () => {
       const { data } = await supabase
         .from("site_content")
