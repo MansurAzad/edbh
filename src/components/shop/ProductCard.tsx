@@ -292,4 +292,10 @@ const ProductCard = ({
   );
 };
 
-export default ProductCard;
+/**
+ * Memoised export — product tiles re-render only when their `product` or
+ * callback identities change. With React Query providing stable data refs and
+ * useCallback-wrapped parent handlers, a grid of 50+ cards skips most renders
+ * triggered by unrelated parent state (filters, sort, etc.).
+ */
+export default memo(ProductCard);
