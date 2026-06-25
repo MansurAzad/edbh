@@ -73,6 +73,10 @@ type ToasterToast = ToastProps & {
 /**
  * Discriminated union of all actions the toast reducer accepts.
  */
+/**
+ * Internal action type constants for the toast reducer.
+ * Using a constant object with `as const` ensures type-safe dispatching.
+ */
 const actionTypes = {
   /** Push a new toast onto the front of the queue. */
   ADD_TOAST: "ADD_TOAST",
@@ -290,11 +294,11 @@ function dispatch(action: Action) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Public imperative API
-// ---------------------------------------------------------------------------
-
 /**
+ * Shape of a toast before it has been assigned an id by the store.
+ * Callers pass this to the imperative `toast()` function.
+ */
+type Toast = Omit<ToasterToast, "id">;
  * Shape of a toast before it has been assigned an id by the store.
  * Callers pass this to the imperative `toast()` function.
  */
@@ -319,15 +323,21 @@ type Toast = Omit<ToasterToast, "id">;
  *
  * @sideEffects Dispatches `ADD_TOAST` to the singleton store, which
  *   synchronously updates `memoryState` and notifies all listeners.
- */
-function toast({ ...props }: Toast) {
-  const id = genId();
-
-  // Convenience updater bound to this toast's id.
+  /**
+   * Updates the properties of the toast currently associated with this `id`.
+   * @param props - The new properties to merge into the existing toast.
+   */
   const update = (props: ToasterToast) =>
     dispatch({
       type: "UPDATE_TOAST",
       toast: { ...props, id },
+    });
+
+  /**
+   * Dismisses the toast associated with this `id` by triggering its exit animation.
+   * Scheduled for physical removal after `TOAST_REMOVE_DELAY`.
+   */
+  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
     });
 
   // Convenience dismisser bound to this toast's id.
@@ -388,7 +398,7 @@ function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
 
   React.useEffect(() => {
-    // Register this component's setState as a listener.
+  }, [state]); // Re-registering on state change ensures the listener stays synchronized with the current state snapshot and render cycle.
     listeners.push(setState);
 
     // Cleanup: remove this listener when the component unmounts.
