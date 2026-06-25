@@ -313,7 +313,7 @@ const ProductDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead title={product.name} description={product.description || `Buy ${product.name} — Premium ${product.category} from Dubai Borka House. ৳${currentPrice.toLocaleString()}`} canonical={`/product/${product.slug || product.id}`} ogImage={getProductImage()} ogType="product" keywords={`${product.name}, ${product.category}, buy ${product.category} online, dubai borka house`} />
+      <SEOHead {...buildProductSeo({ id: product.id, name: product.name, description: product.description, price: product.price, salePrice: product.sale_price, category: product.category, image: getProductImage(), slug: product.slug })} />
       <StructuredData data={productSchema({ name: product.name, description: product.description || `প্রিমিয়াম ${product.category} — দুবাই বোরকা হাউস`, price: product.price, salePrice: product.sale_price, image: getProductImage(), category: product.category, id: product.id, slug: product.slug, stock: product.stock, reviewCount: reviewStats.count, averageRating: reviewStats.avg })} />
       <Header />
       <Breadcrumbs />
