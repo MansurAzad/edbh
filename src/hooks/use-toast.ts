@@ -71,11 +71,9 @@ type ToasterToast = ToastProps & {
 };
 
 /**
- * Discriminated union of all actions the toast reducer accepts.
- */
-/**
  * Internal action type constants for the toast reducer.
- * Using a constant object with `as const` ensures type-safe dispatching.
+ * Using a constant object with `as const` ensures type safety when
+ * dispatching actions.
  */
 const actionTypes = {
   /** Push a new toast onto the front of the queue. */
@@ -294,13 +292,14 @@ function dispatch(action: Action) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Public imperative API
+// ---------------------------------------------------------------------------
+
 /**
- * Shape of a toast before it has been assigned an id by the store.
- * Callers pass this to the imperative `toast()` function.
- */
-type Toast = Omit<ToasterToast, "id">;
- * Shape of a toast before it has been assigned an id by the store.
- * Callers pass this to the imperative `toast()` function.
+ * A partial toast object used for creating new notifications.
+ * It omits the `id` field, which is generated automatically by the store
+ * when the toast is added.
  */
 type Toast = Omit<ToasterToast, "id">;
 
@@ -323,6 +322,10 @@ type Toast = Omit<ToasterToast, "id">;
  *
  * @sideEffects Dispatches `ADD_TOAST` to the singleton store, which
  *   synchronously updates `memoryState` and notifies all listeners.
+ */
+function toast({ ...props }: Toast) {
+  const id = genId();
+
   /**
    * Updates the properties of the toast currently associated with this `id`.
    * @param props - The new properties to merge into the existing toast.
@@ -337,10 +340,6 @@ type Toast = Omit<ToasterToast, "id">;
    * Dismisses the toast associated with this `id` by triggering its exit animation.
    * Scheduled for physical removal after `TOAST_REMOVE_DELAY`.
    */
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
-    });
-
-  // Convenience dismisser bound to this toast's id.
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
 
   dispatch({
@@ -398,7 +397,7 @@ function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
 
   React.useEffect(() => {
-  }, [state]); // Re-registering on state change ensures the listener stays synchronized with the current state snapshot and render cycle.
+    // Register this component's setState as a listener.
     listeners.push(setState);
 
     // Cleanup: remove this listener when the component unmounts.
@@ -408,7 +407,14 @@ function useToast() {
         listeners.splice(index, 1);
       }
     };
-  }, [state]); // Re-registering on state change keeps the closure fresh.
+  }, [state]);
+  /**
+   * Rationale for [state] dependency:
+   * By including `state` in the dependency array, we ensure that the useEffect
+   * re-runs whenever the local state updates. This keeps the `setState`
+   * reference held within the `listeners` array fresh and correctly
+   * synchronized with the latest component render cycle.
+   */
 
   return {
     // Spread the current state (exposes `toasts` array).
