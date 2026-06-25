@@ -19,6 +19,7 @@
  *  - `gridView = false` → horizontal list row (fixed thumbnail beside metadata)
  */
 
+import { memo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Heart, ShoppingBag, Zap, GitCompareArrows } from "lucide-react";
