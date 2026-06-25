@@ -15,6 +15,7 @@
  * (FloatingCartSidebar) which passes callbacks down via props.
  */
 
+import { memo } from "react";
 import { Trash2, Plus, Minus } from "lucide-react";
 import type { CartItem } from "@/contexts/CartContext";
 
