@@ -38,6 +38,8 @@ const OrderTracking = lazy(() => import("./pages/OrderTracking"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ReturnPolicy = lazy(() => import("./pages/ReturnPolicy"));
 const FAQ = lazy(() => import("./pages/FAQ"));
+const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+const DeveloperDocs = lazy(() => import("./pages/DeveloperDocs"));
 
 // Admin pages - lazy loaded
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
@@ -121,6 +123,8 @@ const App = () => (
                   <Route path="/p/:id" element={<ProductDetail />} />
                   <Route path="/wishlist" element={<Wishlist />} />
                   <Route path="/blog" element={<Blog />} />
+                  <Route path="/help" element={<HelpCenter />} />
+                  <Route path="/developers" element={<DeveloperDocs />} />
                   <Route path="/track/:id?" element={<OrderTracking />} />
                   <Route path="/order-tracking" element={<OrderTracking />} />
                   <Route path="/admin" element={<PermissionGuard><AdminDashboard /></PermissionGuard>} />

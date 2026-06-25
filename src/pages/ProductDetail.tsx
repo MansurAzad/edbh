@@ -23,9 +23,9 @@ import StockCountdown from "@/components/marketing/StockCountdown";
 import WhatsAppOrderButton from "@/components/marketing/WhatsAppOrderButton";
 import FlashSaleTimer from "@/components/marketing/FlashSaleTimer";
 import SEOHead from "@/components/seo/SEOHead";
-import { buildProductSeo } from "@/lib/seo/config";
+import { buildProductSeo, buildProductJsonLd } from "@/lib/seo/config";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
-import StructuredData, { productSchema } from "@/components/seo/StructuredData";
+import StructuredData from "@/components/seo/StructuredData";
 import { trackAddToCart, trackViewContent } from "@/components/seo/AnalyticsTracker";
 import PersonalizedRecommendations from "@/components/shop/PersonalizedRecommendations";
 import { type Product, getProductImage as getProductImg, defaultFallbackImage } from "@/types/product";
@@ -315,7 +315,7 @@ const ProductDetail = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead {...buildProductSeo({ id: product.id, name: product.name, description: product.description, price: product.price, salePrice: product.sale_price, category: product.category, image: getProductImage(), slug: product.slug })} />
-      <StructuredData data={productSchema({ name: product.name, description: product.description || `প্রিমিয়াম ${product.category} — দুবাই বোরকা হাউস`, price: product.price, salePrice: product.sale_price, image: getProductImage(), category: product.category, id: product.id, slug: product.slug, stock: product.stock, reviewCount: reviewStats.count, averageRating: reviewStats.avg })} />
+      <StructuredData data={buildProductJsonLd({ id: product.id, name: product.name, description: product.description, price: product.price, salePrice: product.sale_price, image: getProductImage(), category: product.category, slug: product.slug, stock: product.stock, reviewCount: reviewStats.count, averageRating: reviewStats.avg })} />
       <Header />
       <Breadcrumbs />
       <main className="pt-4 pb-16 md:pb-20">
