@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Input } from "@/components/ui/input";
 import SEOHead from "@/components/seo/SEOHead";
+import { buildBlogListSeo } from "@/lib/seo/config";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import StructuredData, { articleSchema } from "@/components/seo/StructuredData";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,12 +80,7 @@ const Blog = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead 
-        title="ব্লগ — ফ্যাশন টিপস ও স্টাইলিং গাইড" 
-        description="দুবাই বোরকা হাউস ব্লগ — ইসলামিক ফ্যাশন ট্রেন্ড, বোরকা স্টাইলিং টিপস, আবায়া কেনার গাইড ও আরো অনেক কিছু।" 
-        canonical="/blog" 
-        keywords="বোরকা স্টাইলিং, আবায়া ফ্যাশন টিপস, হিজাব স্টাইল গাইড, ইসলামিক ফ্যাশন ব্লগ, borka styling tips, abaya fashion blog"
-      />
+      <SEOHead {...buildBlogListSeo()} />
       <StructuredData data={blogListSchema} />
       <Header />
       <Breadcrumbs />
