@@ -3,10 +3,10 @@
 //
 // All event helpers live in `@/lib/tracking` now. This file just re-exports
 // them so existing imports keep working.
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { trackPageView, gtmLoaded } from "@/lib/tracking";
+import { useSiteContent } from "@/hooks/queries/useSiteContent";
 
 // Back-compat re-exports — older call sites import from here.
 export {
@@ -21,23 +21,10 @@ export {
 
 const AnalyticsTracker = () => {
   const location = useLocation();
-  const [gaId, setGaId] = useState<string | null>(null);
-  const [fbPixelId, setFbPixelId] = useState<string | null>(null);
+  const { data: ids } = useSiteContent(["google_analytics_id", "facebook_pixel_id"]);
+  const gaId = ids?.google_analytics_id || null;
+  const fbPixelId = ids?.facebook_pixel_id || null;
 
-  useEffect(() => {
-    const fetchIds = async () => {
-      const { data } = await supabase
-        .from("site_content")
-        .select("section_key, content")
-        .in("section_key", ["google_analytics_id", "facebook_pixel_id"])
-        .eq("is_active", true);
-      data?.forEach((row) => {
-        if (row.section_key === "google_analytics_id" && row.content) setGaId(row.content.trim());
-        if (row.section_key === "facebook_pixel_id" && row.content) setFbPixelId(row.content.trim());
-      });
-    };
-    fetchIds();
-  }, []);
 
   // GA4 fallback injection — only if GTM hasn't loaded
   useEffect(() => {
