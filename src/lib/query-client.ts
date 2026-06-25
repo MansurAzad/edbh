@@ -49,10 +49,18 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       // See file header for rationale on each value.
-      staleTime: 5 * 60 * 1000,
-      gcTime: 15 * 60 * 1000,
+      // Reference data (products, content, settings) changes infrequently.
+      // 10 min default keeps the storefront snappy without manual per-query
+      // overrides — hooks needing fresher data can still set their own staleTime.
+      staleTime: 10 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
       refetchOnWindowFocus: false,
-      retry: 1,
+      // Retry only network-class failures; 4xx/auth errors fail fast.
+      retry: (failureCount, error) => {
+        const msg = (error as Error)?.message || "";
+        if (/4\d{2}|unauthor|forbid|not found/i.test(msg)) return false;
+        return failureCount < 1;
+      },
       refetchOnMount: false,
     },
   },

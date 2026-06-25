@@ -19,6 +19,7 @@
  *  - `gridView = false` → horizontal list row (fixed thumbnail beside metadata)
  */
 
+import { memo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Heart, ShoppingBag, Zap, GitCompareArrows } from "lucide-react";
@@ -291,4 +292,10 @@ const ProductCard = ({
   );
 };
 
-export default ProductCard;
+/**
+ * Memoised export — product tiles re-render only when their `product` or
+ * callback identities change. With React Query providing stable data refs and
+ * useCallback-wrapped parent handlers, a grid of 50+ cards skips most renders
+ * triggered by unrelated parent state (filters, sort, etc.).
+ */
+export default memo(ProductCard);

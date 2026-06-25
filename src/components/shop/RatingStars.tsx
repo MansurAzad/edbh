@@ -12,6 +12,7 @@
  * Returns `null` when `count === 0` so callers never see an empty star row.
  */
 
+import { memo } from "react";
 import { Star } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -99,4 +100,8 @@ const RatingStars = ({ avg, count, size = "sm" }: RatingStarsProps) => {
   );
 };
 
-export default RatingStars;
+/**
+ * Memoised: rating data is identity-stable across renders, so this prevents
+ * needless re-renders of 50+ instances inside a product grid.
+ */
+export default memo(RatingStars);

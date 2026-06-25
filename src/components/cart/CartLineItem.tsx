@@ -15,6 +15,7 @@
  * (FloatingCartSidebar) which passes callbacks down via props.
  */
 
+import { memo } from "react";
 import { Trash2, Plus, Minus } from "lucide-react";
 import type { CartItem } from "@/contexts/CartContext";
 
@@ -130,4 +131,9 @@ const CartLineItem = ({ item, onIncrement, onDecrement, onRemove }: CartLineItem
   );
 };
 
-export default CartLineItem;
+/**
+ * Memoised export — cart rows only re-render when their `item` or callback
+ * identity changes. Parents should stabilise callbacks with useCallback to
+ * realise the benefit (FloatingCartSidebar already does).
+ */
+export default memo(CartLineItem);
