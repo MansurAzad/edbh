@@ -80,12 +80,7 @@ const Blog = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead 
-        title="ব্লগ — ফ্যাশন টিপস ও স্টাইলিং গাইড" 
-        description="দুবাই বোরকা হাউস ব্লগ — ইসলামিক ফ্যাশন ট্রেন্ড, বোরকা স্টাইলিং টিপস, আবায়া কেনার গাইড ও আরো অনেক কিছু।" 
-        canonical="/blog" 
-        keywords="বোরকা স্টাইলিং, আবায়া ফ্যাশন টিপস, হিজাব স্টাইল গাইড, ইসলামিক ফ্যাশন ব্লগ, borka styling tips, abaya fashion blog"
-      />
+      <SEOHead {...buildBlogListSeo()} />
       <StructuredData data={blogListSchema} />
       <Header />
       <Breadcrumbs />
