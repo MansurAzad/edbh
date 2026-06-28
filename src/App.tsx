@@ -80,6 +80,7 @@ const TrackingFunnel = lazy(() => import("./pages/admin/TrackingFunnel"));
 // Performance Budget dashboard — Core Web Vitals + bundle + render counts.
 const PerformanceBudget = lazy(() => import("./pages/admin/PerformanceBudget"));
 const SgtmSetupGuide = lazy(() => import("./pages/admin/SgtmSetupGuide"));
+const InventorySync = lazy(() => import("./pages/admin/InventorySync"));
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
 // Marketing components - deferred to avoid query storms on initial load
@@ -167,6 +168,7 @@ const App = () => (
                     <Route path="/admin/tracking-funnel" element={<PermissionGuard><TrackingFunnel /></PermissionGuard>} />
                     <Route path="/admin/sgtm-setup" element={<PermissionGuard><SgtmSetupGuide /></PermissionGuard>} />
                     <Route path="/admin/performance" element={<PermissionGuard><PerformanceBudget /></PermissionGuard>} />
+                    <Route path="/admin/inventory-sync" element={<PermissionGuard><InventorySync /></PermissionGuard>} />
 
                     <Route path="/return-policy" element={<ReturnPolicy />} />
                     <Route path="/faq" element={<FAQ />} />

@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, Star, Settings,
   LogOut, ChevronLeft, Tag, Mail, BarChart3, RotateCcw, Truck,
   FileText, Menu, X, MapPin, Bell, MessageCircle, Shield, Edit3, Route, Gift, ShoppingBag,
-  HardDrive, ScrollText, Cloud, Activity, BookOpen, TrendingUp, Server,
+  HardDrive, ScrollText, Cloud, Activity, BookOpen, TrendingUp, Server, Plug,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useAuth } from "@/contexts/AuthContext";
@@ -52,6 +52,7 @@ const navItems = [
   { path: "/admin/tracking-funnel", icon: TrendingUp, label: "Conversion Funnel" },
   { path: "/admin/tracking-guide", icon: BookOpen, label: "Tracking Guide" },
   { path: "/admin/sgtm-setup", icon: Server, label: "sGTM Setup Guide" },
+  { path: "/admin/inventory-sync", icon: Plug, label: "Inventory Sync API" },
   { path: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 
