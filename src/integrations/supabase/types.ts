@@ -862,6 +862,45 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_sync_audit_log: {
+        Row: {
+          created_at: string
+          endpoint: string
+          error_message: string | null
+          id: string
+          ip: string | null
+          method: string
+          payload: Json | null
+          product_id: string | null
+          record_count: number | null
+          status_code: number | null
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          error_message?: string | null
+          id?: string
+          ip?: string | null
+          method: string
+          payload?: Json | null
+          product_id?: string | null
+          record_count?: number | null
+          status_code?: number | null
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          error_message?: string | null
+          id?: string
+          ip?: string | null
+          method?: string
+          payload?: Json | null
+          product_id?: string | null
+          record_count?: number | null
+          status_code?: number | null
+        }
+        Relationships: []
+      }
       newsletter_subscribers: {
         Row: {
           created_at: string
