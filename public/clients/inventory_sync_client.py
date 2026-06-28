@@ -99,13 +99,15 @@ class InventorySyncClient:
             body["variant"] = variant
         return self._request("POST", f"/products/{product_id}/stock", json_body=body)
 
+    _UNSET = object()
+
     def update_price(self, product_id: str, *, price: Optional[float] = None,
-                     sale_price: Optional[float] = None) -> dict:
+                     sale_price: Any = _UNSET) -> dict:
+        """Pass ``sale_price=None`` to clear it; omit to leave unchanged."""
         body: dict = {}
         if price is not None:
             body["price"] = price
-        if sale_price is not None or sale_price is None and "sale_price":
-            # caller explicitly passing None clears the sale price
+        if sale_price is not self._UNSET:
             body["sale_price"] = sale_price
         return self._request("POST", f"/products/{product_id}/price", json_body=body)
 
