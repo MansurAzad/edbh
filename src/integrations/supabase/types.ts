@@ -1263,6 +1263,7 @@ export type Database = {
           sizes: string[] | null
           slug: string | null
           stock: number | null
+          updated_at: string
           video_url: string | null
         }
         Insert: {
@@ -1280,6 +1281,7 @@ export type Database = {
           sizes?: string[] | null
           slug?: string | null
           stock?: number | null
+          updated_at?: string
           video_url?: string | null
         }
         Update: {
@@ -1297,6 +1299,7 @@ export type Database = {
           sizes?: string[] | null
           slug?: string | null
           stock?: number | null
+          updated_at?: string
           video_url?: string | null
         }
         Relationships: []
