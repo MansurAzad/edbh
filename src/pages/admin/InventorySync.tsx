@@ -160,7 +160,9 @@ export default function InventorySync() {
     } finally {
       setTestingWebhook(false);
       loadAll();
-    }
+  };
+
+
 
   // ---- Code snippets ----
   const curlList = `curl -H "x-api-key: YOUR_KEY" \\
