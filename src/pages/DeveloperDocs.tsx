@@ -30,7 +30,7 @@ interface ApiParam {
 }
 
 interface ApiRoute {
-  group: "Orders" | "Products" | "Chat & AI" | "Notifications" | "Media" | "SEO & Feeds" | "Admin";
+  group: "Orders" | "Products" | "Chat & AI" | "Notifications" | "Media" | "SEO & Feeds" | "Admin" | "Inventory Sync";
   method: "GET" | "POST" | "PATCH" | "DELETE";
   /** Edge function name — full path is /functions/v1/<name> */
   name: string;
@@ -234,6 +234,78 @@ const ROUTES: ApiRoute[] = [
     params: [{ name: "token", type: "string", required: true, description: "Turnstile widget token" }],
     sample: `{ "token": "0.XXX" }`,
     response: `{ "success": true }`,
+  },
+
+  // ---- Inventory Sync ------------------------------------------------
+  // Server-to-server API for an external inventory software.
+  // Auth header: x-api-key: <INVENTORY_SYNC_API_KEY>. Rate limit: 60 req/min/IP.
+  {
+    group: "Inventory Sync",
+    method: "GET",
+    name: "inventory-sync/ping",
+    summary: "Connection test. Returns server time if the API key is valid.",
+    auth: "service-role",
+    params: [],
+    sample: `curl -H "x-api-key: YOUR_KEY" https://<base>/functions/v1/inventory-sync/ping`,
+    response: `{ "ok": true, "service": "inventory-sync", "time": "2026-..." }`,
+  },
+  {
+    group: "Inventory Sync",
+    method: "GET",
+    name: "inventory-sync/products",
+    summary: "Paginated products list with variants, images, video, sizes/colors. Supports incremental sync via updated_since.",
+    auth: "service-role",
+    params: [
+      { name: "page", type: "number", required: false, description: "1-based page index (default 1)" },
+      { name: "per_page", type: "number", required: false, description: "Max 200 (default 50)" },
+      { name: "updated_since", type: "ISO datetime", required: false, description: "Only products updated after this time" },
+      { name: "category", type: "string", required: false, description: "Filter by category slug/name" },
+    ],
+    sample: `curl -H "x-api-key: YOUR_KEY" \\
+  "https://<base>/functions/v1/inventory-sync/products?page=1&per_page=50&updated_since=2026-01-01T00:00:00Z"`,
+    response: `{ "products": [{ "id": "...", "name": "...", "stock": 50, "variants": [...], "gallery": [...] }], "pagination": { "page":1, "per_page":50, "total":234, "total_pages":5 }, "synced_at": "..." }`,
+  },
+  {
+    group: "Inventory Sync",
+    method: "GET",
+    name: "inventory-sync/products/:id",
+    summary: "Full product detail by UUID — main image, gallery, video, variants with size/color/stock/price_adjustment.",
+    auth: "service-role",
+    params: [{ name: "id", type: "uuid (path)", required: true, description: "Product id" }],
+    sample: `curl -H "x-api-key: YOUR_KEY" https://<base>/functions/v1/inventory-sync/products/PRODUCT_UUID`,
+    response: `{ "id":"...", "name":"...", "main_image":"...", "gallery":[...], "variants":[...] }`,
+  },
+  {
+    group: "Inventory Sync",
+    method: "POST",
+    name: "inventory-sync/products/:id/stock",
+    summary: "Push stock update from external inventory. Optionally targets a specific variant by size/color.",
+    auth: "service-role",
+    params: [
+      { name: "id", type: "uuid (path)", required: true, description: "Product id" },
+      { name: "stock", type: "number ≥ 0", required: true, description: "New main stock" },
+      { name: "variant", type: "{ size?, color?, stock }", required: false, description: "Optional variant override" },
+    ],
+    sample: `curl -X POST -H "x-api-key: YOUR_KEY" -H "Content-Type: application/json" \\
+  -d '{ "stock": 25, "variant": { "size": "54\\"", "color": "Black", "stock": 8 } }' \\
+  https://<base>/functions/v1/inventory-sync/products/PRODUCT_UUID/stock`,
+    response: `{ "ok": true, "id": "...", "stock": 25 }`,
+  },
+  {
+    group: "Inventory Sync",
+    method: "POST",
+    name: "inventory-sync/products/:id/price",
+    summary: "Update price and/or sale_price (pass null to clear sale_price).",
+    auth: "service-role",
+    params: [
+      { name: "id", type: "uuid (path)", required: true, description: "Product id" },
+      { name: "price", type: "number ≥ 0", required: false, description: "Regular price" },
+      { name: "sale_price", type: "number ≥ 0 | null", required: false, description: "Sale price; null to clear" },
+    ],
+    sample: `curl -X POST -H "x-api-key: YOUR_KEY" -H "Content-Type: application/json" \\
+  -d '{ "price": 2500, "sale_price": 2200 }' \\
+  https://<base>/functions/v1/inventory-sync/products/PRODUCT_UUID/price`,
+    response: `{ "ok": true, "id": "...", "price": 2500, "sale_price": 2200 }`,
   },
 ];
 
