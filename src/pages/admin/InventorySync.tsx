@@ -46,6 +46,13 @@ export default function InventorySync() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookEnabled, setWebhookEnabled] = useState(false);
   const [savingWebhook, setSavingWebhook] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [webhookTestResult, setWebhookTestResult] = useState<null | {
+    ok: boolean;
+    status: number | null;
+    error: string | null;
+    url: string | null;
+  }>(null);
 
   // Load audit log + webhook settings
   const loadAll = async () => {
