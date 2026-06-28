@@ -130,6 +130,38 @@ export default function InventorySync() {
     }
   };
 
+  /** Send a signed test payload to the configured webhook URL. */
+  const testWebhook = async () => {
+    if (!apiKey.trim()) {
+      toast.error("আগে API key দিন / Enter your API key in the Test connection field first");
+      return;
+    }
+    if (!webhookUrl.trim() || !webhookEnabled) {
+      toast.error("Webhook URL সেট ও enabled থাকতে হবে / Set & enable the webhook URL first");
+      return;
+    }
+    setTestingWebhook(true);
+    setWebhookTestResult(null);
+    try {
+      const res = await fetch(`${FUNCTION_BASE}/test-webhook`, {
+        method: "POST",
+        headers: { "x-api-key": apiKey.trim(), "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const data = await res.json();
+      setWebhookTestResult({
+        ok: !!data.delivered,
+        status: data.status ?? null,
+        error: data.error ?? null,
+        url: data.url ?? null,
+      });
+    } catch (e: any) {
+      setWebhookTestResult({ ok: false, status: null, error: e?.message ?? "Network error", url: null });
+    } finally {
+      setTestingWebhook(false);
+      loadAll();
+    }
+
   // ---- Code snippets ----
   const curlList = `curl -H "x-api-key: YOUR_KEY" \\
   "${FUNCTION_BASE}/products?page=1&per_page=50&updated_since=2026-01-01T00:00:00Z"`;
