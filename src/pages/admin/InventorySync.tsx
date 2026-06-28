@@ -168,8 +168,15 @@ export default function InventorySync() {
 
 
   // ---- Code snippets ----
-  const curlList = `curl -H "x-api-key: YOUR_KEY" \\
-  "${FUNCTION_BASE}/products?page=1&per_page=50&updated_since=2026-01-01T00:00:00Z"`;
+  // Cursor mode is preferred for incremental sync — pass `cursor=` (empty on first
+  // call) and follow `pagination.next_cursor` until `has_more` is false.
+  const curlList = `# Page mode
+curl -H "x-api-key: YOUR_KEY" \\
+  "${FUNCTION_BASE}/products?page=1&per_page=50&updated_since=2026-01-01T00:00:00Z"
+
+# Cursor mode (recommended for incremental sync)
+curl -H "x-api-key: YOUR_KEY" \\
+  "${FUNCTION_BASE}/products?cursor=&per_page=100&updated_since=2026-01-01T00:00:00Z"`;
 
   const curlStock = `curl -X POST -H "x-api-key: YOUR_KEY" \\
   -H "Content-Type: application/json" \\
