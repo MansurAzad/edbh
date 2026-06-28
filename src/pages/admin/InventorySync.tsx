@@ -280,11 +280,74 @@ for p in data["products"]:
               <Switch checked={webhookEnabled} onCheckedChange={setWebhookEnabled} />
               <Label className="text-sm">Enabled</Label>
             </div>
-            <Button onClick={saveWebhook} disabled={savingWebhook} size="sm">
-              {savingWebhook ? "Saving…" : "Save webhook settings"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={saveWebhook} disabled={savingWebhook} size="sm">
+                {savingWebhook ? "Saving…" : "Save webhook settings"}
+              </Button>
+              <Button
+                onClick={testWebhook}
+                disabled={testingWebhook}
+                size="sm"
+                variant="outline"
+              >
+                {testingWebhook ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Test webhook (send signed sample)"
+                )}
+              </Button>
+            </div>
+            {webhookTestResult && (
+              <div
+                className={`text-sm flex items-start gap-2 ${
+                  webhookTestResult.ok ? "text-green-600" : "text-destructive"
+                }`}
+              >
+                {webhookTestResult.ok ? (
+                  <CheckCircle2 className="w-4 h-4 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 mt-0.5" />
+                )}
+                <div className="font-mono text-xs break-all">
+                  {webhookTestResult.ok
+                    ? `Delivered → HTTP ${webhookTestResult.status} (${webhookTestResult.url})`
+                    : `Failed${
+                        webhookTestResult.status ? ` (HTTP ${webhookTestResult.status})` : ""
+                      }: ${webhookTestResult.error ?? "unknown"}`}
+                </div>
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Signed with header <code className="font-mono">x-lovable-signature: sha256=…</code>{" "}
+              (HMAC-SHA256 of the raw body using <code>INVENTORY_WEBHOOK_SECRET</code>).
+            </p>
           </CardContent>
         </Card>
+
+        {/* Client helpers */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Client helpers</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-muted-foreground text-xs">
+              Drop-in clients with built-in API-key auth, 429 retry, and cursor-pagination iterators.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <a href="/clients/inventory-sync-client.js" download>
+                  Download JS client
+                </a>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <a href="/clients/inventory_sync_client.py" download>
+                  Download Python client
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
 
         {/* Snippets */}
         <Card>
