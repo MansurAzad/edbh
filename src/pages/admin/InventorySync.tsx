@@ -46,6 +46,13 @@ export default function InventorySync() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookEnabled, setWebhookEnabled] = useState(false);
   const [savingWebhook, setSavingWebhook] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [webhookTestResult, setWebhookTestResult] = useState<null | {
+    ok: boolean;
+    status: number | null;
+    error: string | null;
+    url: string | null;
+  }>(null);
 
   // Load audit log + webhook settings
   const loadAll = async () => {
@@ -123,9 +130,53 @@ export default function InventorySync() {
     }
   };
 
+  /** Send a signed test payload to the configured webhook URL. */
+  const testWebhook = async () => {
+    if (!apiKey.trim()) {
+      toast.error("আগে API key দিন / Enter your API key in the Test connection field first");
+      return;
+    }
+    if (!webhookUrl.trim() || !webhookEnabled) {
+      toast.error("Webhook URL সেট ও enabled থাকতে হবে / Set & enable the webhook URL first");
+      return;
+    }
+    setTestingWebhook(true);
+    setWebhookTestResult(null);
+    try {
+      const res = await fetch(`${FUNCTION_BASE}/test-webhook`, {
+        method: "POST",
+        headers: { "x-api-key": apiKey.trim(), "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const data = await res.json();
+      setWebhookTestResult({
+        ok: !!data.delivered,
+        status: data.status ?? null,
+        error: data.error ?? null,
+        url: data.url ?? null,
+      });
+    } catch (e: any) {
+      setWebhookTestResult({ ok: false, status: null, error: e?.message ?? "Network error", url: null });
+    } finally {
+      setTestingWebhook(false);
+      loadAll();
+    }
+  };
+
+
+
+
+
   // ---- Code snippets ----
-  const curlList = `curl -H "x-api-key: YOUR_KEY" \\
-  "${FUNCTION_BASE}/products?page=1&per_page=50&updated_since=2026-01-01T00:00:00Z"`;
+  // Cursor mode is preferred for incremental sync — pass `cursor=` (empty on first
+  // call) and follow `pagination.next_cursor` until `has_more` is false.
+  const curlList = `# Page mode
+curl -H "x-api-key: YOUR_KEY" \\
+  "${FUNCTION_BASE}/products?page=1&per_page=50&updated_since=2026-01-01T00:00:00Z"
+
+# Cursor mode (recommended for incremental sync)
+curl -H "x-api-key: YOUR_KEY" \\
+  "${FUNCTION_BASE}/products?cursor=&per_page=100&updated_since=2026-01-01T00:00:00Z"`;
 
   const curlStock = `curl -X POST -H "x-api-key: YOUR_KEY" \\
   -H "Content-Type: application/json" \\
@@ -236,11 +287,74 @@ for p in data["products"]:
               <Switch checked={webhookEnabled} onCheckedChange={setWebhookEnabled} />
               <Label className="text-sm">Enabled</Label>
             </div>
-            <Button onClick={saveWebhook} disabled={savingWebhook} size="sm">
-              {savingWebhook ? "Saving…" : "Save webhook settings"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={saveWebhook} disabled={savingWebhook} size="sm">
+                {savingWebhook ? "Saving…" : "Save webhook settings"}
+              </Button>
+              <Button
+                onClick={testWebhook}
+                disabled={testingWebhook}
+                size="sm"
+                variant="outline"
+              >
+                {testingWebhook ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Test webhook (send signed sample)"
+                )}
+              </Button>
+            </div>
+            {webhookTestResult && (
+              <div
+                className={`text-sm flex items-start gap-2 ${
+                  webhookTestResult.ok ? "text-green-600" : "text-destructive"
+                }`}
+              >
+                {webhookTestResult.ok ? (
+                  <CheckCircle2 className="w-4 h-4 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 mt-0.5" />
+                )}
+                <div className="font-mono text-xs break-all">
+                  {webhookTestResult.ok
+                    ? `Delivered → HTTP ${webhookTestResult.status} (${webhookTestResult.url})`
+                    : `Failed${
+                        webhookTestResult.status ? ` (HTTP ${webhookTestResult.status})` : ""
+                      }: ${webhookTestResult.error ?? "unknown"}`}
+                </div>
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Signed with header <code className="font-mono">x-lovable-signature: sha256=…</code>{" "}
+              (HMAC-SHA256 of the raw body using <code>INVENTORY_WEBHOOK_SECRET</code>).
+            </p>
           </CardContent>
         </Card>
+
+        {/* Client helpers */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Client helpers</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-muted-foreground text-xs">
+              Drop-in clients with built-in API-key auth, 429 retry, and cursor-pagination iterators.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <a href="/clients/inventory-sync-client.js" download>
+                  Download JS client
+                </a>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <a href="/clients/inventory_sync_client.py" download>
+                  Download Python client
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
 
         {/* Snippets */}
         <Card>
