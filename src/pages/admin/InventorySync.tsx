@@ -160,7 +160,10 @@ export default function InventorySync() {
     } finally {
       setTestingWebhook(false);
       loadAll();
+    }
   };
+
+
 
 
 
