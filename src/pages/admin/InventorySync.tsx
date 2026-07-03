@@ -152,7 +152,7 @@ export default function InventorySync() {
     try {
       const res = await fetch(`${FUNCTION_BASE}/test-webhook`, {
         method: "POST",
-        headers: { "x-api-key": apiKey.trim(), "Content-Type": "application/json" },
+        headers: { ...GATEWAY_HEADERS, "x-api-key": apiKey.trim(), "Content-Type": "application/json" },
         body: "{}",
       });
       const data = await res.json();
