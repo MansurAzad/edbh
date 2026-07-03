@@ -444,6 +444,7 @@ Deno.serve(async (req) => {
     since,
     last_synced_at: lastSyncedAt,
     target: url,
+    branch_id: branchId,
     validation_errors: validationErrors,
     results,
   });
