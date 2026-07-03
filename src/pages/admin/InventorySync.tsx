@@ -717,9 +717,21 @@ for p in data["products"]:
                   <Button variant="outline" size="sm" onClick={downloadReportJson}>
                     Download full report JSON
                   </Button>
+                  {pushResult.sample_payload && (
+                    <Button variant="outline" size="sm" onClick={downloadSamplePayload}>
+                      Download sample payload JSON
+                    </Button>
+                  )}
                 </>
               )}
             </div>
+
+            {pushResult?.branch_id !== undefined && (
+              <p className="text-[11px] text-muted-foreground">
+                branch_id sent with request:{" "}
+                <span className="font-mono">{pushResult.branch_id ?? "(none)"}</span>
+              </p>
+            )}
 
             {/* Live progress while pushing */}
             {pushing && progress && (
