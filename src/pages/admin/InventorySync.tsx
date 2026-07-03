@@ -24,6 +24,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const FUNCTION_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/inventory-sync`;
+// Supabase's gateway requires the anon apikey on every /functions/v1/* call
+// before the request reaches the function. External clients get this via
+// verify_jwt=false + x-api-key only, but browser fetch must include it.
+const GATEWAY_HEADERS = {
+  apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+};
 
 interface AuditRow {
   id: string;
@@ -96,7 +103,7 @@ export default function InventorySync() {
     setTestResult(null);
     try {
       const res = await fetch(`${FUNCTION_BASE}/ping`, {
-        headers: { "x-api-key": apiKey.trim() },
+        headers: { ...GATEWAY_HEADERS, "x-api-key": apiKey.trim() },
       });
       const json = await res.json();
       if (res.ok) {
@@ -145,7 +152,7 @@ export default function InventorySync() {
     try {
       const res = await fetch(`${FUNCTION_BASE}/test-webhook`, {
         method: "POST",
-        headers: { "x-api-key": apiKey.trim(), "Content-Type": "application/json" },
+        headers: { ...GATEWAY_HEADERS, "x-api-key": apiKey.trim(), "Content-Type": "application/json" },
         body: "{}",
       });
       const data = await res.json();
