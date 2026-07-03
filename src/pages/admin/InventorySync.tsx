@@ -63,40 +63,122 @@ export default function InventorySync() {
 
   // ---- Push-to-external-inventory state ----
   const [pushing, setPushing] = useState(false);
+  const [dryRun, setDryRun] = useState(true); // default = safe preview
+  const [incremental, setIncremental] = useState(true);
+  const [concurrency, setConcurrency] = useState(4);
+  const [lastPushAt, setLastPushAt] = useState<string | null>(null);
+
+  interface PushResultRow {
+    product_id: string;
+    name: string;
+    action: "created" | "updated" | "failed" | "skipped" | "invalid";
+    external_id?: string;
+    status?: number;
+    error?: string;
+    attempts?: number;
+  }
+  interface ValidationErr {
+    product_id: string;
+    name: string;
+    errors: string[];
+  }
   const [pushResult, setPushResult] = useState<null | {
+    dry_run: boolean;
     total: number;
+    valid: number;
+    invalid: number;
     created: number;
     updated: number;
     failed: number;
-    errors?: Array<{ name: string; error?: string; status?: number }>;
+    since: string | null;
+    last_synced_at: string | null;
+    validation_errors: ValidationErr[];
+    results: PushResultRow[];
   }>(null);
 
-  /** Trigger the server-side batch push of every product to bigsoftdbh. */
+  /** Trigger the server-side batch push (or dry-run) with current toggles. */
   const pushAllProducts = async () => {
-    if (!confirm("সব products আপনার external inventory-এ পাঠানো হবে। প্রায় 1s/product লাগবে। শুরু করব?")) return;
+    if (!dryRun && !confirm("Actual push শুরু হবে (dry-run নয়)। নিশ্চিত?")) return;
     setPushing(true);
     setPushResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("push-to-external-inventory", {
-        body: {},
+        body: { dry_run: dryRun, incremental, concurrency },
       });
       if (error) throw error;
-      setPushResult({
-        total: data.total,
-        created: data.created,
-        updated: data.updated,
-        failed: data.failed,
-        errors: (data.results ?? [])
-          .filter((r: any) => r.action === "failed")
-          .slice(0, 20)
-          .map((r: any) => ({ name: r.name, error: r.error, status: r.status })),
-      });
-      toast.success(`Push সম্পন্ন: ${data.created + data.updated}/${data.total} success`);
+      setPushResult(data);
+      if (data.last_synced_at) setLastPushAt(data.last_synced_at);
+      if (dryRun) {
+        toast.success(
+          `Dry-run: ${data.valid}/${data.total} valid, ${data.invalid} invalid`,
+        );
+      } else {
+        toast.success(
+          `Push সম্পন্ন: ${data.created + data.updated}/${data.total} success · ${data.failed} failed`,
+        );
+      }
     } catch (e: any) {
       toast.error(e?.message ?? "Push failed");
     } finally {
       setPushing(false);
     }
+  };
+
+  /** Download failed + invalid rows as a CSV file. */
+  const downloadFailedCsv = () => {
+    if (!pushResult) return;
+    const rows = [
+      ...pushResult.validation_errors.map((v) => ({
+        product_id: v.product_id,
+        name: v.name,
+        action: "invalid",
+        status: "",
+        attempts: "",
+        error: v.errors.join(" | "),
+      })),
+      ...pushResult.results
+        .filter((r) => r.action === "failed" || r.action === "invalid")
+        .map((r) => ({
+          product_id: r.product_id,
+          name: r.name,
+          action: r.action,
+          status: r.status ?? "",
+          attempts: r.attempts ?? "",
+          error: r.error ?? "",
+        })),
+    ];
+    if (rows.length === 0) {
+      toast.info("কোনো failure নেই / No failures to export");
+      return;
+    }
+    const headers = ["product_id", "name", "action", "status", "attempts", "error"];
+    const esc = (v: any) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [
+      headers.join(","),
+      ...rows.map((r) => headers.map((h) => esc((r as any)[h])).join(",")),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `inventory-sync-failures-${new Date().toISOString().slice(0, 19)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  /** Download full push report as JSON. */
+  const downloadReportJson = () => {
+    if (!pushResult) return;
+    const blob = new Blob([JSON.stringify(pushResult, null, 2)], {
+      type: "application/json",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `inventory-sync-report-${new Date().toISOString().slice(0, 19)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
 
