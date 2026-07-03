@@ -273,7 +273,8 @@ Deno.serve(async (req) => {
       created: 0, updated: 0, failed: 0, skipped: 0,
       since,
       target: `${BASE.replace(/\/$/, "")}/products`,
-      sample_payload: validRows[0] ? mapProduct(validRows[0]) : null,
+      sample_payload: validRows[0] ? mapProduct(validRows[0], branchId) : null,
+      branch_id: branchId,
       validation_errors: validationErrors,
       results: [],
     });
