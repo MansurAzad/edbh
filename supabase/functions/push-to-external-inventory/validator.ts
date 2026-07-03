@@ -61,7 +61,7 @@ export function validateProduct(p: ProductInput): string[] {
 /**
  * Map our product row → external inventory API payload.
  */
-export function mapProduct(p: ProductInput) {
+export function mapProduct(p: ProductInput, branchId?: string | null) {
   const priceNum = Number(p.price ?? 0);
   const effectivePrice = p.sale_price != null && p.sale_price !== ""
     ? Number(p.sale_price)
@@ -73,7 +73,7 @@ export function mapProduct(p: ProductInput) {
     .filter(Boolean) as string[];
   const image_urls = Array.from(new Set([p.image_url, ...gallery].filter(Boolean))) as string[];
 
-  return {
+  const payload: Record<string, unknown> = {
     name: p.name,
     sku: p.slug ?? p.id,
     external_ref: p.id,
@@ -90,4 +90,6 @@ export function mapProduct(p: ProductInput) {
     is_active: true,
     updated_at: p.updated_at,
   };
+  if (branchId) payload.branch_id = branchId;
+  return payload;
 }

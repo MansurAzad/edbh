@@ -112,10 +112,35 @@ export default function InventorySync() {
     retries?: number;
     since: string | null;
     last_synced_at: string | null;
+    branch_id?: string | null;
+    sample_payload?: Record<string, unknown> | null;
     validation_errors: ValidationErr[];
     results: PushResultRow[];
   }>(null);
   const [progress, setProgress] = useState<LiveProgress | null>(null);
+
+  // --- Branch ID setting (sent with every push) ---
+  const [branchId, setBranchIdState] = useState("");
+  const [savingBranch, setSavingBranch] = useState(false);
+
+  // --- External live-test state ---
+  const [liveTesting, setLiveTesting] = useState(false);
+  const [liveTestMethod, setLiveTestMethod] = useState<"GET" | "POST">("GET");
+  const [liveTestPath, setLiveTestPath] = useState("/products");
+  const [liveTestPayload, setLiveTestPayload] = useState(
+    '{\n  "name": "Test Product",\n  "selling_price": 100,\n  "regular_price": 100,\n  "stock": 1,\n  "sku": "TEST-1"\n}',
+  );
+  const [liveTestResult, setLiveTestResult] = useState<null | {
+    ok: boolean;
+    method: string;
+    url: string;
+    status: number;
+    latency_ms: number;
+    headers?: Record<string, string>;
+    body_text?: string;
+    body_json?: unknown;
+    error?: string;
+  }>(null);
 
   /** Poll `system_settings.inventory_push_progress` while a push is in flight. */
   useEffect(() => {
@@ -147,6 +172,7 @@ export default function InventorySync() {
           incremental,
           concurrency,
           limit: typeof productLimit === "number" ? productLimit : undefined,
+          branch_id: branchId.trim() || undefined,
         },
       });
       if (error) throw error;
@@ -242,6 +268,67 @@ export default function InventorySync() {
     URL.revokeObjectURL(a.href);
   };
 
+  /** Download only the mapped sample payload (dry-run field-name review). */
+  const downloadSamplePayload = () => {
+    if (!pushResult?.sample_payload) return;
+    const blob = new Blob([JSON.stringify(pushResult.sample_payload, null, 2)], {
+      type: "application/json",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `inventory-sample-payload-${new Date().toISOString().slice(0, 19)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  /** Save the branch_id to system_settings (sent with every push request). */
+  const saveBranchId = async () => {
+    setSavingBranch(true);
+    const { error } = await supabase
+      .from("system_settings")
+      .upsert(
+        { key: "inventory_branch_id", value: { id: branchId.trim() } },
+        { onConflict: "key" },
+      );
+    setSavingBranch(false);
+    if (error) toast.error("Save failed: " + error.message);
+    else toast.success("Branch ID saved");
+  };
+
+  /** Live GET/POST test against the external inventory API (uses server-stored key). */
+  const runLiveTest = async () => {
+    setLiveTesting(true);
+    setLiveTestResult(null);
+    try {
+      let payload: unknown = undefined;
+      if (liveTestMethod === "POST") {
+        try {
+          payload = JSON.parse(liveTestPayload);
+        } catch (e: any) {
+          toast.error("Invalid JSON payload: " + e.message);
+          setLiveTesting(false);
+          return;
+        }
+      }
+      const { data, error } = await supabase.functions.invoke("push-to-external-inventory", {
+        body: {
+          action: "live_test",
+          method: liveTestMethod,
+          path: liveTestPath.trim() || "/products",
+          payload,
+        },
+      });
+      if (error) throw error;
+      setLiveTestResult(data);
+      if (data.ok) toast.success(`${liveTestMethod} → HTTP ${data.status} (${data.latency_ms} ms)`);
+      else toast.error(`${liveTestMethod} → HTTP ${data.status} — check details below`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Live test failed");
+    } finally {
+      setLiveTesting(false);
+    }
+  };
+
 
   // Load audit log + webhook settings + last push checkpoint
   const loadAll = async () => {
@@ -259,6 +346,7 @@ export default function InventorySync() {
           "inventory_webhook_url",
           "inventory_webhook_enabled",
           "inventory_last_push_at",
+          "inventory_branch_id",
         ]),
     ]);
     setLogs((rows as AuditRow[]) ?? []);
@@ -266,9 +354,11 @@ export default function InventorySync() {
       const urlRow = settings.find((s: any) => s.key === "inventory_webhook_url");
       const enRow = settings.find((s: any) => s.key === "inventory_webhook_enabled");
       const lastRow = settings.find((s: any) => s.key === "inventory_last_push_at");
+      const brRow = settings.find((s: any) => s.key === "inventory_branch_id");
       setWebhookUrl((urlRow?.value as any)?.url ?? "");
       setWebhookEnabled(!!(enRow?.value as any)?.enabled);
       setLastPushAt((lastRow?.value as any)?.at ?? null);
+      setBranchIdState((brRow?.value as any)?.id ?? "");
     }
     setLoading(false);
   };
@@ -526,6 +616,106 @@ for p in data["products"]:
           </CardContent>
         </Card>
 
+        {/* Branch ID setting */}
+        <Card>
+          <CardHeader>
+            <CardTitle>External Inventory · Branch ID</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              আপনার inventory software-এ একাধিক branch থাকলে এখানে branch ID দিন —
+              প্রতিটি Push products request-এর payload-এ <code className="font-mono">branch_id</code>{" "}
+              ফিল্ড হিসেবে যাবে। খালি রাখলে server default branch ব্যবহার করবে।
+            </p>
+            <div className="flex gap-2">
+              <Input
+                value={branchId}
+                onChange={(e) => setBranchIdState(e.target.value)}
+                placeholder="e.g. main-branch-uuid"
+                className="font-mono text-xs"
+              />
+              <Button onClick={saveBranchId} disabled={savingBranch} size="sm">
+                {savingBranch ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Live external API test */}
+        <Card>
+          <CardHeader>
+            <CardTitle>External Inventory · Live API test</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Server-এ saved <code>EXTERNAL_INVENTORY_API_KEY</code> দিয়ে সরাসরি
+              GET/POST করে raw response দেখুন — mapping/endpoint debug করতে।
+            </p>
+            <div className="flex gap-2">
+              <select
+                value={liveTestMethod}
+                onChange={(e) => setLiveTestMethod(e.target.value as "GET" | "POST")}
+                className="h-10 rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+              </select>
+              <Input
+                value={liveTestPath}
+                onChange={(e) => setLiveTestPath(e.target.value)}
+                placeholder="/products"
+                className="font-mono text-xs"
+              />
+              <Button onClick={runLiveTest} disabled={liveTesting}>
+                {liveTesting ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Run test"}
+              </Button>
+            </div>
+            {liveTestMethod === "POST" && (
+              <div>
+                <Label className="text-xs">POST body (JSON)</Label>
+                <textarea
+                  value={liveTestPayload}
+                  onChange={(e) => setLiveTestPayload(e.target.value)}
+                  rows={6}
+                  className="w-full mt-1 rounded-md border bg-background p-2 font-mono text-xs"
+                />
+              </div>
+            )}
+            {liveTestResult && (
+              <div className="border rounded-md p-3 bg-muted/30 space-y-2 text-xs">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Badge variant={liveTestResult.ok ? "default" : "destructive"}>
+                    HTTP {liveTestResult.status}
+                  </Badge>
+                  <span className="text-muted-foreground">
+                    {liveTestResult.latency_ms} ms · {liveTestResult.method}
+                  </span>
+                  <span className="font-mono break-all">{liveTestResult.url}</span>
+                </div>
+                {liveTestResult.error && (
+                  <div className="text-destructive font-mono">{liveTestResult.error}</div>
+                )}
+                <details>
+                  <summary className="cursor-pointer font-medium">Response body</summary>
+                  <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono">
+                    {liveTestResult.body_json
+                      ? JSON.stringify(liveTestResult.body_json, null, 2)
+                      : liveTestResult.body_text || "(empty)"}
+                  </pre>
+                </details>
+                {liveTestResult.headers && (
+                  <details>
+                    <summary className="cursor-pointer font-medium">Response headers</summary>
+                    <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono">
+                      {JSON.stringify(liveTestResult.headers, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Push all products to external inventory (bigsoftdbh.lovable.app) */}
         <Card>
           <CardHeader>
@@ -627,9 +817,21 @@ for p in data["products"]:
                   <Button variant="outline" size="sm" onClick={downloadReportJson}>
                     Download full report JSON
                   </Button>
+                  {pushResult.sample_payload && (
+                    <Button variant="outline" size="sm" onClick={downloadSamplePayload}>
+                      Download sample payload JSON
+                    </Button>
+                  )}
                 </>
               )}
             </div>
+
+            {pushResult?.branch_id !== undefined && (
+              <p className="text-[11px] text-muted-foreground">
+                branch_id sent with request:{" "}
+                <span className="font-mono">{pushResult.branch_id ?? "(none)"}</span>
+              </p>
+            )}
 
             {/* Live progress while pushing */}
             {pushing && progress && (
@@ -751,6 +953,17 @@ for p in data["products"]:
                           </li>
                         ))}
                     </ul>
+                  </details>
+                )}
+
+                {pushResult.sample_payload && (
+                  <details className="text-xs" open={pushResult.dry_run}>
+                    <summary className="cursor-pointer font-medium">
+                      Sample payload (mapProduct output — এই field-names external API-তে যাচ্ছে)
+                    </summary>
+                    <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap font-mono bg-background p-2 rounded border">
+                      {JSON.stringify(pushResult.sample_payload, null, 2)}
+                    </pre>
                   </details>
                 )}
               </div>
