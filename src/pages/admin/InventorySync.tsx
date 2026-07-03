@@ -103,7 +103,7 @@ export default function InventorySync() {
     setTestResult(null);
     try {
       const res = await fetch(`${FUNCTION_BASE}/ping`, {
-        headers: { "x-api-key": apiKey.trim() },
+        headers: { ...GATEWAY_HEADERS, "x-api-key": apiKey.trim() },
       });
       const json = await res.json();
       if (res.ok) {
