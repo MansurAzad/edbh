@@ -268,6 +268,67 @@ export default function InventorySync() {
     URL.revokeObjectURL(a.href);
   };
 
+  /** Download only the mapped sample payload (dry-run field-name review). */
+  const downloadSamplePayload = () => {
+    if (!pushResult?.sample_payload) return;
+    const blob = new Blob([JSON.stringify(pushResult.sample_payload, null, 2)], {
+      type: "application/json",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `inventory-sample-payload-${new Date().toISOString().slice(0, 19)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  /** Save the branch_id to system_settings (sent with every push request). */
+  const saveBranchId = async () => {
+    setSavingBranch(true);
+    const { error } = await supabase
+      .from("system_settings")
+      .upsert(
+        { key: "inventory_branch_id", value: { id: branchId.trim() } },
+        { onConflict: "key" },
+      );
+    setSavingBranch(false);
+    if (error) toast.error("Save failed: " + error.message);
+    else toast.success("Branch ID saved");
+  };
+
+  /** Live GET/POST test against the external inventory API (uses server-stored key). */
+  const runLiveTest = async () => {
+    setLiveTesting(true);
+    setLiveTestResult(null);
+    try {
+      let payload: unknown = undefined;
+      if (liveTestMethod === "POST") {
+        try {
+          payload = JSON.parse(liveTestPayload);
+        } catch (e: any) {
+          toast.error("Invalid JSON payload: " + e.message);
+          setLiveTesting(false);
+          return;
+        }
+      }
+      const { data, error } = await supabase.functions.invoke("push-to-external-inventory", {
+        body: {
+          action: "live_test",
+          method: liveTestMethod,
+          path: liveTestPath.trim() || "/products",
+          payload,
+        },
+      });
+      if (error) throw error;
+      setLiveTestResult(data);
+      if (data.ok) toast.success(`${liveTestMethod} → HTTP ${data.status} (${data.latency_ms} ms)`);
+      else toast.error(`${liveTestMethod} → HTTP ${data.status} — check details below`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Live test failed");
+    } finally {
+      setLiveTesting(false);
+    }
+  };
+
 
   // Load audit log + webhook settings + last push checkpoint
   const loadAll = async () => {
