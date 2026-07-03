@@ -127,7 +127,7 @@ export default function InventorySync() {
         .select("value")
         .eq("key", "inventory_push_progress")
         .maybeSingle();
-      if (!cancelled && data?.value) setProgress(data.value as LiveProgress);
+      if (!cancelled && data?.value) setProgress(data.value as unknown as LiveProgress);
     };
     tick();
     const id = setInterval(tick, 1000);
