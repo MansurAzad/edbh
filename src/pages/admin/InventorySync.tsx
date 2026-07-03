@@ -469,48 +469,150 @@ for p in data["products"]:
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Upload className="w-5 h-5" /> Push all products → External Inventory
+              <Upload className="w-5 h-5" /> Push products → External Inventory
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              এই বাটন চাপলে সাইটের সব products আপনার external inventory software
-              (<code className="font-mono text-xs">bigsoftdbh.lovable.app</code>)-এ
-              POST হবে। Rate limit মানতে ~1 sec/product সময় লাগবে।
+              সাইটের products আপনার external inventory software
+              (<code className="font-mono text-xs">bigsoftdbh.lovable.app</code>)-এ POST হবে।
+              Rate-limit ও validation সব server-side handle করা হয়।
             </p>
-            <Button onClick={pushAllProducts} disabled={pushing}>
-              {pushing ? (
-                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Pushing…</>
-              ) : (
-                <><Upload className="w-4 h-4 mr-2" /> Push all products now</>
+
+            {/* --- Options row --- */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="flex items-start gap-2 border rounded-md p-3">
+                <Switch id="dry-run" checked={dryRun} onCheckedChange={setDryRun} />
+                <div>
+                  <Label htmlFor="dry-run" className="text-sm font-medium">Dry-run</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    যাচাই করে দেখাবে — কিছু push হবে না।
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 border rounded-md p-3">
+                <Switch
+                  id="incremental"
+                  checked={incremental}
+                  onCheckedChange={setIncremental}
+                />
+                <div>
+                  <Label htmlFor="incremental" className="text-sm font-medium">
+                    Incremental
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    শুধু শেষ sync-এর পর change হওয়া products।
+                  </p>
+                </div>
+              </div>
+              <div className="border rounded-md p-3">
+                <Label htmlFor="concurrency" className="text-sm font-medium">
+                  Concurrency
+                </Label>
+                <Input
+                  id="concurrency"
+                  type="number"
+                  min={1}
+                  max={8}
+                  value={concurrency}
+                  onChange={(e) =>
+                    setConcurrency(Math.max(1, Math.min(8, Number(e.target.value) || 1)))
+                  }
+                  className="h-8 mt-1"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">Parallel workers (1–8)</p>
+              </div>
+            </div>
+
+            {lastPushAt && (
+              <p className="text-xs text-muted-foreground">
+                শেষ successful push: <span className="font-mono">{new Date(lastPushAt).toLocaleString()}</span>
+              </p>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={pushAllProducts} disabled={pushing}>
+                {pushing ? (
+                  <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> {dryRun ? "Validating…" : "Pushing…"}</>
+                ) : (
+                  <><Upload className="w-4 h-4 mr-2" /> {dryRun ? "Run dry-run" : "Push now"}</>
+                )}
+              </Button>
+              {pushResult && (
+                <>
+                  <Button variant="outline" size="sm" onClick={downloadFailedCsv}>
+                    Download failures CSV
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={downloadReportJson}>
+                    Download full report JSON
+                  </Button>
+                </>
               )}
-            </Button>
+            </div>
+
             {pushResult && (
               <div className="text-sm space-y-2 border rounded-md p-3 bg-muted/30">
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {pushResult.dry_run && <Badge variant="outline">Dry-run</Badge>}
                   <Badge variant="default">Total: {pushResult.total}</Badge>
-                  <Badge variant="default" className="bg-green-600">Created: {pushResult.created}</Badge>
-                  <Badge variant="secondary">Updated: {pushResult.updated}</Badge>
-                  {pushResult.failed > 0 && (
-                    <Badge variant="destructive">Failed: {pushResult.failed}</Badge>
+                  <Badge variant="secondary">Valid: {pushResult.valid}</Badge>
+                  {pushResult.invalid > 0 && (
+                    <Badge variant="destructive">Invalid: {pushResult.invalid}</Badge>
+                  )}
+                  {!pushResult.dry_run && (
+                    <>
+                      <Badge className="bg-green-600">Created: {pushResult.created}</Badge>
+                      <Badge variant="secondary">Updated: {pushResult.updated}</Badge>
+                      {pushResult.failed > 0 && (
+                        <Badge variant="destructive">Failed: {pushResult.failed}</Badge>
+                      )}
+                    </>
                   )}
                 </div>
-                {pushResult.errors && pushResult.errors.length > 0 && (
-                  <div className="text-xs">
-                    <div className="font-medium mb-1">First failures:</div>
-                    <ul className="list-disc list-inside space-y-0.5 text-destructive">
-                      {pushResult.errors.map((e, i) => (
-                        <li key={i} className="font-mono break-all">
-                          [{e.status ?? "-"}] {e.name}: {e.error}
+                {pushResult.since && (
+                  <p className="text-xs text-muted-foreground">
+                    Filtered since: <span className="font-mono">{pushResult.since}</span>
+                  </p>
+                )}
+
+                {pushResult.validation_errors.length > 0 && (
+                  <details className="text-xs" open>
+                    <summary className="cursor-pointer font-medium text-destructive">
+                      Validation errors ({pushResult.validation_errors.length})
+                    </summary>
+                    <ul className="mt-1 space-y-1 max-h-56 overflow-auto">
+                      {pushResult.validation_errors.slice(0, 50).map((v) => (
+                        <li key={v.product_id} className="font-mono break-all">
+                          <span className="text-muted-foreground">{v.name}:</span>{" "}
+                          <span className="text-destructive">{v.errors.join("; ")}</span>
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </details>
+                )}
+
+                {pushResult.results.filter((r) => r.action === "failed").length > 0 && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer font-medium text-destructive">
+                      Push failures ({pushResult.results.filter((r) => r.action === "failed").length})
+                    </summary>
+                    <ul className="mt-1 space-y-1 max-h-56 overflow-auto">
+                      {pushResult.results
+                        .filter((r) => r.action === "failed")
+                        .slice(0, 50)
+                        .map((r) => (
+                          <li key={r.product_id} className="font-mono break-all">
+                            [{r.status ?? "-"}] {r.name}: {r.error}
+                          </li>
+                        ))}
+                    </ul>
+                  </details>
                 )}
               </div>
             )}
           </CardContent>
         </Card>
+
 
         {/* Client helpers */}
 
