@@ -616,6 +616,106 @@ for p in data["products"]:
           </CardContent>
         </Card>
 
+        {/* Branch ID setting */}
+        <Card>
+          <CardHeader>
+            <CardTitle>External Inventory · Branch ID</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              আপনার inventory software-এ একাধিক branch থাকলে এখানে branch ID দিন —
+              প্রতিটি Push products request-এর payload-এ <code className="font-mono">branch_id</code>{" "}
+              ফিল্ড হিসেবে যাবে। খালি রাখলে server default branch ব্যবহার করবে।
+            </p>
+            <div className="flex gap-2">
+              <Input
+                value={branchId}
+                onChange={(e) => setBranchIdState(e.target.value)}
+                placeholder="e.g. main-branch-uuid"
+                className="font-mono text-xs"
+              />
+              <Button onClick={saveBranchId} disabled={savingBranch} size="sm">
+                {savingBranch ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Live external API test */}
+        <Card>
+          <CardHeader>
+            <CardTitle>External Inventory · Live API test</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Server-এ saved <code>EXTERNAL_INVENTORY_API_KEY</code> দিয়ে সরাসরি
+              GET/POST করে raw response দেখুন — mapping/endpoint debug করতে।
+            </p>
+            <div className="flex gap-2">
+              <select
+                value={liveTestMethod}
+                onChange={(e) => setLiveTestMethod(e.target.value as "GET" | "POST")}
+                className="h-10 rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+              </select>
+              <Input
+                value={liveTestPath}
+                onChange={(e) => setLiveTestPath(e.target.value)}
+                placeholder="/products"
+                className="font-mono text-xs"
+              />
+              <Button onClick={runLiveTest} disabled={liveTesting}>
+                {liveTesting ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Run test"}
+              </Button>
+            </div>
+            {liveTestMethod === "POST" && (
+              <div>
+                <Label className="text-xs">POST body (JSON)</Label>
+                <textarea
+                  value={liveTestPayload}
+                  onChange={(e) => setLiveTestPayload(e.target.value)}
+                  rows={6}
+                  className="w-full mt-1 rounded-md border bg-background p-2 font-mono text-xs"
+                />
+              </div>
+            )}
+            {liveTestResult && (
+              <div className="border rounded-md p-3 bg-muted/30 space-y-2 text-xs">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Badge variant={liveTestResult.ok ? "default" : "destructive"}>
+                    HTTP {liveTestResult.status}
+                  </Badge>
+                  <span className="text-muted-foreground">
+                    {liveTestResult.latency_ms} ms · {liveTestResult.method}
+                  </span>
+                  <span className="font-mono break-all">{liveTestResult.url}</span>
+                </div>
+                {liveTestResult.error && (
+                  <div className="text-destructive font-mono">{liveTestResult.error}</div>
+                )}
+                <details>
+                  <summary className="cursor-pointer font-medium">Response body</summary>
+                  <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono">
+                    {liveTestResult.body_json
+                      ? JSON.stringify(liveTestResult.body_json, null, 2)
+                      : liveTestResult.body_text || "(empty)"}
+                  </pre>
+                </details>
+                {liveTestResult.headers && (
+                  <details>
+                    <summary className="cursor-pointer font-medium">Response headers</summary>
+                    <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono">
+                      {JSON.stringify(liveTestResult.headers, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Push all products to external inventory (bigsoftdbh.lovable.app) */}
         <Card>
           <CardHeader>
