@@ -66,7 +66,9 @@ export default function InventorySync() {
   const [dryRun, setDryRun] = useState(true); // default = safe preview
   const [incremental, setIncremental] = useState(true);
   const [concurrency, setConcurrency] = useState(4);
+  const [productLimit, setProductLimit] = useState<number | "">(""); // empty = no limit
   const [lastPushAt, setLastPushAt] = useState<string | null>(null);
+  const [resettingCheckpoint, setResettingCheckpoint] = useState(false);
 
   interface PushResultRow {
     product_id: string;
@@ -76,11 +78,28 @@ export default function InventorySync() {
     status?: number;
     error?: string;
     attempts?: number;
+    worker?: number;
   }
   interface ValidationErr {
     product_id: string;
     name: string;
     errors: string[];
+  }
+  interface LiveProgress {
+    status?: "running" | "done";
+    dry_run?: boolean;
+    total: number;
+    valid: number;
+    invalid: number;
+    done_count: number;
+    created: number;
+    updated: number;
+    failed: number;
+    retries: number;
+    recent: Array<{ name: string; action: string; status?: number }>;
+    in_flight: Array<{ worker: number; product_id: string; name: string; attempts: number }>;
+    concurrency?: number;
+    updated_at?: string;
   }
   const [pushResult, setPushResult] = useState<null | {
     dry_run: boolean;
@@ -90,28 +109,51 @@ export default function InventorySync() {
     created: number;
     updated: number;
     failed: number;
+    retries?: number;
     since: string | null;
     last_synced_at: string | null;
     validation_errors: ValidationErr[];
     results: PushResultRow[];
   }>(null);
+  const [progress, setProgress] = useState<LiveProgress | null>(null);
+
+  /** Poll `system_settings.inventory_push_progress` while a push is in flight. */
+  useEffect(() => {
+    if (!pushing) return;
+    let cancelled = false;
+    const tick = async () => {
+      const { data } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "inventory_push_progress")
+        .maybeSingle();
+      if (!cancelled && data?.value) setProgress(data.value as LiveProgress);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [pushing]);
 
   /** Trigger the server-side batch push (or dry-run) with current toggles. */
   const pushAllProducts = async () => {
     if (!dryRun && !confirm("Actual push শুরু হবে (dry-run নয়)। নিশ্চিত?")) return;
     setPushing(true);
     setPushResult(null);
+    setProgress(null);
     try {
       const { data, error } = await supabase.functions.invoke("push-to-external-inventory", {
-        body: { dry_run: dryRun, incremental, concurrency },
+        body: {
+          dry_run: dryRun,
+          incremental,
+          concurrency,
+          limit: typeof productLimit === "number" ? productLimit : undefined,
+        },
       });
       if (error) throw error;
       setPushResult(data);
       if (data.last_synced_at) setLastPushAt(data.last_synced_at);
       if (dryRun) {
-        toast.success(
-          `Dry-run: ${data.valid}/${data.total} valid, ${data.invalid} invalid`,
-        );
+        toast.success(`Dry-run: ${data.valid}/${data.total} valid, ${data.invalid} invalid`);
       } else {
         toast.success(
           `Push সম্পন্ন: ${data.created + data.updated}/${data.total} success · ${data.failed} failed`,
@@ -123,6 +165,25 @@ export default function InventorySync() {
       setPushing(false);
     }
   };
+
+  /** Clear the stored checkpoint so the next incremental run pushes everything. */
+  const resetCheckpoint = async () => {
+    if (!confirm("Checkpoint clear করা হবে — পরের incremental push সব products পাঠাবে। নিশ্চিত?")) return;
+    setResettingCheckpoint(true);
+    try {
+      const { error } = await supabase.functions.invoke("push-to-external-inventory", {
+        body: { reset_checkpoint: true, only_reset: true },
+      });
+      if (error) throw error;
+      setLastPushAt(null);
+      toast.success("Checkpoint reset হয়েছে");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Reset failed");
+    } finally {
+      setResettingCheckpoint(false);
+    }
+  };
+
 
   /** Download failed + invalid rows as a CSV file. */
   const downloadFailedCsv = () => {
