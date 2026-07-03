@@ -955,6 +955,17 @@ for p in data["products"]:
                     </ul>
                   </details>
                 )}
+
+                {pushResult.sample_payload && (
+                  <details className="text-xs" open={pushResult.dry_run}>
+                    <summary className="cursor-pointer font-medium">
+                      Sample payload (mapProduct output — এই field-names external API-তে যাচ্ছে)
+                    </summary>
+                    <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap font-mono bg-background p-2 rounded border">
+                      {JSON.stringify(pushResult.sample_payload, null, 2)}
+                    </pre>
+                  </details>
+                )}
               </div>
             )}
           </CardContent>
