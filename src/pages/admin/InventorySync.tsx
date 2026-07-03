@@ -377,7 +377,55 @@ for p in data["products"]:
           </CardContent>
         </Card>
 
+        {/* Push all products to external inventory (bigsoftdbh.lovable.app) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5" /> Push all products → External Inventory
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              এই বাটন চাপলে সাইটের সব products আপনার external inventory software
+              (<code className="font-mono text-xs">bigsoftdbh.lovable.app</code>)-এ
+              POST হবে। Rate limit মানতে ~1 sec/product সময় লাগবে।
+            </p>
+            <Button onClick={pushAllProducts} disabled={pushing}>
+              {pushing ? (
+                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Pushing…</>
+              ) : (
+                <><Upload className="w-4 h-4 mr-2" /> Push all products now</>
+              )}
+            </Button>
+            {pushResult && (
+              <div className="text-sm space-y-2 border rounded-md p-3 bg-muted/30">
+                <div className="flex flex-wrap gap-3">
+                  <Badge variant="default">Total: {pushResult.total}</Badge>
+                  <Badge variant="default" className="bg-green-600">Created: {pushResult.created}</Badge>
+                  <Badge variant="secondary">Updated: {pushResult.updated}</Badge>
+                  {pushResult.failed > 0 && (
+                    <Badge variant="destructive">Failed: {pushResult.failed}</Badge>
+                  )}
+                </div>
+                {pushResult.errors && pushResult.errors.length > 0 && (
+                  <div className="text-xs">
+                    <div className="font-medium mb-1">First failures:</div>
+                    <ul className="list-disc list-inside space-y-0.5 text-destructive">
+                      {pushResult.errors.map((e, i) => (
+                        <li key={i} className="font-mono break-all">
+                          [{e.status ?? "-"}] {e.name}: {e.error}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Client helpers */}
+
         <Card>
           <CardHeader>
             <CardTitle>Client helpers</CardTitle>
