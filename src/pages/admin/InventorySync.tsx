@@ -182,7 +182,7 @@ export default function InventorySync() {
   };
 
 
-  // Load audit log + webhook settings
+  // Load audit log + webhook settings + last push checkpoint
   const loadAll = async () => {
     setLoading(true);
     const [{ data: rows }, { data: settings }] = await Promise.all([
@@ -194,14 +194,20 @@ export default function InventorySync() {
       supabase
         .from("system_settings")
         .select("key, value")
-        .in("key", ["inventory_webhook_url", "inventory_webhook_enabled"]),
+        .in("key", [
+          "inventory_webhook_url",
+          "inventory_webhook_enabled",
+          "inventory_last_push_at",
+        ]),
     ]);
     setLogs((rows as AuditRow[]) ?? []);
     if (settings) {
       const urlRow = settings.find((s: any) => s.key === "inventory_webhook_url");
       const enRow = settings.find((s: any) => s.key === "inventory_webhook_enabled");
+      const lastRow = settings.find((s: any) => s.key === "inventory_last_push_at");
       setWebhookUrl((urlRow?.value as any)?.url ?? "");
       setWebhookEnabled(!!(enRow?.value as any)?.enabled);
+      setLastPushAt((lastRow?.value as any)?.at ?? null);
     }
     setLoading(false);
   };
