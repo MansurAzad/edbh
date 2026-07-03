@@ -1,19 +1,32 @@
 /**
  * push-to-external-inventory
  *
- * Pushes every product from this site's DB to the user's external inventory
- * software (bigsoftdbh.lovable.app) via its public REST API.
+ * Batch-pushes products from this site's DB to the external inventory software
+ * (bigsoftdbh.lovable.app) via its public REST API.
  *
- * Auth: caller must be an admin (JWT validated via getClaims + has_role).
- * Uses EXTERNAL_INVENTORY_API_KEY + EXTERNAL_INVENTORY_BASE_URL server secrets.
+ * Auth: caller must be an admin (JWT + has_role).
+ * Server secrets: EXTERNAL_INVENTORY_BASE_URL, EXTERNAL_INVENTORY_API_KEY.
  *
- * Endpoint (POST): no body needed. Optional { dry_run: true } returns the
- * mapped payload for the first product without sending anything.
+ * ------------------------------------------------------------------
+ * POST body (all optional):
+ *   dry_run:      boolean  → validate & return payloads, DO NOT send.
+ *   incremental:  boolean  → only push products updated_at > last checkpoint.
+ *   since:        string   → ISO timestamp override for `incremental`.
+ *   concurrency:  number   → parallel workers (1..8, default 4).
+ *   limit:        number   → cap products processed (safety, 1..5000).
  *
- * Response: { total, created, updated, failed, skipped, errors: [...] }
+ * Response:
+ *   {
+ *     dry_run, total, valid, invalid, created, updated, failed, skipped,
+ *     since, last_synced_at, target,
+ *     validation_errors: [{ product_id, name, errors: [...] }],
+ *     results:           [{ product_id, name, action, external_id?, status?, error? }]
+ *   }
  *
- * Rate-limit strategy: external API allows 60 req/min per key → we pause
- * ~1100ms between requests and honor Retry-After on 429.
+ * Rate limiting: external API allows 60 req/min per key. We use a shared
+ * token-bucket (60 tokens/min) across all concurrent workers and honor
+ * `Retry-After` on 429 responses.
+ * ------------------------------------------------------------------
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -31,13 +44,58 @@ const json = (b: unknown, status = 200) =>
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const LAST_SYNC_KEY = "inventory_last_push_at";
+
 interface PushResult {
   product_id: string;
   name: string;
-  action: "created" | "updated" | "failed" | "skipped";
+  action: "created" | "updated" | "failed" | "skipped" | "invalid";
   external_id?: string;
   status?: number;
   error?: string;
+  attempts?: number;
+}
+
+interface ValidationError {
+  product_id: string;
+  name: string;
+  errors: string[];
+}
+
+// ---------- Validation ----------
+/**
+ * Validate a product row against the external API's expected schema.
+ * Returns an array of human-readable error strings; empty means valid.
+ */
+function validateProduct(p: any): string[] {
+  const errs: string[] = [];
+  if (!p.id) errs.push("Missing product id");
+  if (!p.name || typeof p.name !== "string" || !p.name.trim()) {
+    errs.push("`name` is required and must be a non-empty string");
+  } else if (p.name.length > 255) {
+    errs.push("`name` must be ≤ 255 characters");
+  }
+  const price = Number(p.price);
+  if (p.price == null || Number.isNaN(price)) {
+    errs.push("`price` is required and must be numeric");
+  } else if (price < 0) {
+    errs.push("`price` must be ≥ 0");
+  }
+  if (p.sale_price != null) {
+    const sp = Number(p.sale_price);
+    if (Number.isNaN(sp) || sp < 0) errs.push("`sale_price` must be a non-negative number");
+    else if (sp > price) errs.push("`sale_price` should not exceed `price`");
+  }
+  if (p.stock != null && (!Number.isInteger(Number(p.stock)) || Number(p.stock) < 0)) {
+    errs.push("`stock` must be a non-negative integer");
+  }
+  if (!p.image_url && (!Array.isArray(p.product_images) || p.product_images.length === 0)) {
+    errs.push("At least one image (image_url or gallery) is required");
+  }
+  if (p.slug && typeof p.slug === "string" && p.slug.length > 255) {
+    errs.push("`slug` too long (≤ 255)");
+  }
+  return errs;
 }
 
 /** Map our product row → external inventory API payload. */
@@ -53,7 +111,7 @@ function mapProduct(p: any) {
   return {
     name: p.name,
     sku: p.slug ?? p.id,
-    external_ref: p.id, // our UUID — helps dedupe
+    external_ref: p.id,
     selling_price: effectivePrice,
     regular_price: Number(p.price ?? 0),
     stock: p.stock ?? 0,
@@ -65,7 +123,30 @@ function mapProduct(p: any) {
     image_url: p.image_url ?? null,
     image_urls,
     is_active: true,
+    updated_at: p.updated_at,
   };
+}
+
+// ---------- Rate limiter (token bucket: 60/min) ----------
+class RateLimiter {
+  private timestamps: number[] = [];
+  constructor(private readonly max = 55, private readonly windowMs = 60_000) {}
+  /** Await until we're allowed to make another request. */
+  async take() {
+    // Drop timestamps older than the window.
+    const now = Date.now();
+    this.timestamps = this.timestamps.filter((t) => now - t < this.windowMs);
+    if (this.timestamps.length >= this.max) {
+      const waitMs = this.windowMs - (now - this.timestamps[0]) + 50;
+      await sleep(waitMs);
+      return this.take();
+    }
+    this.timestamps.push(Date.now());
+  }
+  /** Manually pause (e.g. after Retry-After) — blocks the whole bucket. */
+  async pause(ms: number) {
+    await sleep(ms);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -96,112 +177,204 @@ Deno.serve(async (req) => {
   const { data: isAdmin } = await admin.rpc("has_role", { _user_id: userId, _role: "admin" });
   if (!isAdmin) return json({ error: "Forbidden — admin only" }, 403);
 
-  // --- optional body ---
+  // --- parse body ---
   const body = await req.json().catch(() => ({}));
   const dryRun = !!body?.dry_run;
+  const incremental = !!body?.incremental;
   const limit = typeof body?.limit === "number" ? Math.max(1, Math.min(5000, body.limit)) : null;
+  const concurrency = Math.max(
+    1,
+    Math.min(8, typeof body?.concurrency === "number" ? body.concurrency : 4),
+  );
 
-  // --- fetch all products ---
+  // Resolve incremental checkpoint
+  let since: string | null = typeof body?.since === "string" ? body.since : null;
+  if (!since && incremental) {
+    const { data: setting } = await admin
+      .from("system_settings")
+      .select("value")
+      .eq("key", LAST_SYNC_KEY)
+      .maybeSingle();
+    since = (setting?.value as any)?.at ?? null;
+  }
+
+  // --- fetch products ---
   let q = admin
     .from("products")
     .select("*, product_images(image_url, display_order)")
-    .order("created_at", { ascending: true });
+    .order("updated_at", { ascending: true });
+  if (since) q = q.gt("updated_at", since);
   if (limit) q = q.limit(limit);
   const { data: products, error: prodErr } = await q;
   if (prodErr) return json({ error: prodErr.message }, 500);
 
+  const rows = products ?? [];
+
+  // --- validate all up front ---
+  const validationErrors: ValidationError[] = [];
+  const validRows: any[] = [];
+  for (const p of rows) {
+    const errs = validateProduct(p);
+    if (errs.length) {
+      validationErrors.push({ product_id: p.id, name: p.name ?? "(unnamed)", errors: errs });
+    } else {
+      validRows.push(p);
+    }
+  }
+
+  // Track newest updated_at seen so the checkpoint moves forward on success.
+  let maxUpdatedAt: string | null = null;
+  for (const p of rows) {
+    if (p.updated_at && (!maxUpdatedAt || p.updated_at > maxUpdatedAt)) {
+      maxUpdatedAt = p.updated_at;
+    }
+  }
+
+  // ---- Dry run: no network calls ----
   if (dryRun) {
     return json({
       dry_run: true,
-      total: products?.length ?? 0,
-      sample_payload: products?.[0] ? mapProduct(products[0]) : null,
+      total: rows.length,
+      valid: validRows.length,
+      invalid: validationErrors.length,
+      created: 0,
+      updated: 0,
+      failed: 0,
+      skipped: 0,
+      since,
       target: `${BASE.replace(/\/$/, "")}/products`,
+      sample_payload: validRows[0] ? mapProduct(validRows[0]) : null,
+      validation_errors: validationErrors,
+      results: [],
     });
   }
 
-  const results: PushResult[] = [];
+  // ---- Real push with concurrency + rate limit ----
+  const url = `${BASE.replace(/\/$/, "")}/products`;
+  const limiter = new RateLimiter(55, 60_000); // 55/min = safe under 60 cap
+  const results: PushResult[] = [
+    ...validationErrors.map((v) => ({
+      product_id: v.product_id,
+      name: v.name,
+      action: "invalid" as const,
+      error: v.errors.join("; "),
+    })),
+  ];
   let created = 0;
   let updated = 0;
   let failed = 0;
-  let skipped = 0;
+  const skipped = 0;
+  const invalid = validationErrors.length;
 
-  const url = `${BASE.replace(/\/$/, "")}/products`;
+  // Simple worker pool — index-based queue.
+  let idx = 0;
+  const total = validRows.length;
 
-  for (const p of products ?? []) {
-    const payload = mapProduct(p);
-    try {
-      let attempt = 0;
-      // Retry loop for 429
-      // We cap at 3 retries; wait Retry-After (or exponential) between.
-      // Success returns break out.
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${KEY}`,
-            "x-api-key": KEY,
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (res.status === 429 && attempt < 3) {
-          const ra = Number(res.headers.get("retry-after") ?? "2");
-          await sleep(Math.max(1000, ra * 1000));
-          attempt++;
-          continue;
-        }
-
-        const text = await res.text();
-        let parsed: any = null;
-        try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
-
-        if (res.ok) {
-          const action: "created" | "updated" =
-            res.status === 200 ? "updated" : "created";
-          if (action === "created") created++;
-          else updated++;
-          results.push({
-            product_id: p.id,
-            name: p.name,
-            action,
-            external_id: parsed?.id ?? parsed?.data?.id,
-            status: res.status,
+  const worker = async () => {
+    while (true) {
+      const i = idx++;
+      if (i >= total) return;
+      const p = validRows[i];
+      const payload = mapProduct(p);
+      let attempts = 0;
+      const maxAttempts = 5;
+      let done = false;
+      while (!done && attempts < maxAttempts) {
+        attempts++;
+        await limiter.take();
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${KEY}`,
+              "x-api-key": KEY,
+            },
+            body: JSON.stringify(payload),
           });
-        } else {
+          if (res.status === 429) {
+            const ra = Number(res.headers.get("retry-after") ?? "2");
+            // Shared pause — hitting 429 means the whole bucket must chill.
+            await limiter.pause(Math.max(1000, ra * 1000));
+            continue;
+          }
+          const text = await res.text();
+          let parsed: any = null;
+          try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
+          if (res.ok) {
+            const action: "created" | "updated" = res.status === 200 ? "updated" : "created";
+            if (action === "created") created++; else updated++;
+            results.push({
+              product_id: p.id,
+              name: p.name,
+              action,
+              external_id: parsed?.id ?? parsed?.data?.id,
+              status: res.status,
+              attempts,
+            });
+          } else {
+            // Transient 5xx → retry with backoff
+            if (res.status >= 500 && attempts < maxAttempts) {
+              await sleep(500 * 2 ** (attempts - 1));
+              continue;
+            }
+            failed++;
+            results.push({
+              product_id: p.id,
+              name: p.name,
+              action: "failed",
+              status: res.status,
+              attempts,
+              error:
+                typeof parsed === "string"
+                  ? parsed.slice(0, 500)
+                  : parsed?.error ?? parsed?.message ?? `HTTP ${res.status}`,
+            });
+          }
+          done = true;
+        } catch (e) {
+          if (attempts < maxAttempts) {
+            await sleep(500 * 2 ** (attempts - 1));
+            continue;
+          }
           failed++;
           results.push({
             product_id: p.id,
             name: p.name,
             action: "failed",
-            status: res.status,
-            error: typeof parsed === "string" ? parsed.slice(0, 300) : (parsed?.error ?? parsed?.message ?? `HTTP ${res.status}`),
+            attempts,
+            error: e instanceof Error ? e.message : "network error",
           });
+          done = true;
         }
-        break;
       }
-    } catch (e) {
-      failed++;
-      results.push({
-        product_id: p.id,
-        name: p.name,
-        action: "failed",
-        error: e instanceof Error ? e.message : "network error",
-      });
     }
+  };
 
-    // Pace requests: 60 req/min = 1 per second. 1.1s gives headroom.
-    await sleep(1100);
+  await Promise.all(Array.from({ length: concurrency }, worker));
+
+  // --- Persist checkpoint on any successful sync so incremental works next time.
+  let lastSyncedAt: string | null = null;
+  if ((created + updated) > 0 && maxUpdatedAt) {
+    lastSyncedAt = maxUpdatedAt;
+    await admin
+      .from("system_settings")
+      .upsert({ key: LAST_SYNC_KEY, value: { at: lastSyncedAt } }, { onConflict: "key" });
   }
 
   return json({
-    total: products?.length ?? 0,
+    dry_run: false,
+    total: rows.length,
+    valid: validRows.length,
+    invalid,
     created,
     updated,
     failed,
     skipped,
+    since,
+    last_synced_at: lastSyncedAt,
     target: url,
+    validation_errors: validationErrors,
     results,
   });
 });
