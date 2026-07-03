@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Copy, RefreshCw, Plug, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Copy, RefreshCw, Plug, AlertCircle, CheckCircle2, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -60,6 +60,45 @@ export default function InventorySync() {
     error: string | null;
     url: string | null;
   }>(null);
+
+  // ---- Push-to-external-inventory state ----
+  const [pushing, setPushing] = useState(false);
+  const [pushResult, setPushResult] = useState<null | {
+    total: number;
+    created: number;
+    updated: number;
+    failed: number;
+    errors?: Array<{ name: string; error?: string; status?: number }>;
+  }>(null);
+
+  /** Trigger the server-side batch push of every product to bigsoftdbh. */
+  const pushAllProducts = async () => {
+    if (!confirm("সব products আপনার external inventory-এ পাঠানো হবে। প্রায় 1s/product লাগবে। শুরু করব?")) return;
+    setPushing(true);
+    setPushResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("push-to-external-inventory", {
+        body: {},
+      });
+      if (error) throw error;
+      setPushResult({
+        total: data.total,
+        created: data.created,
+        updated: data.updated,
+        failed: data.failed,
+        errors: (data.results ?? [])
+          .filter((r: any) => r.action === "failed")
+          .slice(0, 20)
+          .map((r: any) => ({ name: r.name, error: r.error, status: r.status })),
+      });
+      toast.success(`Push সম্পন্ন: ${data.created + data.updated}/${data.total} success`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Push failed");
+    } finally {
+      setPushing(false);
+    }
+  };
+
 
   // Load audit log + webhook settings
   const loadAll = async () => {
@@ -338,7 +377,55 @@ for p in data["products"]:
           </CardContent>
         </Card>
 
+        {/* Push all products to external inventory (bigsoftdbh.lovable.app) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5" /> Push all products → External Inventory
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              এই বাটন চাপলে সাইটের সব products আপনার external inventory software
+              (<code className="font-mono text-xs">bigsoftdbh.lovable.app</code>)-এ
+              POST হবে। Rate limit মানতে ~1 sec/product সময় লাগবে।
+            </p>
+            <Button onClick={pushAllProducts} disabled={pushing}>
+              {pushing ? (
+                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Pushing…</>
+              ) : (
+                <><Upload className="w-4 h-4 mr-2" /> Push all products now</>
+              )}
+            </Button>
+            {pushResult && (
+              <div className="text-sm space-y-2 border rounded-md p-3 bg-muted/30">
+                <div className="flex flex-wrap gap-3">
+                  <Badge variant="default">Total: {pushResult.total}</Badge>
+                  <Badge variant="default" className="bg-green-600">Created: {pushResult.created}</Badge>
+                  <Badge variant="secondary">Updated: {pushResult.updated}</Badge>
+                  {pushResult.failed > 0 && (
+                    <Badge variant="destructive">Failed: {pushResult.failed}</Badge>
+                  )}
+                </div>
+                {pushResult.errors && pushResult.errors.length > 0 && (
+                  <div className="text-xs">
+                    <div className="font-medium mb-1">First failures:</div>
+                    <ul className="list-disc list-inside space-y-0.5 text-destructive">
+                      {pushResult.errors.map((e, i) => (
+                        <li key={i} className="font-mono break-all">
+                          [{e.status ?? "-"}] {e.name}: {e.error}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Client helpers */}
+
         <Card>
           <CardHeader>
             <CardTitle>Client helpers</CardTitle>

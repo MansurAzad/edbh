@@ -6,3 +6,7 @@ verify_jwt = false
 [functions.inventory-sync]
 verify_jwt = false
 
+[functions.push-to-external-inventory]
+verify_jwt = false
+
+
