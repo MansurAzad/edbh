@@ -172,6 +172,7 @@ export default function InventorySync() {
           incremental,
           concurrency,
           limit: typeof productLimit === "number" ? productLimit : undefined,
+          branch_id: branchId.trim() || undefined,
         },
       });
       if (error) throw error;
