@@ -112,10 +112,35 @@ export default function InventorySync() {
     retries?: number;
     since: string | null;
     last_synced_at: string | null;
+    branch_id?: string | null;
+    sample_payload?: Record<string, unknown> | null;
     validation_errors: ValidationErr[];
     results: PushResultRow[];
   }>(null);
   const [progress, setProgress] = useState<LiveProgress | null>(null);
+
+  // --- Branch ID setting (sent with every push) ---
+  const [branchId, setBranchIdState] = useState("");
+  const [savingBranch, setSavingBranch] = useState(false);
+
+  // --- External live-test state ---
+  const [liveTesting, setLiveTesting] = useState(false);
+  const [liveTestMethod, setLiveTestMethod] = useState<"GET" | "POST">("GET");
+  const [liveTestPath, setLiveTestPath] = useState("/products");
+  const [liveTestPayload, setLiveTestPayload] = useState(
+    '{\n  "name": "Test Product",\n  "selling_price": 100,\n  "regular_price": 100,\n  "stock": 1,\n  "sku": "TEST-1"\n}',
+  );
+  const [liveTestResult, setLiveTestResult] = useState<null | {
+    ok: boolean;
+    method: string;
+    url: string;
+    status: number;
+    latency_ms: number;
+    headers?: Record<string, string>;
+    body_text?: string;
+    body_json?: unknown;
+    error?: string;
+  }>(null);
 
   /** Poll `system_settings.inventory_push_progress` while a push is in flight. */
   useEffect(() => {
