@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Copy, RefreshCw, Plug, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Copy, RefreshCw, Plug, AlertCircle, CheckCircle2, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -60,6 +60,45 @@ export default function InventorySync() {
     error: string | null;
     url: string | null;
   }>(null);
+
+  // ---- Push-to-external-inventory state ----
+  const [pushing, setPushing] = useState(false);
+  const [pushResult, setPushResult] = useState<null | {
+    total: number;
+    created: number;
+    updated: number;
+    failed: number;
+    errors?: Array<{ name: string; error?: string; status?: number }>;
+  }>(null);
+
+  /** Trigger the server-side batch push of every product to bigsoftdbh. */
+  const pushAllProducts = async () => {
+    if (!confirm("সব products আপনার external inventory-এ পাঠানো হবে। প্রায় 1s/product লাগবে। শুরু করব?")) return;
+    setPushing(true);
+    setPushResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("push-to-external-inventory", {
+        body: {},
+      });
+      if (error) throw error;
+      setPushResult({
+        total: data.total,
+        created: data.created,
+        updated: data.updated,
+        failed: data.failed,
+        errors: (data.results ?? [])
+          .filter((r: any) => r.action === "failed")
+          .slice(0, 20)
+          .map((r: any) => ({ name: r.name, error: r.error, status: r.status })),
+      });
+      toast.success(`Push সম্পন্ন: ${data.created + data.updated}/${data.total} success`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Push failed");
+    } finally {
+      setPushing(false);
+    }
+  };
+
 
   // Load audit log + webhook settings
   const loadAll = async () => {
