@@ -2,3 +2,7 @@ project_id = "izeabmhtxtrelfqgkuua"
 
 [functions.steadfast-webhook]
 verify_jwt = false
+
+[functions.inventory-sync]
+verify_jwt = false
+
