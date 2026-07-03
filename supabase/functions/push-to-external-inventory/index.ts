@@ -108,6 +108,48 @@ Deno.serve(async (req) => {
 
   // --- parse body ---
   const body = await req.json().catch(() => ({}));
+
+  // --- Live test action: single GET or POST to external API, return raw ---
+  if (body?.action === "live_test") {
+    const method = (body?.method === "POST" ? "POST" : "GET") as "GET" | "POST";
+    const path = typeof body?.path === "string" && body.path.startsWith("/") ? body.path : "/products";
+    const url = `${BASE.replace(/\/$/, "")}${path}`;
+    const started = Date.now();
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${KEY}`,
+          "x-api-key": KEY,
+        },
+        body: method === "POST" ? JSON.stringify(body?.payload ?? {}) : undefined,
+      });
+      const text = await res.text();
+      let parsed: any = null;
+      try { parsed = text ? JSON.parse(text) : null; } catch { parsed = null; }
+      return json({
+        ok: res.ok,
+        method,
+        url,
+        status: res.status,
+        latency_ms: Date.now() - started,
+        headers: Object.fromEntries(res.headers.entries()),
+        body_text: text.slice(0, 4000),
+        body_json: parsed,
+      });
+    } catch (e) {
+      return json({
+        ok: false,
+        method,
+        url,
+        status: 0,
+        latency_ms: Date.now() - started,
+        error: e instanceof Error ? e.message : "network error",
+      });
+    }
+  }
+
   const dryRun = !!body?.dry_run;
   const incremental = !!body?.incremental;
   const resetCheckpoint = !!body?.reset_checkpoint;
@@ -116,6 +158,19 @@ Deno.serve(async (req) => {
     1,
     Math.min(8, typeof body?.concurrency === "number" ? body.concurrency : 4),
   );
+
+  // Resolve branch_id: explicit body override → stored setting → null.
+  let branchId: string | null = typeof body?.branch_id === "string" && body.branch_id.trim()
+    ? body.branch_id.trim()
+    : null;
+  if (!branchId) {
+    const { data: br } = await admin
+      .from("system_settings")
+      .select("value")
+      .eq("key", "inventory_branch_id")
+      .maybeSingle();
+    branchId = (br?.value as any)?.id ?? null;
+  }
 
   // Handle checkpoint reset up-front.
   if (resetCheckpoint) {
