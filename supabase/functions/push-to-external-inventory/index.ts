@@ -333,7 +333,7 @@ Deno.serve(async (req) => {
       const i = idx++;
       if (i >= total) return;
       const p = validRows[i];
-      const payload = mapProduct(p);
+      const payload = mapProduct(p, branchId);
       inFlight.set(workerId, { product_id: p.id, name: p.name, attempts: 0 });
       await emitProgress();
       let attempts = 0;
