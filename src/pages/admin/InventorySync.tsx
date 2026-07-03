@@ -285,6 +285,7 @@ export default function InventorySync() {
           "inventory_webhook_url",
           "inventory_webhook_enabled",
           "inventory_last_push_at",
+          "inventory_branch_id",
         ]),
     ]);
     setLogs((rows as AuditRow[]) ?? []);
@@ -292,9 +293,11 @@ export default function InventorySync() {
       const urlRow = settings.find((s: any) => s.key === "inventory_webhook_url");
       const enRow = settings.find((s: any) => s.key === "inventory_webhook_enabled");
       const lastRow = settings.find((s: any) => s.key === "inventory_last_push_at");
+      const brRow = settings.find((s: any) => s.key === "inventory_branch_id");
       setWebhookUrl((urlRow?.value as any)?.url ?? "");
       setWebhookEnabled(!!(enRow?.value as any)?.enabled);
       setLastPushAt((lastRow?.value as any)?.at ?? null);
+      setBranchIdState((brRow?.value as any)?.id ?? "");
     }
     setLoading(false);
   };
