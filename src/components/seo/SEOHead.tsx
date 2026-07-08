@@ -8,6 +8,8 @@ interface SEOHeadProps {
   ogType?: string;
   noIndex?: boolean;
   keywords?: string;
+  /** If true, use `title` as-is without appending " | Dubai Borka House". */
+  fullTitle?: boolean;
 }
 
 const SITE_NAME = "Dubai Borka House";
@@ -22,8 +24,13 @@ const SEOHead = ({
   ogType = "website",
   noIndex = false,
   keywords,
+  fullTitle = false,
 }: SEOHeadProps) => {
-  const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} - প্রিমিয়াম ইসলামিক ফ্যাশন`;
+  const fullTitleStr = !title
+    ? `${SITE_NAME} – Premium Dubai Imported Borka, Abaya & Hijab in Bangladesh`
+    : fullTitle
+      ? title
+      : `${title} | ${SITE_NAME}`;
   const canonicalUrl = canonical ? `${BASE_URL}${canonical}` : undefined;
 
   useEffect(() => {
