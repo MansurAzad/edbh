@@ -206,7 +206,7 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
       // Auto-share to WhatsApp — track visible status for the success screen
       setShareStatus("sharing");
       const shareRes = await shareOrderToWhatsApp(receipt);
-      setShareStatus(shareRes.status === "opened" ? "opened" : shareRes.status);
+      setShareStatus(shareRes.status === "opened" || shareRes.status === "retried" ? "opened" : shareRes.status);
       if (shareRes.status === "blocked") {
         toast({
           title: "WhatsApp popup ব্লক হয়েছে",
