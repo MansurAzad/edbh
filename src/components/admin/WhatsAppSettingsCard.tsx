@@ -28,6 +28,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -55,6 +65,10 @@ export default function WhatsAppSettingsCard() {
   const [verifyResult, setVerifyResult] = useState<
     { ok: true; latencyMs: number } | { ok: false; error: string } | null
   >(null);
+  /** Original token loaded from DB — used to detect changes and show the
+   *  confirmation modal only when the verify token is actually being modified. */
+  const [initialVerifyToken, setInitialVerifyToken] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -67,10 +81,23 @@ export default function WhatsAppSettingsCard() {
       const v = raw && typeof raw === "object" ? (raw as Partial<WhatsappWebhookSettings>) : null;
       if (v) {
         if (v.webhook_url) setWebhookUrl(v.webhook_url);
-        if (v.verify_token) setVerifyToken(v.verify_token);
+        if (v.verify_token) {
+          setVerifyToken(v.verify_token);
+          setInitialVerifyToken(v.verify_token);
+        }
       }
     })();
   }, []);
+
+  /** Save trigger — routes through a confirmation modal when the verify token
+   *  is being changed from its stored value (highest-risk edit). */
+  function handleSaveClick() {
+    if (verifyToken.trim() !== initialVerifyToken.trim()) {
+      setConfirmOpen(true);
+      return;
+    }
+    void save();
+  }
 
   async function copy(name: string, value: string) {
     try {
@@ -105,6 +132,8 @@ export default function WhatsAppSettingsCard() {
           .insert([{ key: SETTING_KEY, value: payload as unknown as Record<string, string> }]);
       }
       toast({ title: "WhatsApp সেটিংস সেভ হয়েছে" });
+      setInitialVerifyToken(verifyToken.trim());
+      setConfirmOpen(false);
     } catch (e) {
       toast({
         title: "সেভ ব্যর্থ",
@@ -278,10 +307,33 @@ export default function WhatsAppSettingsCard() {
             )}
             {verifying ? "Verifying…" : "Test & Verify"}
           </Button>
-          <Button onClick={save} disabled={saving || verifying} className="gap-2">
+          <Button onClick={handleSaveClick} disabled={saving || verifying} className="gap-2">
             <Save className="w-4 h-4" /> {saving ? "সেভ হচ্ছে..." : "সেভ করুন"}
           </Button>
         </div>
+
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm verify token change</AlertDialogTitle>
+              <AlertDialogDescription>
+                Verify token পরিবর্তন করলে Meta Dashboard-এর webhook subscription তাৎক্ষণিকভাবে ভেঙে যেতে পারে
+                যতক্ষণ না নতুন token সেখানেও আপডেট করা হয়। নিশ্চিত হয়ে সেভ করুন — বিশেষভাবে backend secret{" "}
+                <code className="font-mono">META_WHATSAPP_VERIFY_TOKEN</code>-এর সাথে হুবহু মিলতে হবে।
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="rounded-md border p-2 text-xs font-mono break-all bg-muted/40">
+              <div className="text-muted-foreground">New token:</div>
+              <div>{verifyToken.trim() || <span className="italic">(empty)</span>}</div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={(e) => { e.preventDefault(); void save(); }} disabled={saving}>
+                {saving ? "সেভ হচ্ছে..." : "Yes, save token"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );
