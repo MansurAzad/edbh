@@ -160,6 +160,79 @@ const About = () => {
           </div>
         </section>
 
+        {/* Legal / Business Identity */}
+        <section className="py-16 bg-background">
+          <div className="container mx-auto px-4 max-w-4xl">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-8">
+              <h2 className="font-display text-3xl md:text-4xl font-bold mb-3">
+                <span className="text-foreground">Legal & </span>
+                <span className="text-gradient-gold">Business Identity</span>
+              </h2>
+              <p className="text-muted-foreground text-sm">Official business registration and identity of Dubai Borka House Bangladesh</p>
+            </motion.div>
+
+            <div className="card-luxury p-6 md:p-8">
+              <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Legal Name</dt>
+                  <dd className="text-foreground font-semibold mt-1">Dubai Borka House Bangladesh</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Brand Name</dt>
+                  <dd className="text-foreground font-semibold mt-1">Dubai Borka House · দুবাই বোরকা হাউস</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Business Type</dt>
+                  <dd className="text-foreground font-semibold mt-1">Retail & Online Store — Islamic Fashion</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Founded</dt>
+                  <dd className="text-foreground font-semibold mt-1">2009 · 15+ years in business</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Head Office</dt>
+                  <dd className="text-foreground mt-1">Kohinoor City, 3rd Floor, Shop #342, Police Lane, WASA, Chattogram, Bangladesh</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Branches</dt>
+                  <dd className="text-foreground mt-1">8 physical showrooms across Chattogram, Sylhet, Dhaka & Cox's Bazar</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Official Website</dt>
+                  <dd className="mt-1">
+                    <a href="https://dubaiborkahouse.com" className="text-primary font-semibold hover:underline">https://dubaiborkahouse.com</a>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Official Facebook</dt>
+                  <dd className="mt-1">
+                    <a href="https://www.facebook.com/dborkahouse" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">facebook.com/dborkahouse</a>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Customer Hotline</dt>
+                  <dd className="text-foreground font-semibold mt-1">+880 1845-853634</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Email</dt>
+                  <dd className="text-foreground font-semibold mt-1">info@dubaiborkehouse.com</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Service Area</dt>
+                  <dd className="text-foreground mt-1">All 64 districts of Bangladesh (Cash on Delivery)</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wider text-muted-foreground">Payment Accepted</dt>
+                  <dd className="text-foreground mt-1">Cash on Delivery, bKash, Nagad, Rocket, Bank Transfer</dd>
+                </div>
+              </dl>
+              <p className="text-xs text-muted-foreground text-center mt-6 pt-6 border-t border-border">
+                This is the <strong className="text-primary">Official Website of Dubai Borka House Bangladesh</strong>. Beware of copycat pages and unofficial resellers — always verify via <a href="https://dubaiborkahouse.com" className="text-primary underline">dubaiborkahouse.com</a>.
+              </p>
+            </div>
+          </div>
+        </section>
+
         <NewsletterSection />
       </main>
       <Footer />
