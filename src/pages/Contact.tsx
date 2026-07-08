@@ -106,7 +106,7 @@ const Contact = () => {
                 <p className="text-muted-foreground">শনি - বৃহস্পতি: সকাল ১০টা - রাত ৯টা<br />শুক্রবার: বন্ধ</p>
               </div>
               <div className="flex gap-3">
-                <a href="https://www.facebook.com/dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"><Facebook className="w-5 h-5" /></a>
+                <a href="https://www.facebook.com/dborkahouse" target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"><Facebook className="w-5 h-5" /></a>
                 <a href="https://www.instagram.com/dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"><Instagram className="w-5 h-5" /></a>
                 <a href="https://wa.me/8801845853634" target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"><MessageCircle className="w-5 h-5" /></a>
               </div>
