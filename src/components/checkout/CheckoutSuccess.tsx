@@ -106,7 +106,7 @@ export default function CheckoutSuccess({
     <div className="min-h-screen bg-background">
       <Header />
       <main className="pt-24 pb-20">
-        <div className="container mx-auto px-4"></div>
+        <div className="container mx-auto px-4">
 
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
