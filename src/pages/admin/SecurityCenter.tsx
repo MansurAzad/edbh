@@ -65,6 +65,7 @@ async function logAudit(action: string, category: string, metadata: Record<strin
 type ScanReport = {
   id: string; created_at: string; updated_at?: string; triggered_by: string;
   status?: string; progress?: number; error?: string | null;
+  cancel_requested?: boolean; last_message?: string | null;
   total_findings: number; critical_count: number; duration_ms: number | null;
   findings: any;
 };
