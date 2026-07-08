@@ -147,6 +147,8 @@ export default function ProductsFilters({
   setSortMode,
   lowStockCount,
   onOpenBulkInventory,
+  onExportFiltered,
+  filteredCount,
 }: Props) {
   return (
     <div className="space-y-3">
