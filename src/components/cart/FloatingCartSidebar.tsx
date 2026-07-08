@@ -251,24 +251,49 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
     }
   };
 
-  const handleReshare = async () => {
+  const handleReshare = () => {
     if (!lastReceipt || reshareLoading) return;
-    setReshareLoading(true);
-    setShareStatus("sharing");
-    setShareError(null);
+    pendingReceiptRef.current = lastReceipt;
+    pendingIsRetryRef.current = true;
+    setPreviewPayload(buildWhatsAppPayload(lastReceipt));
+    setPreviewOpen(true);
+  };
+
+  const handlePreviewCancel = () => {
+    setPreviewOpen(false);
+    if (shareStatus === "sharing") {
+      // Never actually sent — mark as blocked so admin/customer sees the state.
+      setShareStatus("blocked");
+      setShareError("প্রিভিউ বাতিল করা হয়েছে");
+    }
+  };
+
+  const handlePreviewSend = async () => {
+    const receipt = pendingReceiptRef.current;
+    if (!receipt) return;
+    const isRetry = pendingIsRetryRef.current;
+    setPreviewSending(true);
+    if (isRetry) setReshareLoading(true);
     try {
-      const res = await shareOrderToWhatsApp(lastReceipt, { isRetry: true });
+      const res = await shareOrderToWhatsApp(receipt, { isRetry });
       const ok = res.status === "opened" || res.status === "retried" || res.status === "queued";
       setShareStatus(ok ? "opened" : (res.status as "blocked" | "failed"));
       setShareError(res.error ?? null);
-      toast({
-        title: res.status === "blocked" ? "আবার popup ব্লক হয়েছে" :
-               res.status === "failed"  ? "শেয়ার ব্যর্থ" : "WhatsApp খোলা হয়েছে ✅",
-        description: res.error ?? undefined,
-        variant: ok ? "default" : "destructive",
-      });
+      if (res.status === "blocked") {
+        toast({ title: "WhatsApp popup ব্লক হয়েছে", description: res.error ?? undefined });
+      } else if (res.status === "failed") {
+        toast({ title: "WhatsApp শেয়ার ব্যর্থ", description: res.error, variant: "destructive" });
+      } else {
+        toast({
+          title: res.channel === "cloud_api"
+            ? "WhatsApp Cloud API-এ পাঠানো হয়েছে ✅"
+            : "WhatsApp রিসিট শেয়ার হয়েছে ✅",
+        });
+      }
     } finally {
+      setPreviewSending(false);
       setReshareLoading(false);
+      setPreviewOpen(false);
     }
   };
 
