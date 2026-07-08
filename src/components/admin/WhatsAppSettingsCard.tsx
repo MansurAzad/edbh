@@ -70,7 +70,7 @@ export default function WhatsAppSettingsCard() {
   async function save() {
     setSaving(true);
     try {
-      const payload: WhatsappWebhookSettings = {
+      const payload = {
         webhook_url: webhookUrl.trim(),
         verify_token: verifyToken.trim(),
       };
@@ -80,9 +80,14 @@ export default function WhatsAppSettingsCard() {
         .eq("key", SETTING_KEY)
         .maybeSingle();
       if (existing) {
-        await supabase.from("system_settings").update({ value: payload }).eq("key", SETTING_KEY);
+        await supabase
+          .from("system_settings")
+          .update({ value: payload as unknown as Record<string, string> })
+          .eq("key", SETTING_KEY);
       } else {
-        await supabase.from("system_settings").insert({ key: SETTING_KEY, value: payload });
+        await supabase
+          .from("system_settings")
+          .insert([{ key: SETTING_KEY, value: payload as unknown as Record<string, string> }]);
       }
       toast({ title: "WhatsApp সেটিংস সেভ হয়েছে" });
     } catch (e) {
