@@ -43,10 +43,33 @@ const escapeHtml = (s: unknown): string =>
 const isBot = (ua: string): boolean =>
   /bot|crawl|spider|slurp|facebookexternalhit|whatsapp|linkedin|twitterbot|slackbot|discordbot|telegrambot|embedly|quora link preview|showyoubot|outbrain|pinterest|developers\.google\.com\/\+\/web\/snippet|chatgpt|perplexity|claude|gpt|anthropic|openai|ahrefs|semrush|screaming frog|applebot/i.test(ua);
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function absoluteImage(u: string | null | undefined): string {
   if (!u) return `${SITE_URL}/og-image.jpg`;
   if (/^https?:\/\//i.test(u)) return u;
   return `${SITE_URL}${u.startsWith("/") ? "" : "/"}${u}`;
+}
+
+// Build response headers that GUARANTEE Content-Type: text/html — spreading
+// `corsHeaders` from @supabase/supabase-js@2/cors leaves a `Content-Type:
+// text/plain` default that keeps winning even after `.set(...)` due to how
+// its internal init interacts with the Response constructor. Bypass it by
+// hand-authoring the CORS + cache + type headers here.
+function htmlHeaders(cacheControl = "public, max-age=300, s-maxage=1800"): HeadersInit {
+  return {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": cacheControl,
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+  };
+}
+function textHeaders(): HeadersInit {
+  return {
+    "content-type": "text/plain; charset=utf-8",
+    "access-control-allow-origin": "*",
+  };
 }
 
 // ── page renderers ─────────────────────────────────────────────────────────
@@ -87,13 +110,16 @@ ${ld}
 }
 
 async function renderProduct(idOrSlug: string): Promise<Response> {
-  const { data: p } = await supabase
-    .from("products")
-    .select("id,name,description,price,sale_price,stock,category,image_url,slug,sizes,colors,material,sku")
-    .or(`slug.eq.${idOrSlug},id.eq.${idOrSlug}`)
-    .maybeSingle();
+  // PostgREST rejects `id.eq.<non-uuid>` with 400, which causes the whole
+  // `.or(...)` filter to error out and return null. Only include id.eq when
+  // the argument is a valid UUID.
+  const cols = "id,name,description,price,sale_price,stock,category,image_url,slug,sizes,colors,material";
+  const q = supabase.from("products").select(cols);
+  const { data: p } = UUID_RE.test(idOrSlug)
+    ? await q.or(`slug.eq.${idOrSlug},id.eq.${idOrSlug}`).maybeSingle()
+    : await q.eq("slug", idOrSlug).maybeSingle();
 
-  if (!p) return new Response("Product not found", { status: 404, headers: corsHeaders });
+  if (!p) return new Response("Product not found", { status: 404, headers: textHeaders() });
 
   const price = p.sale_price ?? p.price;
   const canonical = `${SITE_URL}/product/${p.slug || p.id}`;
@@ -164,7 +190,7 @@ async function renderProduct(idOrSlug: string): Promise<Response> {
 
   return new Response(
     shell({ title, description, canonical, ogImage: absoluteImage(p.image_url), body, jsonLd }),
-    { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300, s-maxage=600" } },
+    { headers: htmlHeaders("public, max-age=300, s-maxage=600") },
   );
 }
 
@@ -199,13 +225,13 @@ ${(rows || []).map(r => `  <li><a href="${SITE_URL}/product/${r.slug || r.id}">$
 
   return new Response(
     shell({ title, description, canonical, ogImage: `${SITE_URL}/og-image.jpg`, body, jsonLd }),
-    { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300, s-maxage=600" } },
+    { headers: htmlHeaders("public, max-age=300, s-maxage=600") },
   );
 }
 
 async function renderBlogPost(slug: string): Promise<Response> {
   const { data: post } = await supabase.from("blog_posts").select("*").eq("slug", slug).maybeSingle();
-  if (!post) return new Response("Post not found", { status: 404, headers: corsHeaders });
+  if (!post) return new Response("Post not found", { status: 404, headers: textHeaders() });
 
   const canonical = `${SITE_URL}/blog/${post.slug}`;
   const title = `${post.title} | ${SITE_NAME}`;
@@ -232,7 +258,7 @@ async function renderBlogPost(slug: string): Promise<Response> {
 
   return new Response(
     shell({ title, description, canonical, ogImage: absoluteImage(post.featured_image), body, jsonLd }),
-    { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=600, s-maxage=3600" } },
+    { headers: htmlHeaders("public, max-age=600, s-maxage=3600") },
   );
 }
 
@@ -253,11 +279,24 @@ function renderHome(): Response {
 </nav>`;
   return new Response(
     shell({ title, description, canonical: `${SITE_URL}/`, ogImage: `${SITE_URL}/og-image.jpg`, body }),
-    { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=600, s-maxage=1800" } },
+    { headers: htmlHeaders("public, max-age=600, s-maxage=1800") },
   );
 }
 
 // ── entrypoint ─────────────────────────────────────────────────────────────
+// Wrap every response with a fresh Response that reuses the body + status but
+// hard-sets Content-Type. The Supabase edge gateway appears to keep whatever
+// text/plain default the runtime chose otherwise, even when the renderer
+// itself supplied text/html.
+function reheader(res: Response): Response {
+  const status = res.status;
+  const isHtml = status === 200; // renderers only emit 200 for HTML
+  const headers = new Headers(res.headers);
+  headers.set("content-type", isHtml ? "text/html; charset=utf-8" : "text/plain; charset=utf-8");
+  headers.set("access-control-allow-origin", "*");
+  return new Response(res.body, { status, headers });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -265,7 +304,6 @@ Deno.serve(async (req) => {
   const ua = req.headers.get("user-agent") || "";
   const force = url.searchParams.get("force") === "1";
 
-  // Path: prefer `?path=`, else strip everything up to /bot-prerender in the URL.
   let path = url.searchParams.get("path") || "";
   if (!path) {
     const m = url.pathname.match(/\/bot-prerender(\/.*)?$/);
@@ -273,29 +311,23 @@ Deno.serve(async (req) => {
   }
   if (!path.startsWith("/")) path = "/" + path;
 
-  // If a human hits this directly, bounce them to the real SPA URL.
   if (!force && !isBot(ua)) {
     return new Response(null, { status: 302, headers: { ...corsHeaders, Location: `${SITE_URL}${path}` } });
   }
 
   try {
-    // /product/:idOrSlug   or   /p/:idOrSlug
     const productMatch = path.match(/^\/(?:product|p)\/(?:show\/)?([^/?]+)/);
-    if (productMatch) return await renderProduct(decodeURIComponent(productMatch[1]));
+    if (productMatch) return reheader(await renderProduct(decodeURIComponent(productMatch[1])));
 
-    // /blog/:slug
     const blogMatch = path.match(/^\/blog\/([^/?]+)/);
-    if (blogMatch) return await renderBlogPost(decodeURIComponent(blogMatch[1]));
+    if (blogMatch) return reheader(await renderBlogPost(decodeURIComponent(blogMatch[1])));
 
-    // /shop or /shop?category=X   or   /categories
-    if (path.startsWith("/shop") || path.startsWith("/categories")) {
-      // category may be encoded in the raw path query
+    if (path.startsWith("/shop") || path.startsWith("/categor")) {
       const cat = new URL(`${SITE_URL}${path}`).searchParams.get("category");
-      return await renderCategoryOrShop(cat);
+      return reheader(await renderCategoryOrShop(cat));
     }
 
-    // Home / fallback
-    return renderHome();
+    return reheader(renderHome());
   } catch (err) {
     console.error("bot-prerender error:", err);
     return new Response(`Prerender error: ${err instanceof Error ? err.message : String(err)}`, {

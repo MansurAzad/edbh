@@ -331,6 +331,12 @@ type VerifyResult = {
   checks: VerifyCheck[];
 } | { error: string };
 
+function extractMeta(html: string, kind: "og" | "name", key: string): string | null {
+  const attr = kind === "og" ? "property" : "name";
+  const re = new RegExp(`<meta[^>]+${attr}=["']${key}["'][^>]*content=["']([^"']+)["']`, "i");
+  return html.match(re)?.[1] ?? null;
+}
+
 function runHtmlChecks(html: string, pathname: string): VerifyCheck[] {
   const kind = pathname.startsWith("/product")
     ? "product"
@@ -338,12 +344,29 @@ function runHtmlChecks(html: string, pathname: string): VerifyCheck[] {
     ? "blog"
     : "category";
 
+  const ogTitle = extractMeta(html, "og", "og:title");
+  const ogDesc = extractMeta(html, "og", "og:description");
+  const ogImage = extractMeta(html, "og", "og:image");
+  const ogUrl = extractMeta(html, "og", "og:url");
+  const ogType = extractMeta(html, "og", "og:type");
+  const twCard = extractMeta(html, "name", "twitter:card");
+  const twTitle = extractMeta(html, "name", "twitter:title");
+  const twImage = extractMeta(html, "name", "twitter:image");
+
+  const expectedOgType = kind === "product" ? "product" : kind === "blog" ? "article" : "website";
+
   const c: VerifyCheck[] = [
     { label: "<title> present", ok: /<title>[^<]{5,}<\/title>/i.test(html) },
     { label: "meta description", ok: /<meta[^>]+name=["']description["'][^>]*content=["'][^"']{10,}/i.test(html) },
     { label: "canonical link", ok: /<link[^>]+rel=["']canonical["']/i.test(html) },
-    { label: "og:title / og:image", ok: /og:title/i.test(html) && /og:image/i.test(html) },
-    { label: "twitter:card", ok: /twitter:card/i.test(html) },
+    { label: "og:title", ok: !!ogTitle, detail: ogTitle || undefined },
+    { label: "og:description", ok: !!ogDesc, detail: ogDesc || undefined },
+    { label: "og:image", ok: !!ogImage, detail: ogImage || undefined },
+    { label: "og:url", ok: !!ogUrl, detail: ogUrl || undefined },
+    { label: `og:type = "${expectedOgType}"`, ok: ogType === expectedOgType, detail: `got: ${ogType || "(missing)"}` },
+    { label: "twitter:card", ok: !!twCard, detail: twCard || undefined },
+    { label: "twitter:title", ok: !!twTitle, detail: twTitle || undefined },
+    { label: "twitter:image (falls back to og:image)", ok: !!(twImage || ogImage) },
     { label: "JSON-LD block", ok: /application\/ld\+json/i.test(html) },
   ];
   if (kind === "product") {
@@ -365,9 +388,34 @@ function runHtmlChecks(html: string, pathname: string): VerifyCheck[] {
 }
 
 const PrerenderVerify = () => {
-  const [input, setInput] = useState("/product/show/abaya-ibis-pink-1132");
+  const [input, setInput] = useState("/product/show/dubai-embroidery-borka");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<VerifyResult | null>(null);
+  const [reports, setReports] = useState<SavedReport[]>(() => loadReports());
+
+  const persistReports = (next: SavedReport[]) => {
+    setReports(next);
+    try { localStorage.setItem(REPORTS_KEY, JSON.stringify(next)); } catch { /* quota */ }
+  };
+  const saveReport = () => {
+    if (!result || !("checks" in result)) return;
+    const path = input.trim().startsWith("/") ? input.trim() : "/" + input.trim();
+    const sameCount = reports.filter((r) => r.path === path).length;
+    const entry: SavedReport = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      version: sameCount + 1,
+      path,
+      savedAt: new Date().toISOString(),
+      status: result.status,
+      passed: result.checks.filter((c) => c.ok).length,
+      total: result.checks.length,
+      checks: result.checks,
+      htmlHead: result.html.slice(0, 4000),
+    };
+    persistReports([entry, ...reports].slice(0, 50));
+  };
+  const deleteReport = (id: string) => persistReports(reports.filter((r) => r.id !== id));
+  const clearReports = () => persistReports([]);
 
   const run = async () => {
     let path = input.trim();
@@ -459,12 +507,15 @@ const PrerenderVerify = () => {
                   </li>
                 ))}
               </ul>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => copy(result.html)}>
                   <Copy className="w-3 h-3 mr-1" /> Copy HTML
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => copy(result.visibleText)}>
                   <Copy className="w-3 h-3 mr-1" /> Copy visible text
+                </Button>
+                <Button size="sm" variant="secondary" onClick={saveReport}>
+                  💾 Save as report
                 </Button>
               </div>
             </CardContent>
@@ -489,7 +540,72 @@ const PrerenderVerify = () => {
           </Card>
         </>
       )}
+
+      <SavedReports reports={reports} onDelete={deleteReport} onClearAll={clearReports} />
     </div>
+  );
+};
+
+// ── saved reports ─────────────────────────────────────────────────────
+type SavedReport = {
+  id: string;
+  version: number;
+  path: string;
+  savedAt: string;
+  status: number;
+  passed: number;
+  total: number;
+  checks: VerifyCheck[];
+  htmlHead: string;
+};
+
+const REPORTS_KEY = "seo-debug:prerender-reports";
+const loadReports = (): SavedReport[] => {
+  try { return JSON.parse(localStorage.getItem(REPORTS_KEY) || "[]"); } catch { return []; }
+};
+
+const SavedReports = ({
+  reports, onDelete, onClearAll,
+}: { reports: SavedReport[]; onDelete: (id: string) => void; onClearAll: () => void }) => {
+  if (!reports.length) return null;
+  const downloadOne = (r: SavedReport) => {
+    const blob = new Blob([JSON.stringify(r, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `prerender-report-${r.path.replace(/[^\w]+/g, "_")}-v${r.version}.json`;
+    a.click();
+  };
+  const downloadAll = () => {
+    const blob = new Blob([JSON.stringify(reports, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `prerender-reports-all-${Date.now()}.json`;
+    a.click();
+  };
+  return (
+    <Card>
+      <CardHeader className="pb-2 flex flex-row items-center gap-2">
+        <CardTitle className="text-sm">Saved verify reports ({reports.length})</CardTitle>
+        <div className="ml-auto flex gap-2">
+          <Button size="sm" variant="outline" onClick={downloadAll}>Download all (JSON)</Button>
+          <Button size="sm" variant="ghost" onClick={onClearAll}>Clear</Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {reports.map((r) => (
+          <div key={r.id} className="flex items-center gap-2 text-xs border rounded p-2">
+            <Badge variant="outline">v{r.version}</Badge>
+            <span className="font-mono truncate flex-1" title={r.path}>{r.path}</span>
+            <Badge variant={r.passed === r.total ? "default" : "destructive"}>
+              {r.passed}/{r.total}
+            </Badge>
+            <span className="text-muted-foreground">{new Date(r.savedAt).toLocaleString()}</span>
+            <Button size="sm" variant="outline" onClick={() => downloadOne(r)}>Download</Button>
+            <Button size="sm" variant="ghost" onClick={() => onDelete(r.id)}>✕</Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 };
 
