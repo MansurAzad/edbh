@@ -312,36 +312,101 @@ const BulkProductEdit = () => {
     toast.info("সব pending পরিবর্তন বাতিল করা হলো");
   };
 
-  const runAiEnrich = async () => {
-    if (selected.size === 0) { toast.error("প্রোডাক্ট সিলেক্ট করুন"); return; }
+  // Title format validator: expects "[Origin] [Fabric...] [Type] – [Color] [– Set/Part]?"
+  const validateAiTitle = (title: string): { valid: boolean; warnings: string[] } => {
+    const w: string[] = [];
+    if (!title) return { valid: false, warnings: ["empty"] };
+    if (title.length < 40) w.push(`too short (${title.length})`);
+    if (title.length > 100) w.push(`too long (${title.length})`);
+    if (!/(Dubai|Imported|Premium)/i.test(title)) w.push("origin missing");
+    if (!/(Nida|Chiffon|Barbie|Georgette|Crepe|Organza|Silk|Fabric)/i.test(title)) w.push("fabric missing");
+    if (!/(Abaya|Borka|Farasha|Kaftan|Hijab)/i.test(title)) w.push("product type missing");
+    if (!/–|-/.test(title)) w.push("no separator (–)");
+    if (/dubai collection$/i.test(title.trim())) w.push('remove "Dubai Collection" suffix');
+    return { valid: w.length === 0, warnings: w };
+  };
+
+  const runAiEnrichBatch = async (ids: string[]) => {
+    if (ids.length === 0) { toast.error("প্রোডাক্ট সিলেক্ট করুন"); return; }
     if (!aiFields.title && !aiFields.description) { toast.error("অন্তত title বা description বেছে নিন"); return; }
-    if (selected.size > 50) { toast.error("এক বারে সর্বোচ্চ ৫০টি প্রোডাক্ট"); return; }
+    if (ids.length > 50) { toast.error("এক বারে সর্বোচ্চ ৫০টি প্রোডাক্ট"); return; }
 
     setAiRunning(true);
+    setAiRateLimited(false);
+    setAiProgress({ done: 0, total: ids.length, ok: 0, fail: 0 });
+    setAiResults([]);
+    setAiPanelOpen(true);
+
     const fields = [aiFields.title && "title", aiFields.description && "description"].filter(Boolean) as string[];
-    try {
-      const { data, error } = await supabase.functions.invoke("enrich-product", {
-        body: { productIds: Array.from(selected), fields, dryRun: true },
-      });
-      if (error) throw error;
-      const results = (data?.results || []) as Array<{ id: string; title?: string; description?: string; error?: string }>;
-      let ok = 0, fail = 0;
-      results.forEach(r => {
-        if (r.error) { fail++; return; }
-        const patch: EditPatch = {};
-        if (aiFields.title && r.title) patch.name = r.title;
-        if (aiFields.description && r.description) patch.description = r.description;
-        if (Object.keys(patch).length) {
-          setEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], ...patch } }));
-          ok++;
+    const CHUNK = 5;
+    const collected: typeof aiResults = [];
+
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunkIds = ids.slice(i, i + CHUNK);
+      try {
+        const { data, error } = await supabase.functions.invoke("enrich-product", {
+          body: { productIds: chunkIds, fields, dryRun: true },
+        });
+        if (error) {
+          const msg = String(error.message || error);
+          if (/429|rate limit/i.test(msg)) setAiRateLimited(true);
+          if (/402|credit/i.test(msg)) toast.error("AI credits শেষ — Workspace billing-এ credits যোগ করুন");
+          throw new Error(msg);
         }
-      });
-      toast.success(`AI-জেনারেটেড: ${ok}টি সফল, ${fail}টি ব্যর্থ — Dry-run দেখুন তারপর Save`);
-    } catch (e: any) {
-      toast.error(`AI ব্যর্থ: ${e?.message || "unknown"}`);
-    } finally {
-      setAiRunning(false);
+        const results = (data?.results || []) as Array<{ id: string; title?: string; description?: string; error?: string }>;
+        for (const r of results) {
+          const orig = productMap.get(r.id);
+          const beforeName = orig?.name || "";
+          const beforeDesc = orig?.description || "";
+          if (r.error) {
+            collected.push({
+              id: r.id, productName: beforeName, beforeName, beforeDesc,
+              titleValid: false, titleWarnings: [], error: r.error,
+            });
+            setAiProgress(p => ({ ...p, done: p.done + 1, fail: p.fail + 1 }));
+            continue;
+          }
+          const validation = r.title ? validateAiTitle(r.title) : { valid: true, warnings: [] };
+          const patch: EditPatch = {};
+          if (aiFields.title && r.title) patch.name = r.title;
+          if (aiFields.description && r.description) patch.description = r.description;
+          if (Object.keys(patch).length) {
+            setEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], ...patch } }));
+          }
+          collected.push({
+            id: r.id, productName: beforeName, beforeName, beforeDesc,
+            afterName: r.title, afterDesc: r.description,
+            titleValid: validation.valid, titleWarnings: validation.warnings,
+          });
+          setAiProgress(p => ({ ...p, done: p.done + 1, ok: p.ok + 1 }));
+        }
+      } catch (e: any) {
+        // Mark all items in this chunk as failed
+        for (const id of chunkIds) {
+          const orig = productMap.get(id);
+          collected.push({
+            id, productName: orig?.name || id, beforeName: orig?.name || "", beforeDesc: orig?.description || "",
+            titleValid: false, titleWarnings: [], error: e?.message || "unknown",
+          });
+          setAiProgress(p => ({ ...p, done: p.done + 1, fail: p.fail + 1 }));
+        }
+      }
+      setAiResults([...collected]);
+      // Gentle spacing between chunks to reduce rate-limit risk
+      if (i + CHUNK < ids.length) await new Promise(r => setTimeout(r, 400));
     }
+
+    setAiRunning(false);
+    const okCount = collected.filter(r => !r.error).length;
+    const failCount = collected.filter(r => !!r.error).length;
+    toast.success(`AI-জেনারেটেড: ${okCount} সফল, ${failCount} ব্যর্থ — নিচের প্যানেলে দেখুন`);
+  };
+
+  const runAiEnrich = () => runAiEnrichBatch(Array.from(selected));
+  const retryFailed = () => {
+    const failedIds = aiResults.filter(r => !!r.error).map(r => r.id);
+    if (failedIds.length === 0) { toast.info("Retry করার কিছু নেই"); return; }
+    runAiEnrichBatch(failedIds);
   };
 
   const editCount = Object.keys(edits).length;
