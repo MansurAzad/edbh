@@ -99,6 +99,8 @@ export interface AdminOrder {
 export interface AdminOrderItem {
   /** UUID primary key. */
   id: string;
+  /** FK to `products.id` — nullable when the product was deleted. */
+  product_id: string | null;
   /** Snapshot of the product name at time of purchase. */
   product_name: string;
   /** Number of units ordered. */
@@ -109,6 +111,12 @@ export interface AdminOrderItem {
   size: string | null;
   /** Selected colour variant (nullable). */
   color: string | null;
+  /**
+   * Resolved product thumbnail URL — hydrated client-side by joining
+   * `order_items.product_id` against `products.image_url`. Null when the
+   * source product no longer exists or has no image.
+   */
+  image_url?: string | null;
 }
 
 // ---------------------------------------------------------------------------
