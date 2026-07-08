@@ -145,9 +145,9 @@ export default function SimpleCheckoutForm({
           </div>
 
           <p className="text-xs text-muted-foreground">
-            📦 ডেলিভারি চার্জ সম্পূর্ণ বাংলাদেশে <strong>৳১৫০</strong> ফিক্সড
-            {selectedZone ? ` — বর্তমান জোন: ${selectedZone.zone_name} (৳${selectedZone.shipping_charge})` : "।"}
+            📦 ডেলিভারি চার্জ সম্পূর্ণ বাংলাদেশে <strong>৳১৫০</strong> ফিক্সড।
           </p>
+
         </div>
       </div>
 
@@ -213,10 +213,14 @@ export default function SimpleCheckoutForm({
           type="button"
           onClick={onConfirmOrder}
           disabled={processing}
-          className="btn-gold w-full text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-busy={processing}
+          data-testid="confirm-order-btn"
+          className="btn-gold w-full text-base sm:text-lg py-3 sm:py-4 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
         >
+          {processing && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
           {processing ? "প্রসেসিং..." : `অর্ডার কনফার্ম করুন — ৳${finalTotal.toLocaleString()}`}
         </button>
+
       </div>
     </motion.div>
   );
