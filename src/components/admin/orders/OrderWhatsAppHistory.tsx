@@ -188,26 +188,38 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
       aria-label="WhatsApp share history"
       data-testid="order-wa-history"
     >
-      <header className="flex items-center gap-2 mb-3">
+      <header className="flex items-center gap-2 mb-2 flex-wrap">
         <MessageCircle className="w-4 h-4 text-green-600" />
         <h4 className="text-sm font-semibold">WhatsApp Share History</h4>
         <span className="text-xs text-muted-foreground">({events.length} attempts)</span>
-        <div className="ml-auto flex gap-1">
+        <div className="ml-auto flex flex-wrap gap-1">
+          <Button
+            type="button" size="sm" variant="ghost"
+            onClick={() => exportWhatsAppHistoryCSV(orderId, events, "failed")}
+            disabled={failedCount === 0}
+            title="Download only failed/blocked attempts"
+            data-testid="wa-export-failed"
+          >
+            <Download className="w-3.5 h-3.5 mr-1" />
+            Failed CSV {failedCount > 0 ? `(${failedCount})` : ""}
+          </Button>
           <Button
             type="button" size="sm" variant="outline"
             onClick={() => runRetry("primary")}
-            disabled={retryingId !== null}
+            disabled={busy}
+            aria-busy={busy}
             data-testid="wa-retry-primary"
           >
-            {retryingId === "primary"
+            {retryingId === "primary" || (awaitingDeliveryId && retryingId === null)
               ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
               : <Send className="w-3.5 h-3.5 mr-1" />}
-            Retry
+            {awaitingDeliveryId && retryingId === null ? "Awaiting delivery…" : "Resend"}
           </Button>
           <Button
             type="button" size="sm"
             onClick={() => runRetry("escalate")}
-            disabled={retryingId !== null}
+            disabled={busy}
+            aria-busy={busy}
             data-testid="wa-retry-escalate"
             title="Escalate: automatically pick a shorter fallback template on repeated failure"
           >
@@ -219,6 +231,19 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
         </div>
       </header>
 
+      {/* Search box: filters the list by wa_message_id, error text, actor,
+          status/delivery_status, variant, or any key inside the webhook payload. */}
+      <div className="mb-2 relative">
+        <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search wa_message_id, error code, payload…"
+          className="h-8 pl-7 text-xs"
+          data-testid="wa-history-search"
+        />
+      </div>
+
       {loading && events.length === 0 && (
         <p className="text-xs text-muted-foreground flex items-center gap-2">
           <Loader2 className="w-3 h-3 animate-spin" /> Loading…
@@ -226,6 +251,11 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
       )}
       {!loading && events.length === 0 && (
         <p className="text-xs text-muted-foreground">No WhatsApp share attempts yet.</p>
+      )}
+      {!loading && events.length > 0 && visibleEvents.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          No attempts match "{search}". <button className="underline" onClick={() => setSearch("")}>Clear</button>
+        </p>
       )}
 
       {latest && (
