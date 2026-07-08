@@ -186,24 +186,46 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
         {events.map((ev) => (
           <li
             key={ev.id}
-            className="flex flex-wrap items-center gap-2 text-[11px] rounded border border-border/40 bg-background/60 px-2 py-1.5"
+            className="rounded border border-border/40 bg-background/60 px-2 py-1.5 text-[11px]"
           >
-            <span className={`px-1.5 py-0.5 rounded border text-[10px] uppercase font-mono ${statusColor(ev.status)}`}>
-              {ev.status}
-            </span>
-            {deliveryBadge(ev.delivery_status)}
-            <span className="font-mono text-muted-foreground">{fmt(ev.created_at)}</span>
-            <span className="text-muted-foreground">[{ev.actor}]</span>
-            {ev.attempt_variant && (
-              <span className="text-muted-foreground font-mono">v:{ev.attempt_variant}</span>
-            )}
-            {ev.delivery_updated_at && ev.delivery_status && (
-              <span className="text-muted-foreground text-[10px]">
-                {ev.delivery_status} @ {fmt(ev.delivery_updated_at)}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`px-1.5 py-0.5 rounded border text-[10px] uppercase font-mono ${statusColor(ev.status)}`}>
+                {ev.status}
               </span>
-            )}
+              {deliveryBadge(ev.delivery_status)}
+              <span className="font-mono text-muted-foreground">{fmt(ev.created_at)}</span>
+              <span className="text-muted-foreground">[{ev.actor}]</span>
+              {ev.attempt_variant && (
+                <span className="text-muted-foreground font-mono">v:{ev.attempt_variant}</span>
+              )}
+              {ev.delivery_updated_at && ev.delivery_status && (
+                <span className="text-muted-foreground text-[10px]">
+                  {ev.delivery_status} @ {fmt(ev.delivery_updated_at)}
+                </span>
+              )}
+            </div>
             {ev.error && (
-              <span className="text-destructive/90 break-words w-full">{ev.error}</span>
+              <p className="mt-1 text-destructive/90 break-words">{ev.error}</p>
+            )}
+            {/* Full Meta payload — collapsed by default so the log stays scannable. */}
+            {(ev.wa_message_id || ev.payload_snapshot) && (
+              <details className="mt-1">
+                <summary className="cursor-pointer select-none text-[10px] text-muted-foreground hover:text-foreground">
+                  {ev.wa_message_id ? `Meta id: ${ev.wa_message_id}` : "Payload"} · details
+                </summary>
+                <div className="mt-1 space-y-1">
+                  {ev.wa_message_id && (
+                    <p className="font-mono text-[10px] break-all">
+                      <span className="text-muted-foreground">wa_message_id:</span> {ev.wa_message_id}
+                    </p>
+                  )}
+                  {ev.payload_snapshot && (
+                    <pre className="max-h-40 overflow-auto rounded bg-muted/40 p-1.5 text-[10px] font-mono whitespace-pre-wrap break-all">
+{JSON.stringify(ev.payload_snapshot, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              </details>
             )}
           </li>
         ))}

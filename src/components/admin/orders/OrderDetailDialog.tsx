@@ -13,7 +13,7 @@
 // =============================================================================
 
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Zap, Download } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import TrackingForm from "./TrackingForm";
+import ZoomableThumb from "@/components/admin/ZoomableThumb";
 import {
   type AdminOrder,
   type AdminOrderItem,
@@ -31,7 +32,11 @@ import {
   fetchWhatsAppShareEvents,
   type WhatsAppShareEvent,
 } from "@/lib/checkout/whatsappShare";
-import { retryWhatsAppShareForOrder } from "@/lib/admin/adminWhatsAppRetry";
+import {
+  retryWhatsAppShareForOrder,
+  retryWithEscalation,
+} from "@/lib/admin/adminWhatsAppRetry";
+import { exportWhatsAppHistoryCSV } from "@/lib/admin/whatsappHistoryCsv";
 import WhatsAppShareTimeline from "@/components/checkout/WhatsAppShareTimeline";
 import OrderWhatsAppHistory from "@/components/admin/orders/OrderWhatsAppHistory";
 
@@ -126,25 +131,43 @@ const OrderDetailDialog = ({
       setWaEvents([]);
       return;
     }
-    supabase
-      .from("order_items")
-      .select("*")
-      .eq("order_id", order.id)
-      .then(({ data }) => setItems((data as AdminOrderItem[]) || []));
+    // Load items and hydrate each row with the product's image_url.
+    (async () => {
+      const { data: rawItems } = await supabase
+        .from("order_items")
+        .select("id, product_id, product_name, quantity, price, size, color")
+        .eq("order_id", order.id);
+      const rows = (rawItems ?? []) as Array<Omit<AdminOrderItem, "image_url">>;
+
+      const productIds = Array.from(
+        new Set(rows.map((r) => r.product_id).filter((v): v is string => !!v)),
+      );
+      let imageMap: Record<string, string | null> = {};
+      if (productIds.length) {
+        const { data: prods } = await supabase
+          .from("products")
+          .select("id, image_url")
+          .in("id", productIds);
+        imageMap = Object.fromEntries((prods ?? []).map((p) => [p.id, p.image_url ?? null]));
+      }
+      setItems(rows.map((r) => ({ ...r, image_url: r.product_id ? imageMap[r.product_id] ?? null : null })));
+    })();
     loadWaEvents(order.id);
   }, [order]);
 
-  const handleAdminRetryWa = async () => {
+  const handleAdminRetryWa = async (mode: "primary" | "escalate" = "primary") => {
     if (!order) return;
     setWaRetrying(true);
     try {
-      const res = await retryWhatsAppShareForOrder(order.id);
+      const res = mode === "escalate"
+        ? await retryWithEscalation(order.id)
+        : await retryWhatsAppShareForOrder(order.id);
       toast({
         title:
           res.status === "opened" || res.status === "retried"
             ? "WhatsApp আবার খোলা হয়েছে"
             : "WhatsApp শেয়ার হয়নি",
-        description: res.error || `স্ট্যাটাস: ${res.status}`,
+        description: res.error || `স্ট্যাটাস: ${res.status} · variant: ${res.variant}`,
         variant:
           res.status === "opened" || res.status === "retried"
             ? "default"
@@ -315,18 +338,41 @@ const OrderDetailDialog = ({
                   <h4 className="text-sm font-medium text-muted-foreground">
                     📱 WhatsApp রিসিট শেয়ার
                   </h4>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleAdminRetryWa}
-                    disabled={waRetrying}
-                    data-testid="admin-wa-retry"
-                    aria-busy={waRetrying}
-                    className="gap-1.5 h-7 text-xs"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${waRetrying ? "animate-spin" : ""}`} />
-                    {waRetrying ? "চেষ্টা করা হচ্ছে..." : "আবার শেয়ার করুন"}
-                  </Button>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAdminRetryWa("primary")}
+                      disabled={waRetrying}
+                      data-testid="admin-wa-retry"
+                      aria-busy={waRetrying}
+                      className="gap-1.5 h-7 text-xs"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${waRetrying ? "animate-spin" : ""}`} />
+                      {waRetrying ? "চেষ্টা করা হচ্ছে..." : "Resend WhatsApp"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleAdminRetryWa("escalate")}
+                      disabled={waRetrying}
+                      data-testid="admin-wa-retry-escalate"
+                      className="gap-1.5 h-7 text-xs"
+                      title="Escalate with a shorter fallback template"
+                    >
+                      <Zap className="w-3 h-3" /> Escalate
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => exportWhatsAppHistoryCSV(order.id, waEvents)}
+                      disabled={waEvents.length === 0}
+                      data-testid="admin-wa-export-csv"
+                      className="gap-1.5 h-7 text-xs"
+                    >
+                      <Download className="w-3 h-3" /> CSV
+                    </Button>
+                  </div>
                 </div>
 
                 {order.whatsapp_share_status && (
@@ -398,14 +444,8 @@ const OrderDetailDialog = ({
               <div className="border rounded-lg divide-y">
                 {items.map((item) => (
                   <div key={item.id} className="p-3 flex items-center gap-3">
-                    {/* Product thumbnail — placeholder used until real images are wired */}
-                    <div className="w-14 h-14 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
-                      <img
-                        src="/placeholder.svg"
-                        alt={item.product_name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+                    {/* Product thumbnail — real image_url with click-to-zoom */}
+                    <ZoomableThumb src={item.image_url} alt={item.product_name} sizeClass="w-14 h-14" />
 
                     {/* Product name + size/color chips + quantity */}
                     <div className="flex-1 min-w-0">

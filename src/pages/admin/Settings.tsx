@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import RoleManagement from "@/components/admin/RoleManagement";
 import AIProviderSettings from "@/components/admin/AIProviderSettings";
+import WhatsAppSettingsCard from "@/components/admin/WhatsAppSettingsCard";
 
  const CloudinaryMigrationCard = () => {
    const [migrating, setMigrating] = useState(false);
@@ -341,6 +342,10 @@ import AIProviderSettings from "@/components/admin/AIProviderSettings";
 
          {/* Cloudinary Migration */}
          <CloudinaryMigrationCard />
+
+         {/* WhatsApp Cloud API webhook configuration */}
+         <WhatsAppSettingsCard />
+ 
  
          <Button onClick={handleSave} className="w-full">
            <Save className="w-4 h-4 mr-2" />
