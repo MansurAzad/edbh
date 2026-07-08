@@ -131,25 +131,43 @@ const OrderDetailDialog = ({
       setWaEvents([]);
       return;
     }
-    supabase
-      .from("order_items")
-      .select("*")
-      .eq("order_id", order.id)
-      .then(({ data }) => setItems((data as AdminOrderItem[]) || []));
+    // Load items and hydrate each row with the product's image_url.
+    (async () => {
+      const { data: rawItems } = await supabase
+        .from("order_items")
+        .select("id, product_id, product_name, quantity, price, size, color")
+        .eq("order_id", order.id);
+      const rows = (rawItems ?? []) as Array<Omit<AdminOrderItem, "image_url">>;
+
+      const productIds = Array.from(
+        new Set(rows.map((r) => r.product_id).filter((v): v is string => !!v)),
+      );
+      let imageMap: Record<string, string | null> = {};
+      if (productIds.length) {
+        const { data: prods } = await supabase
+          .from("products")
+          .select("id, image_url")
+          .in("id", productIds);
+        imageMap = Object.fromEntries((prods ?? []).map((p) => [p.id, p.image_url ?? null]));
+      }
+      setItems(rows.map((r) => ({ ...r, image_url: r.product_id ? imageMap[r.product_id] ?? null : null })));
+    })();
     loadWaEvents(order.id);
   }, [order]);
 
-  const handleAdminRetryWa = async () => {
+  const handleAdminRetryWa = async (mode: "primary" | "escalate" = "primary") => {
     if (!order) return;
     setWaRetrying(true);
     try {
-      const res = await retryWhatsAppShareForOrder(order.id);
+      const res = mode === "escalate"
+        ? await retryWithEscalation(order.id)
+        : await retryWhatsAppShareForOrder(order.id);
       toast({
         title:
           res.status === "opened" || res.status === "retried"
             ? "WhatsApp আবার খোলা হয়েছে"
             : "WhatsApp শেয়ার হয়নি",
-        description: res.error || `স্ট্যাটাস: ${res.status}`,
+        description: res.error || `স্ট্যাটাস: ${res.status} · variant: ${res.variant}`,
         variant:
           res.status === "opened" || res.status === "retried"
             ? "default"
