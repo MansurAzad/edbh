@@ -26,7 +26,7 @@ import SEOHead from "@/components/seo/SEOHead";
 import { buildProductSeo, buildProductJsonLd } from "@/lib/seo/config";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import StructuredData from "@/components/seo/StructuredData";
-import { trackAddToCart, trackViewContent } from "@/components/seo/AnalyticsTracker";
+import { trackAddToCart, trackViewContent, trackContact } from "@/components/seo/AnalyticsTracker";
 import PersonalizedRecommendations from "@/components/shop/PersonalizedRecommendations";
 import { type Product, getProductImage as getProductImg, defaultFallbackImage } from "@/types/product";
 
@@ -484,6 +484,7 @@ const ProductDetail = () => {
                       href={`https://wa.me/8801845853634?text=${encodeURIComponent(`প্রি-অর্ডার করতে চাই:\n${product.name}\nমূল্য: ৳${currentPrice.toLocaleString()}\n৫০% অগ্রিম: ৳${Math.ceil(currentPrice * 0.5).toLocaleString()}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => trackContact("whatsapp_preorder")}
                       className="flex items-center justify-center gap-2 w-full h-12 rounded-lg border-2 border-primary text-primary hover:bg-primary/10 transition-colors font-medium text-sm"
                     >
                       <Smartphone className="w-4 h-4" />
@@ -500,6 +501,7 @@ const ProductDetail = () => {
                       href={`https://wa.me/8801845853634?text=${encodeURIComponent(`প্রি-অর্ডার করতে চাই:\n${product.name}${selectedColor ? ` (${selectedColor})` : ''}${selectedSize ? ` - ${selectedSize}` : ''}\nমূল্য: ৳${currentPrice.toLocaleString()}\n৫০% অগ্রিম: ৳${Math.ceil(currentPrice * 0.5).toLocaleString()}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => trackContact("whatsapp_preorder")}
                       className="flex items-center justify-center gap-2 w-full h-12 rounded-lg border-2 border-primary text-primary hover:bg-primary/10 transition-colors font-medium text-sm"
                     >
                       <Smartphone className="w-4 h-4" />

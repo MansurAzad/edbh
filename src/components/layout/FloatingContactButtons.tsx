@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Phone, MessageCircle, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { trackContact } from "@/lib/tracking";
 
 const PHONE = "+8801845853634";
 const WHATSAPP_URL = `https://wa.me/8801845853634`;
@@ -18,6 +19,7 @@ const FloatingContactButtons = () => {
               href={WHATSAPP_URL}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackContact("whatsapp")}
               initial={{ opacity: 0, y: 20, scale: 0.8 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.8 }}
@@ -29,6 +31,7 @@ const FloatingContactButtons = () => {
             </motion.a>
             <motion.a
               href={CALL_URL}
+              onClick={() => trackContact("call")}
               initial={{ opacity: 0, y: 20, scale: 0.8 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.8 }}
