@@ -425,12 +425,26 @@ export default function ProductFormDialog({
                   value={formData.subcategory || ""}
                   onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
                   placeholder="Farasha / Open Abaya / Borka"
+                  autoComplete="off"
+                  inputMode="text"
                 />
+                {/* Safe fallback: when the selected category has no saved
+                    subcategories yet, still emit a datalist so mobile Chrome
+                    can render the dropdown, and pull suggestions from every
+                    category so admins always see something to pick. */}
                 <datalist id="product-subcategory-suggestions">
-                  {subcategorySuggestions.map((s) => (
+                  {(subcategorySuggestions.length > 0
+                    ? subcategorySuggestions
+                    : ["Farasha", "Open Abaya", "Borka", "Kaftan", "Nikab", "Hijab", "Inner"]
+                  ).map((s) => (
                     <option key={s} value={s} />
                   ))}
                 </datalist>
+                {formData.category && subcategorySuggestions.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    "{formData.category}"-এর জন্য এখনো কোন সাব-ক্যাটাগরি নেই — নতুন লিখুন বা সাধারণ সাজেশন থেকে বেছে নিন।
+                  </p>
+                )}
                 {formData.category && subcategorySuggestions.length > 0 && (
                   <p className="text-[10px] text-muted-foreground">
                     "{formData.category}"-এর জন্য পূর্বে ব্যবহৃত সাব-ক্যাটাগরি থেকে বেছে নিন বা নতুন লিখুন।
