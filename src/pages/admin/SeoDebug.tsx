@@ -482,12 +482,15 @@ const PrerenderVerify = () => {
                   </li>
                 ))}
               </ul>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => copy(result.html)}>
                   <Copy className="w-3 h-3 mr-1" /> Copy HTML
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => copy(result.visibleText)}>
                   <Copy className="w-3 h-3 mr-1" /> Copy visible text
+                </Button>
+                <Button size="sm" variant="secondary" onClick={saveReport}>
+                  💾 Save as report
                 </Button>
               </div>
             </CardContent>
@@ -512,7 +515,72 @@ const PrerenderVerify = () => {
           </Card>
         </>
       )}
+
+      <SavedReports reports={reports} onDelete={deleteReport} onClearAll={clearReports} />
     </div>
+  );
+};
+
+// ── saved reports ─────────────────────────────────────────────────────
+type SavedReport = {
+  id: string;
+  version: number;
+  path: string;
+  savedAt: string;
+  status: number;
+  passed: number;
+  total: number;
+  checks: VerifyCheck[];
+  htmlHead: string;
+};
+
+const REPORTS_KEY = "seo-debug:prerender-reports";
+const loadReports = (): SavedReport[] => {
+  try { return JSON.parse(localStorage.getItem(REPORTS_KEY) || "[]"); } catch { return []; }
+};
+
+const SavedReports = ({
+  reports, onDelete, onClearAll,
+}: { reports: SavedReport[]; onDelete: (id: string) => void; onClearAll: () => void }) => {
+  if (!reports.length) return null;
+  const downloadOne = (r: SavedReport) => {
+    const blob = new Blob([JSON.stringify(r, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `prerender-report-${r.path.replace(/[^\w]+/g, "_")}-v${r.version}.json`;
+    a.click();
+  };
+  const downloadAll = () => {
+    const blob = new Blob([JSON.stringify(reports, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `prerender-reports-all-${Date.now()}.json`;
+    a.click();
+  };
+  return (
+    <Card>
+      <CardHeader className="pb-2 flex flex-row items-center gap-2">
+        <CardTitle className="text-sm">Saved verify reports ({reports.length})</CardTitle>
+        <div className="ml-auto flex gap-2">
+          <Button size="sm" variant="outline" onClick={downloadAll}>Download all (JSON)</Button>
+          <Button size="sm" variant="ghost" onClick={onClearAll}>Clear</Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {reports.map((r) => (
+          <div key={r.id} className="flex items-center gap-2 text-xs border rounded p-2">
+            <Badge variant="outline">v{r.version}</Badge>
+            <span className="font-mono truncate flex-1" title={r.path}>{r.path}</span>
+            <Badge variant={r.passed === r.total ? "default" : "destructive"}>
+              {r.passed}/{r.total}
+            </Badge>
+            <span className="text-muted-foreground">{new Date(r.savedAt).toLocaleString()}</span>
+            <Button size="sm" variant="outline" onClick={() => downloadOne(r)}>Download</Button>
+            <Button size="sm" variant="ghost" onClick={() => onDelete(r.id)}>✕</Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 };
 
