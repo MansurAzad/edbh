@@ -52,6 +52,15 @@ const Checkout = () => {
   const { deliveryZones, selectedZone, selectZone } = useDeliveryZones(shippingInfo.city);
   useCheckoutTracking(items, total);
 
+  // Hot Sale checkout attribution — fire once per checkout entry when the visitor
+  // arrived from a Hot Sale click within this session.
+  useEffect(() => {
+    const attr = consumeHotSaleAttribution();
+    if (attr) trackHotSale("hot_sale_checkout", { variant: attr.variant, product_id: attr.productId, value: total });
+    // total captured at mount is fine — we only want a single attribution event
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const shippingCost = selectedZone?.shipping_charge ?? 0;
   const finalTotal = total - discountAmount + (total > 0 ? shippingCost : 0);
 
