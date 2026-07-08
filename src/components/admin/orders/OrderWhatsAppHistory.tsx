@@ -55,10 +55,16 @@ function deliveryBadge(s: WhatsAppDeliveryStatus | null | undefined) {
   );
 }
 
+/** Delivery statuses that mean the send is done — success or terminal failure. */
+const TERMINAL_DELIVERY: readonly WhatsAppDeliveryStatus[] = ["delivered", "read", "failed"];
+
 export default function OrderWhatsAppHistory({ orderId }: Props) {
   const [events, setEvents] = useState<WhatsAppShareEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  /** id of the event we're waiting on a terminal delivery_status for. */
+  const [awaitingDeliveryId, setAwaitingDeliveryId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
