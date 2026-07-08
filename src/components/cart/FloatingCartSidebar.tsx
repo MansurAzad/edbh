@@ -68,6 +68,11 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
   const [processing, setProcessing] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [shareStatus, setShareStatus] = useState<
+    "idle" | "sharing" | "opened" | "blocked" | "failed"
+  >("idle");
+  const [lastReceipt, setLastReceipt] = useState<OrderReceipt | null>(null);
+  const [reshareLoading, setReshareLoading] = useState(false);
 
   // Simplified checkout state
   const [shippingInfo, setShippingInfo] = useState(emptyShippingInfo);
