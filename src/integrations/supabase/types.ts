@@ -740,6 +740,57 @@ export type Database = {
         }
         Relationships: []
       }
+      csp_reports: {
+        Row: {
+          blocked_uri: string | null
+          column_number: number | null
+          created_at: string
+          document_uri: string | null
+          effective_directive: string | null
+          id: string
+          line_number: number | null
+          original_policy: string | null
+          raw: Json | null
+          referrer: string | null
+          source_file: string | null
+          status_code: number | null
+          user_agent: string | null
+          violated_directive: string | null
+        }
+        Insert: {
+          blocked_uri?: string | null
+          column_number?: number | null
+          created_at?: string
+          document_uri?: string | null
+          effective_directive?: string | null
+          id?: string
+          line_number?: number | null
+          original_policy?: string | null
+          raw?: Json | null
+          referrer?: string | null
+          source_file?: string | null
+          status_code?: number | null
+          user_agent?: string | null
+          violated_directive?: string | null
+        }
+        Update: {
+          blocked_uri?: string | null
+          column_number?: number | null
+          created_at?: string
+          document_uri?: string | null
+          effective_directive?: string | null
+          id?: string
+          line_number?: number | null
+          original_policy?: string | null
+          raw?: Json | null
+          referrer?: string | null
+          source_file?: string | null
+          status_code?: number | null
+          user_agent?: string | null
+          violated_directive?: string | null
+        }
+        Relationships: []
+      }
       customer_segment_members: {
         Row: {
           added_at: string
@@ -859,6 +910,39 @@ export type Database = {
           sent_count?: number | null
           status?: string
           subject?: string
+        }
+        Relationships: []
+      }
+      injection_block_log: {
+        Row: {
+          actor: string | null
+          created_at: string
+          id: string
+          matched_pattern: string | null
+          metadata: Json | null
+          payload_excerpt: string | null
+          reason: string
+          source: string
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          id?: string
+          matched_pattern?: string | null
+          metadata?: Json | null
+          payload_excerpt?: string | null
+          reason: string
+          source: string
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          id?: string
+          matched_pattern?: string | null
+          metadata?: Json | null
+          payload_excerpt?: string | null
+          reason?: string
+          source?: string
         }
         Relationships: []
       }
@@ -1541,6 +1625,42 @@ export type Database = {
         }
         Relationships: []
       }
+      security_scan_reports: {
+        Row: {
+          created_at: string
+          critical_count: number
+          duration_ms: number | null
+          findings: Json
+          id: string
+          status: string
+          total_findings: number
+          triggered_by: string
+          triggered_user: string | null
+        }
+        Insert: {
+          created_at?: string
+          critical_count?: number
+          duration_ms?: number | null
+          findings?: Json
+          id?: string
+          status?: string
+          total_findings?: number
+          triggered_by?: string
+          triggered_user?: string | null
+        }
+        Update: {
+          created_at?: string
+          critical_count?: number
+          duration_ms?: number | null
+          findings?: Json
+          id?: string
+          status?: string
+          total_findings?: number
+          triggered_by?: string
+          triggered_user?: string | null
+        }
+        Relationships: []
+      }
       site_content: {
         Row: {
           content: string | null
@@ -1716,6 +1836,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      detect_injection: { Args: { input: string }; Returns: string }
       get_active_ai_provider: {
         Args: { _scope: string }
         Returns: {
