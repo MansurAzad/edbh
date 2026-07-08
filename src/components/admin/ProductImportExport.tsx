@@ -411,12 +411,11 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
   };
 
   const downloadProductTemplate = () => {
-    const template = `name,category,price,sale_price,stock,featured,description,image_url,sizes,colors,material,variant_size,variant_color,variant_stock,variant_sku,variant_price_adjustment,variant_image_url
-"Premium Black Borka","Borkas",2500,2200,50,true,"প্রিমিয়াম কোয়ালিটি বোরকা","https://example.com/borka.jpg","S; M; L; XL","Black; White","Nida","S","Black",20,"PBB-S-BLK",0,"https://example.com/black.jpg"
-"Premium Black Borka","Borkas",2500,2200,50,true,"প্রিমিয়াম কোয়ালিটি বোরকা","https://example.com/borka.jpg","S; M; L; XL","Black; White","Nida","M","Black",15,"PBB-M-BLK",0,"https://example.com/black.jpg"
-"Premium Black Borka","Borkas",2500,2200,50,true,"প্রিমিয়াম কোয়ালিটি বোরকা","https://example.com/borka.jpg","S; M; L; XL","Black; White","Nida","S","White",10,"PBB-S-WHT",100,"https://example.com/white.jpg"
-"Silk Hijab Collection","Hijabs",1500,,30,false,"সিল্ক হিজাব","","Free Size","Red; Blue","Silk","Free Size","Red",15,"SHC-RED",0,"https://example.com/red.jpg"
-"Silk Hijab Collection","Hijabs",1500,,30,false,"সিল্ক হিজাব","","Free Size","Red; Blue","Silk","Free Size","Blue",15,"SHC-BLU",0,"https://example.com/blue.jpg"`;
+    // Header row now includes standardized catalogue fields alongside the
+    // original variant columns so a single CSV round-trips full product data.
+    const template = `name,category,price,sale_price,stock,featured,description,image_url,sizes,colors,material,sku,subcategory,fabric,work_type,part,hijab_included,inner_included,purchase_cost,image_alt_text,meta_title,meta_description,variant_size,variant_color,variant_stock,variant_sku,variant_price_adjustment,variant_image_url
+"Dubai Nida Karchupi Abaya","Abaya",6500,5800,20,true,"Dubai imported karchupi abaya","https://example.com/abaya.jpg","52; 54; 56; 58","Black","Nida","DBH-ABY-1001","Farasha","Nida","Karchupi","1 Part",false,true,3800,"Dubai Imported Black Karchupi Abaya","Dubai Nida Karchupi Abaya — Premium Karchupi","Premium karchupi abaya imported from Dubai. Sizes 52-58, Nida fabric.","54","Black",10,"DBH-ABY-1001-54",0,"https://example.com/abaya.jpg"
+"Silk Hijab Collection","Hijabs",1500,,30,false,"সিল্ক হিজাব","","Free Size","Red; Blue","Silk","DBH-HJB-2001","Chiffon Hijab","Silk","Plain","1 Part",false,false,900,"Silk Red Hijab","Silk Hijab Collection","Free-size silk hijab in red and blue.","Free Size","Red",15,"DBH-HJB-2001-RED",0,"https://example.com/red.jpg"`;
     downloadCSV(template, "product_with_variants_template.csv");
   };
 
