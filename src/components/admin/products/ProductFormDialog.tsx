@@ -122,6 +122,10 @@ interface Props {
   onSubmit: (e: React.FormEvent) => void;
   /** Disables submit while a Supabase mutation is pending. বাংলা: মিউটেশন চলাকালীন সাবমিট বন্ধ। */
   submitting?: boolean;
+  /** Category autocomplete suggestions sourced from existing products. */
+  categorySuggestions?: string[];
+  /** Subcategory autocomplete suggestions, filtered by selected category upstream. */
+  subcategorySuggestions?: string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,6 +172,8 @@ export default function ProductFormDialog({
   setGalleryUrls,
   onSubmit,
   submitting,
+  categorySuggestions = [],
+  subcategorySuggestions = [],
 }: Props) {
   return (
     /**
@@ -211,10 +217,16 @@ export default function ProductFormDialog({
               <Label htmlFor="category">Category</Label>
               <Input
                 id="category"
+                list="product-category-suggestions"
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 required
               />
+              <datalist id="product-category-suggestions">
+                {categorySuggestions.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </div>
           </div>
 
@@ -409,10 +421,21 @@ export default function ProductFormDialog({
                 <Label htmlFor="subcategory">Subcategory</Label>
                 <Input
                   id="subcategory"
+                  list="product-subcategory-suggestions"
                   value={formData.subcategory || ""}
                   onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
                   placeholder="Farasha / Open Abaya / Borka"
                 />
+                <datalist id="product-subcategory-suggestions">
+                  {subcategorySuggestions.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+                {formData.category && subcategorySuggestions.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    "{formData.category}"-এর জন্য পূর্বে ব্যবহৃত সাব-ক্যাটাগরি থেকে বেছে নিন বা নতুন লিখুন।
+                  </p>
+                )}
               </div>
             </div>
 

@@ -19,6 +19,18 @@ export interface Product {
   slug?: string | null;
   material?: string | null;
   video_url?: string | null;
+  // Standardized catalogue fields (optional on the shared frontend type — the
+  // admin `AdminProduct` type in `productHelpers.ts` is the source of truth).
+  sku?: string | null;
+  subcategory?: string | null;
+  fabric?: string | null;
+  work_type?: string | null;
+  part?: string | null;
+  hijab_included?: boolean | null;
+  inner_included?: boolean | null;
+  image_alt_text?: string | null;
+  meta_title?: string | null;
+  meta_description?: string | null;
 }
 
 export interface RatingSummary {

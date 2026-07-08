@@ -47,12 +47,23 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
         return;
       }
 
-      // Product CSV
-      const pHeaders = ["name", "category", "price", "sale_price", "stock", "featured", "description", "image_url", "sizes", "colors", "material"];
-      const pRows = products.map((p) => [
+      // Product CSV — includes standardized catalogue fields.
+      const pHeaders = [
+        "name", "category", "price", "sale_price", "stock", "featured",
+        "description", "image_url", "sizes", "colors", "material",
+        "sku", "subcategory", "fabric", "work_type", "part",
+        "hijab_included", "inner_included", "purchase_cost",
+        "image_alt_text", "meta_title", "meta_description",
+      ];
+      const pRows = products.map((p: any) => [
         esc(p.name), esc(p.category), p.price, p.sale_price || "", p.stock || 0,
         p.featured ? "true" : "false", esc(p.description || ""), esc(p.image_url || ""),
         esc((p.sizes || []).join("; ")), esc((p.colors || []).join("; ")), esc(p.material || ""),
+        esc(p.sku || ""), esc(p.subcategory || ""), esc(p.fabric || ""),
+        esc(p.work_type || ""), esc(p.part || ""),
+        p.hijab_included ? "true" : "false", p.inner_included ? "true" : "false",
+        p.purchase_cost ?? "",
+        esc(p.image_alt_text || ""), esc(p.meta_title || ""), esc(p.meta_description || ""),
       ]);
       downloadCSV([pHeaders.join(","), ...pRows.map((r) => r.join(","))].join("\n"),
         `products_export_${new Date().toISOString().split("T")[0]}.csv`);
@@ -350,18 +361,29 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
       const value = parseCsvField(values[index] || "");
       switch (header) {
         case "name": case "category": case "description": case "image_url": case "material":
-          product[header] = value; break;
+        case "sku": case "subcategory": case "fabric": case "work_type": case "part":
+        case "image_alt_text": case "meta_title": case "meta_description":
+          if (value) product[header] = value; break;
         case "price": case "sale_price":
           const num = parseFloat(value);
           if (!isNaN(num) && num > 0) product[header] = num;
           else if (header === "price") throw new Error("অবৈধ মূল্য");
           break;
         case "stock": product.stock = parseInt(value) || 0; break;
+        case "purchase_cost":
+          const pc = parseFloat(value);
+          if (!isNaN(pc)) product.purchase_cost = pc;
+          break;
         case "featured": product.featured = value.toLowerCase() === "true"; break;
+        case "hijab_included": product.hijab_included = value.toLowerCase() === "true"; break;
+        case "inner_included": product.inner_included = value.toLowerCase() === "true"; break;
         case "sizes": product.sizes = value ? value.split(";").map((s) => s.trim()).filter(Boolean) : []; break;
         case "colors": product.colors = value ? value.split(";").map((c) => c.trim()).filter(Boolean) : []; break;
       }
     });
+    // Back-compat: mirror fabric ↔ material if only one is provided.
+    if (product.fabric && !product.material) product.material = product.fabric;
+    if (product.material && !product.fabric) product.fabric = product.material;
     return product;
   };
 
@@ -389,12 +411,11 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
   };
 
   const downloadProductTemplate = () => {
-    const template = `name,category,price,sale_price,stock,featured,description,image_url,sizes,colors,material,variant_size,variant_color,variant_stock,variant_sku,variant_price_adjustment,variant_image_url
-"Premium Black Borka","Borkas",2500,2200,50,true,"প্রিমিয়াম কোয়ালিটি বোরকা","https://example.com/borka.jpg","S; M; L; XL","Black; White","Nida","S","Black",20,"PBB-S-BLK",0,"https://example.com/black.jpg"
-"Premium Black Borka","Borkas",2500,2200,50,true,"প্রিমিয়াম কোয়ালিটি বোরকা","https://example.com/borka.jpg","S; M; L; XL","Black; White","Nida","M","Black",15,"PBB-M-BLK",0,"https://example.com/black.jpg"
-"Premium Black Borka","Borkas",2500,2200,50,true,"প্রিমিয়াম কোয়ালিটি বোরকা","https://example.com/borka.jpg","S; M; L; XL","Black; White","Nida","S","White",10,"PBB-S-WHT",100,"https://example.com/white.jpg"
-"Silk Hijab Collection","Hijabs",1500,,30,false,"সিল্ক হিজাব","","Free Size","Red; Blue","Silk","Free Size","Red",15,"SHC-RED",0,"https://example.com/red.jpg"
-"Silk Hijab Collection","Hijabs",1500,,30,false,"সিল্ক হিজাব","","Free Size","Red; Blue","Silk","Free Size","Blue",15,"SHC-BLU",0,"https://example.com/blue.jpg"`;
+    // Header row now includes standardized catalogue fields alongside the
+    // original variant columns so a single CSV round-trips full product data.
+    const template = `name,category,price,sale_price,stock,featured,description,image_url,sizes,colors,material,sku,subcategory,fabric,work_type,part,hijab_included,inner_included,purchase_cost,image_alt_text,meta_title,meta_description,variant_size,variant_color,variant_stock,variant_sku,variant_price_adjustment,variant_image_url
+"Dubai Nida Karchupi Abaya","Abaya",6500,5800,20,true,"Dubai imported karchupi abaya","https://example.com/abaya.jpg","52; 54; 56; 58","Black","Nida","DBH-ABY-1001","Farasha","Nida","Karchupi","1 Part",false,true,3800,"Dubai Imported Black Karchupi Abaya","Dubai Nida Karchupi Abaya — Premium Karchupi","Premium karchupi abaya imported from Dubai. Sizes 52-58, Nida fabric.","54","Black",10,"DBH-ABY-1001-54",0,"https://example.com/abaya.jpg"
+"Silk Hijab Collection","Hijabs",1500,,30,false,"সিল্ক হিজাব","","Free Size","Red; Blue","Silk","DBH-HJB-2001","Chiffon Hijab","Silk","Plain","1 Part",false,false,900,"Silk Red Hijab","Silk Hijab Collection","Free-size silk hijab in red and blue.","Free Size","Red",15,"DBH-HJB-2001-RED",0,"https://example.com/red.jpg"`;
     downloadCSV(template, "product_with_variants_template.csv");
   };
 

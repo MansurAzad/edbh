@@ -312,9 +312,18 @@ const ProductDetail = () => {
     );
   }
 
+  // Build base SEO from the helper, then override title/description when the
+  // admin has authored custom meta_title / meta_description for this product.
+  const baseSeo = buildProductSeo({ id: product.id, name: product.name, description: product.description, price: product.price, salePrice: product.sale_price, category: product.category, image: getProductImage(), slug: product.slug });
+  const seoOverrides = {
+    ...baseSeo,
+    ...(product.meta_title ? { title: product.meta_title, fullTitle: true } : {}),
+    ...(product.meta_description ? { description: product.meta_description } : {}),
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead {...buildProductSeo({ id: product.id, name: product.name, description: product.description, price: product.price, salePrice: product.sale_price, category: product.category, image: getProductImage(), slug: product.slug })} />
+      <SEOHead {...seoOverrides} />
       <StructuredData data={buildProductJsonLd({ id: product.id, name: product.name, description: product.description, price: product.price, salePrice: product.sale_price, image: getProductImage(), category: product.category, slug: product.slug, stock: product.stock, reviewCount: reviewStats.count, averageRating: reviewStats.avg, sizes: (product as any).sizes, colors: (product as any).colors, material: (product as any).material, sku: (product as any).sku })} />
       <Header />
       <Breadcrumbs />
@@ -362,6 +371,34 @@ const ProductDetail = () => {
               <p className="text-muted-foreground leading-relaxed text-sm md:text-base">
                 {product.description || "This premium product from our Dubai collection is crafted with the finest materials."}
               </p>
+
+              {/* Standardized product specification table — surfaces the
+                  admin-authored catalogue fields so shoppers can scan the
+                  headline attributes at a glance. Only rows with a value are
+                  rendered to keep the panel tight. */}
+              {(product.subcategory || product.fabric || product.work_type || product.part ||
+                product.hijab_included !== null || product.inner_included !== null) && (
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs md:text-sm border border-border/60 rounded-lg p-3 md:p-4 bg-muted/20">
+                  {product.subcategory && (
+                    <><dt className="text-muted-foreground">Subcategory</dt><dd className="text-foreground font-medium">{product.subcategory}</dd></>
+                  )}
+                  {product.fabric && (
+                    <><dt className="text-muted-foreground">Fabric</dt><dd className="text-foreground font-medium">{product.fabric}</dd></>
+                  )}
+                  {product.work_type && (
+                    <><dt className="text-muted-foreground">Work Type</dt><dd className="text-foreground font-medium">{product.work_type}</dd></>
+                  )}
+                  {product.part && (
+                    <><dt className="text-muted-foreground">Part</dt><dd className="text-foreground font-medium">{product.part}</dd></>
+                  )}
+                  {product.hijab_included !== null && product.hijab_included !== undefined && (
+                    <><dt className="text-muted-foreground">Hijab Included</dt><dd className="text-foreground font-medium">{product.hijab_included ? "Yes" : "No"}</dd></>
+                  )}
+                  {product.inner_included !== null && product.inner_included !== undefined && (
+                    <><dt className="text-muted-foreground">Inner Included</dt><dd className="text-foreground font-medium">{product.inner_included ? "Yes" : "No"}</dd></>
+                  )}
+                </dl>
+              )}
 
               {/* Colors with stock count */}
               {allColorsForDisplay.length > 0 && (
