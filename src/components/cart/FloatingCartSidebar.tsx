@@ -317,7 +317,43 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
 
             <div className="flex-1 overflow-y-auto p-4">
               {orderPlaced ? (
-                <OrderSuccess orderId={orderId} onAfterAction={resetCheckout} />
+                <div className="space-y-4">
+                  <OrderSuccess orderId={orderId} onAfterAction={resetCheckout} />
+                  <div
+                    data-testid="wa-share-status"
+                    data-status={shareStatus}
+                    className={`rounded-xl border p-3 text-sm ${
+                      shareStatus === "opened"
+                        ? "border-green-500/40 bg-green-500/5 text-green-700 dark:text-green-400"
+                        : shareStatus === "sharing"
+                        ? "border-border bg-muted/50 text-muted-foreground"
+                        : shareStatus === "blocked" || shareStatus === "failed"
+                        ? "border-destructive/40 bg-destructive/5 text-destructive"
+                        : "hidden"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-medium">
+                      <MessageCircle className="w-4 h-4" />
+                      {shareStatus === "sharing" && "WhatsApp রিসিট শেয়ার হচ্ছে..."}
+                      {shareStatus === "opened" && "WhatsApp রিসিট শেয়ার হয়েছে ✅"}
+                      {shareStatus === "blocked" && "WhatsApp popup ব্লক হয়েছে"}
+                      {shareStatus === "failed" && "WhatsApp শেয়ার ব্যর্থ হয়েছে"}
+                    </div>
+                    {(shareStatus === "blocked" || shareStatus === "failed") && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="mt-2 w-full"
+                        onClick={handleReshare}
+                        disabled={reshareLoading}
+                        data-testid="wa-reshare"
+                      >
+                        {reshareLoading ? "চেষ্টা করা হচ্ছে..." : "আবার WhatsApp-এ শেয়ার করুন"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
               ) : mode === "cart" ? (
                 items.length === 0 ? (
                   <EmptyCart onClose={onClose} />
