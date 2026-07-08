@@ -197,7 +197,32 @@ serve(async (req) => {
       }
     };
 
+    // helper: check cancel flag
+    const checkCancel = async (): Promise<boolean> => {
+      if (!reportId) return false;
+      const r = await fetch(
+        `${SB_URL}/rest/v1/security_scan_reports?id=eq.${reportId}&select=cancel_requested`,
+        { headers: sbHeaders }).catch(() => null);
+      if (!r || !r.ok) return false;
+      const row = (await r.json())[0];
+      return !!row?.cancel_requested;
+    };
+
     for (let ti = 0; ti < TARGETS.length; ti++) {
+      if (await checkCancel()) {
+        await updateReport({
+          status: "canceled", progress: Math.round((ti / TARGETS.length) * 90),
+          duration_ms: Date.now() - start, last_message: "Canceled by admin",
+          total_findings: findings.length, critical_count: critical,
+          findings: { items: findings, canceled_at: new Date().toISOString(), rules_snapshot: rules },
+        });
+        await sendAlert(alerts, "[Security] Scan canceled",
+          `Trigger: ${triggeredBy}\nStopped after ${ti}/${TARGETS.length} targets.\nPartial findings: ${findings.length} (${critical} critical).`,
+          { report_id: reportId });
+        return new Response(JSON.stringify({ ok: true, canceled: true, report_id: reportId }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const t = TARGETS[ti];
       const url = `${SB_URL}/rest/v1/${t.table}?select=${encodeURIComponent(t.cols.join(","))}`;
       const res = await fetch(url, { headers: sbHeaders });
@@ -232,6 +257,7 @@ serve(async (req) => {
       status: "completed", progress: 100,
       total_findings: findings.length, critical_count: critical,
       duration_ms: Date.now() - start,
+      last_message: `Completed: ${findings.length} findings (${critical} critical) in ${Math.round((Date.now()-start)/1000)}s`,
       findings: { items: findings, recent_blocks: recentBlocks, csp_last_window: cspCount, rules_snapshot: rules },
     };
     await updateReport(finalPatch);
@@ -245,25 +271,26 @@ serve(async (req) => {
       }).catch(() => {});
     }
 
-    // Fire alerts
+    // Completion alert (always, plus criticality/spike reasons)
     const alertReasons: string[] = [];
     if (alerts.alert_on_critical && critical > 0) alertReasons.push(`${critical} critical finding(s)`);
     if (cspSpike) alertReasons.push(`CSP spike: ${cspCount} in ${alerts.spike_window_minutes}m (>=${alerts.spike_threshold})`);
-    if (alertReasons.length) {
-      await sendAlert(
-        alerts,
-        `[Security] Scan alert — ${alertReasons.join(", ")}`,
-        `Trigger: ${triggeredBy}\nTotal findings: ${findings.length}\nCritical: ${critical}\nCSP window (${alerts.spike_window_minutes}m): ${cspCount}`,
-        { report_id: reportId, top_findings: findings.slice(0, 20) },
-      );
-    }
+    const subject = alertReasons.length
+      ? `[Security] Scan complete — ${alertReasons.join(", ")}`
+      : `[Security] Scan complete — clean`;
+    await sendAlert(alerts, subject,
+      `Trigger: ${triggeredBy}\nTotal findings: ${findings.length}\nCritical: ${critical}\nCSP window (${alerts.spike_window_minutes}m): ${cspCount}\nDuration: ${Math.round((Date.now()-start)/1000)}s`,
+      { report_id: reportId, top_findings: findings.slice(0, 20) });
 
     return new Response(JSON.stringify({ ok: true, report_id: reportId, ...finalPatch, alerts_fired: alertReasons }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    await updateReport({ status: "failed", error: msg, progress: 100, duration_ms: Date.now() - start });
+    await updateReport({ status: "failed", error: msg, last_message: `Failed: ${msg}`, progress: 100, duration_ms: Date.now() - start });
+    await sendAlert(alerts, "[Security] Scan FAILED",
+      `Trigger: ${triggeredBy}\nError: ${msg}`,
+      { report_id: reportId });
     return new Response(JSON.stringify({ ok: false, error: msg, report_id: reportId }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
