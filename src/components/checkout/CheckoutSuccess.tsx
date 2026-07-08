@@ -18,7 +18,10 @@ import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
-import type { WhatsAppShareStatus } from "@/lib/checkout/whatsappShare";
+import type {
+  WhatsAppShareStatus,
+  ShareResult,
+} from "@/lib/checkout/whatsappShare";
 
 interface Props {
   orderId: string | null;
@@ -30,6 +33,8 @@ interface Props {
   whatsappStatus?: WhatsAppShareStatus | null;
   /** Human-readable reason when whatsappStatus is "blocked" or "failed". */
   whatsappError?: string | null;
+  /** Timestamped log of every share attempt in this session (newest first). */
+  whatsappEvents?: ShareResult[];
 }
 
 function WhatsAppStatusCard({
