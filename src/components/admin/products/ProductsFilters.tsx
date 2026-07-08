@@ -33,8 +33,12 @@
  * @module ProductsFilters
  */
 
-import { Search } from "lucide-react";
+import { Search, AlertTriangle, ArrowDownWideNarrow } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -95,51 +99,31 @@ import ProductImportExport from "@/components/admin/ProductImportExport";
  *   বাংলা: CSV ইমপোর্ট সফল হলে প্যারেন্ট রিফ্রেশ করার জন্য কলব্যাক।
  */
 interface Props {
-  /** Current search query string. বাংলা: বর্তমান সার্চ টেক্সট। */
   searchQuery: string;
-  /** Setter for search query. বাংলা: সার্চ সেটার। */
   setSearchQuery: (v: string) => void;
-  /** Active category filter ("" = all). বাংলা: ক্যাটাগরি ফিল্টার। */
   categoryFilter: string;
-  /** Setter for category filter. বাংলা: ক্যাটাগরি সেটার। */
   setCategoryFilter: (v: string) => void;
-  /** Min price filter as string. বাংলা: সর্বনিম্ন মূল্য (স্ট্রিং)। */
   minPrice: string;
-  /** Setter for min price. বাংলা: মিন প্রাইস সেটার। */
   setMinPrice: (v: string) => void;
-  /** Max price filter as string. বাংলা: সর্বোচ্চ মূল্য (স্ট্রিং)। */
   maxPrice: string;
-  /** Setter for max price. বাংলা: ম্যাক্স প্রাইস সেটার। */
   setMaxPrice: (v: string) => void;
-  /** Unique category list for the dropdown. বাংলা: ড্রপডাউনের ক্যাটাগরি তালিকা। */
   categories: string[];
-  /** Called after a successful CSV import to trigger list refresh. বাংলা: ইমপোর্ট শেষে রিফ্রেশ কলব্যাক। */
   onImportComplete: () => void;
+  /** Show only products at or below the configured low-stock threshold. */
+  lowStockOnly: boolean;
+  setLowStockOnly: (v: boolean) => void;
+  /** Numeric stock threshold used for the "low stock only" filter and badge. */
+  lowStockThreshold: number;
+  setLowStockThreshold: (v: number) => void;
+  /** Current sort mode for the products list. */
+  sortMode: "newest" | "stock_asc" | "stock_desc";
+  setSortMode: (v: "newest" | "stock_asc" | "stock_desc") => void;
+  /** Number of products currently at or below the threshold. */
+  lowStockCount: number;
+  /** Open the bulk inventory update modal. */
+  onOpenBulkInventory: () => void;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Component
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * `ProductsFilters` — filter + import/export toolbar for the Products admin table.
- *
- * All controls are fully controlled via props; no internal state.
- * The wrapping `flex flex-wrap` layout gracefully stacks controls on small
- * screens without requiring explicit breakpoint media queries.
- *
- * ### Category select sentinel
- * The shadcn `<Select>` cannot hold an empty string as its value, so the
- * component uses `"all"` as a sentinel.  When `"all"` is selected,
- * `setCategoryFilter("")` is called so the parent sees the canonical empty value.
- *
- * @param {Props} props – See {@link Props}.
- * @returns {JSX.Element} A flex row of filter controls.
- *
- * বাংলা নোট:
- *  ক্যাটাগরি ড্রপডাউনে "All Categories" মানে কোনো ফিল্টার নেই।
- *  মূল্য ফিল্টারে শুধু সংখ্যা দিন (টাকায়)।
- */
 export default function ProductsFilters({
   searchQuery,
   setSearchQuery,
@@ -151,95 +135,118 @@ export default function ProductsFilters({
   setMaxPrice,
   categories,
   onImportComplete,
+  lowStockOnly,
+  setLowStockOnly,
+  lowStockThreshold,
+  setLowStockThreshold,
+  sortMode,
+  setSortMode,
+  lowStockCount,
+  onOpenBulkInventory,
 }: Props) {
   return (
-    /**
-     * Flex row that wraps to the next line when viewport is narrow.
-     * gap-3 gives consistent spacing between all controls.
-     * বাংলা: ছোট স্ক্রিনে কন্ট্রোলগুলো নিচের লাইনে চলে যাবে।
-     */
-    <div className="flex items-center gap-3 flex-wrap">
+    <div className="space-y-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search products..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
 
-      {/* ── Search input ──────────────────────────────────────────────── */}
-      {/*
-       * flex-1 + min/max width: grows to fill available space but stays
-       * readable between 200 px and 384 px.
-       * The Search icon is absolutely positioned inside the input padding.
-       * বাংলা: সার্চ ইনপুট — পণ্যের নামে সার্চ করুন।
-       */}
-      <div className="relative flex-1 min-w-[200px] max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search products..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10" /* left padding makes room for the Search icon */
-        />
+        <Select
+          value={categoryFilter || "all"}
+          onValueChange={(v) => setCategoryFilter(v === "all" ? "" : v)}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            placeholder="Min ৳"
+            value={minPrice}
+            onChange={(e) => setMinPrice(e.target.value)}
+            className="w-24"
+          />
+          <span className="text-muted-foreground">-</span>
+          <Input
+            type="number"
+            placeholder="Max ৳"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(e.target.value)}
+            className="w-24"
+          />
+        </div>
+
+        <ProductImportExport onImportComplete={onImportComplete} />
       </div>
 
-      {/* ── Category select ───────────────────────────────────────────── */}
-      {/*
-       * Uses "all" as the internal sentinel for "no filter applied".
-       * When the user picks "all", setCategoryFilter("") is called so the
-       * parent sees an empty string (canonical no-filter value).
-       * বাংলা: "All Categories" বেছে নিলে ক্যাটাগরি ফিল্টার বাতিল হয়।
-       */}
-      <Select
-        value={categoryFilter || "all"}
-        onValueChange={(v) => setCategoryFilter(v === "all" ? "" : v)}
-      >
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="All Categories" />
-        </SelectTrigger>
-        <SelectContent>
-          {/* Sentinel option — clears the category filter. বাংলা: সব ক্যাটাগরি দেখান। */}
-          <SelectItem value="all">All Categories</SelectItem>
-          {/*
-           * One option per unique category string from the full product list.
-           * `key` uses the category string itself since categories are unique.
-           * বাংলা: প্রতিটি অনন্য ক্যাটাগরির জন্য একটি অপশন।
-           */}
-          {categories.map((c) => (
-            <SelectItem key={c} value={c}>{c}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/* ── Inventory row: low-stock filter, threshold, sort, bulk action ─── */}
+      <div className="flex items-center gap-3 flex-wrap p-3 rounded-md border border-border bg-muted/30">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-500" aria-hidden="true" />
+          <Label htmlFor="low-stock-toggle" className="text-sm font-medium">
+            Low stock only
+          </Label>
+          <Switch
+            id="low-stock-toggle"
+            checked={lowStockOnly}
+            onCheckedChange={setLowStockOnly}
+          />
+          {lowStockCount > 0 && (
+            <Badge variant="destructive" data-testid="low-stock-count">
+              {lowStockCount}
+            </Badge>
+          )}
+        </div>
 
-      {/* ── Price range inputs ────────────────────────────────────────── */}
-      {/*
-       * Two numeric inputs separated by a dash. Both stored as strings to
-       * avoid parsing issues while the user types.  The parent converts them
-       * to numbers when applying the filter.
-       * বাংলা: সর্বনিম্ন ও সর্বোচ্চ মূল্য ফিল্টার — টাকায় সংখ্যা দিন।
-       */}
-      <div className="flex items-center gap-2">
-        <Input
-          type="number"
-          placeholder="Min ৳"
-          value={minPrice}
-          onChange={(e) => setMinPrice(e.target.value)}
-          className="w-24"
-        />
-        {/* Visual separator between min and max price inputs. */}
-        <span className="text-muted-foreground">-</span>
-        <Input
-          type="number"
-          placeholder="Max ৳"
-          value={maxPrice}
-          onChange={(e) => setMaxPrice(e.target.value)}
-          className="w-24"
-        />
+        <div className="flex items-center gap-2">
+          <Label htmlFor="low-stock-threshold" className="text-xs text-muted-foreground">
+            Threshold ≤
+          </Label>
+          <Input
+            id="low-stock-threshold"
+            type="number"
+            min={0}
+            value={lowStockThreshold}
+            onChange={(e) => setLowStockThreshold(Math.max(0, Number(e.target.value) || 0))}
+            className="w-20"
+            aria-label="Low stock threshold"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <ArrowDownWideNarrow className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+          <Select value={sortMode} onValueChange={(v) => setSortMode(v as Props["sortMode"])}>
+            <SelectTrigger className="w-[170px]" aria-label="Sort products">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest first</SelectItem>
+              <SelectItem value="stock_asc">Stock: low → high</SelectItem>
+              <SelectItem value="stock_desc">Stock: high → low</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="ml-auto">
+          <Button size="sm" variant="secondary" onClick={onOpenBulkInventory}>
+            Bulk inventory update
+          </Button>
+        </div>
       </div>
-
-      {/* ── Import / Export widget ────────────────────────────────────── */}
-      {/*
-       * Renders a CSV download button and a CSV upload input.
-       * After a successful import it calls `onImportComplete` so the parent
-       * re-fetches the product list from Supabase.
-       * বাংলা: CSV ডাউনলোড ও আপলোড বাটন। ইমপোর্ট সফল হলে তালিকা রিফ্রেশ হয়।
-       */}
-      <ProductImportExport onImportComplete={onImportComplete} />
-
     </div>
   );
 }

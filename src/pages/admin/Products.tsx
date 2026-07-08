@@ -14,6 +14,7 @@ import ProductsFilters from "@/components/admin/products/ProductsFilters";
 import ProductsTable from "@/components/admin/products/ProductsTable";
 import ProductsPagination from "@/components/admin/products/ProductsPagination";
 import ProductFormDialog from "@/components/admin/products/ProductFormDialog";
+import BulkInventoryDialog from "@/components/admin/products/BulkInventoryDialog";
 import { useAdminProducts } from "@/hooks/admin/useAdminProducts";
 import {
   emptyProduct, PRODUCTS_PER_PAGE,
@@ -28,6 +29,10 @@ const Products = () => {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [lowStockThreshold, setLowStockThreshold] = useState(5);
+  const [sortMode, setSortMode] = useState<"newest" | "stock_asc" | "stock_desc">("newest");
+  const [bulkInventoryOpen, setBulkInventoryOpen] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
@@ -68,8 +73,21 @@ const Products = () => {
     if (categoryFilter) filtered = filtered.filter((p) => p.category === categoryFilter);
     if (minPrice) filtered = filtered.filter((p) => (p.sale_price || p.price) >= Number(minPrice));
     if (maxPrice) filtered = filtered.filter((p) => (p.sale_price || p.price) <= Number(maxPrice));
+    if (lowStockOnly) filtered = filtered.filter((p) => (p.stock ?? 0) <= lowStockThreshold);
+    if (sortMode !== "newest") {
+      filtered = [...filtered].sort((a, b) => {
+        const sa = a.stock ?? 0;
+        const sb = b.stock ?? 0;
+        return sortMode === "stock_asc" ? sa - sb : sb - sa;
+      });
+    }
     return filtered;
-  }, [products, searchQuery, categoryFilter, minPrice, maxPrice]);
+  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode]);
+
+  const lowStockCount = useMemo(
+    () => products.filter((p) => (p.stock ?? 0) <= lowStockThreshold).length,
+    [products, lowStockThreshold],
+  );
 
   const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
   const paginatedProducts = useMemo(() => {
@@ -168,6 +186,21 @@ const Products = () => {
           setMaxPrice={onFilterChange(setMaxPrice)}
           categories={categories}
           onImportComplete={invalidateProducts}
+          lowStockOnly={lowStockOnly}
+          setLowStockOnly={onFilterChange(setLowStockOnly)}
+          lowStockThreshold={lowStockThreshold}
+          setLowStockThreshold={onFilterChange(setLowStockThreshold)}
+          sortMode={sortMode}
+          setSortMode={onFilterChange(setSortMode)}
+          lowStockCount={lowStockCount}
+          onOpenBulkInventory={() => setBulkInventoryOpen(true)}
+        />
+
+        <BulkInventoryDialog
+          open={bulkInventoryOpen}
+          onOpenChange={setBulkInventoryOpen}
+          products={filteredProducts}
+          onSaved={invalidateProducts}
         />
 
         <ProductsTable

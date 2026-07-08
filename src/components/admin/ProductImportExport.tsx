@@ -19,6 +19,7 @@ import {
   esc,
   type CsvRowError,
 } from "@/lib/admin/productCsv";
+import { groupErrorsByRow } from "@/lib/admin/productImportErrors";
 
 interface ProductImportExportProps {
   onImportComplete: () => void;
@@ -437,19 +438,43 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
                 </div>
 
                 {importResult.errors.length > 0 && (
-                  <Alert variant="destructive">
+                  <Alert variant="destructive" data-testid="import-error-summary">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      <div className="text-sm font-semibold mb-1">
+                      <div className="text-sm font-semibold mb-2">
                         {importResult.failed}টি রো-তে সমস্যা — নিচের ফিল্ডগুলো ঠিক করে আবার আপলোড করুন:
                       </div>
-                      <div className="max-h-40 overflow-y-auto text-xs space-y-0.5">
-                        {importResult.errors.slice(0, 20).map((error, i) => (
-                          <div key={i} className="font-mono">• {error}</div>
-                        ))}
-                        {importResult.errors.length > 20 && (
+                      <div className="max-h-56 overflow-y-auto text-xs space-y-2">
+                        {groupErrorsByRow(importResult.fieldErrors ?? [], importResult.errors)
+                          .slice(0, 15)
+                          .map((group) => (
+                            <div
+                              key={group.row ?? `misc-${group.messages[0]}`}
+                              data-testid="import-error-row"
+                              className="border border-destructive/30 rounded-md p-2 bg-destructive/5"
+                            >
+                              <div className="font-semibold mb-1">
+                                {group.row != null ? `রো ${group.row}` : "সাধারণ ত্রুটি"}
+                              </div>
+                              <ul className="space-y-0.5 pl-3 list-disc">
+                                {group.messages.map((m, idx) => (
+                                  <li key={idx} className="font-mono">
+                                    {m.field && (
+                                      <span className="font-sans font-semibold text-destructive/90">
+                                        {m.field}:{" "}
+                                      </span>
+                                    )}
+                                    {m.message}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        {groupErrorsByRow(importResult.fieldErrors ?? [], importResult.errors).length > 15 && (
                           <div className="mt-1 text-muted-foreground">
-                            ...আরো {importResult.errors.length - 20}টি এরর
+                            ...আরো{" "}
+                            {groupErrorsByRow(importResult.fieldErrors ?? [], importResult.errors).length - 15}
+                            টি রো
                           </div>
                         )}
                       </div>
