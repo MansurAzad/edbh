@@ -1118,6 +1118,50 @@ export type Database = {
           },
         ]
       }
+      product_edit_audit: {
+        Row: {
+          admin_email: string | null
+          admin_id: string | null
+          created_at: string
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          product_id: string
+          source: string
+        }
+        Insert: {
+          admin_email?: string | null
+          admin_id?: string | null
+          created_at?: string
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          product_id: string
+          source?: string
+        }
+        Update: {
+          admin_email?: string | null
+          admin_id?: string | null
+          created_at?: string
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          product_id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_edit_audit_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_images: {
         Row: {
           alt_text: string | null
