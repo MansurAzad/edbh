@@ -740,6 +740,95 @@ const BulkProductEdit = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Enrich Results Panel */}
+      <Dialog open={aiPanelOpen} onOpenChange={setAiPanelOpen}>
+        <DialogContent className="max-w-5xl max-h-[88vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              <Bot className="w-4 h-4" /> AI Enrich Results
+              <Badge variant="secondary">✓ {aiProgress.ok}</Badge>
+              {aiProgress.fail > 0 && <Badge variant="destructive">✗ {aiProgress.fail}</Badge>}
+              {aiRunning && <Badge variant="outline" className="animate-pulse">Running…</Badge>}
+            </DialogTitle>
+          </DialogHeader>
+
+          {aiRateLimited && (
+            <Alert variant="destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertDescription>
+                AI Gateway rate limit (429) — কিছু chunk ব্যর্থ হয়েছে। কিছুক্ষণ পর <b>Retry Failed</b> চাপুন।
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {(aiRunning || aiProgress.total > 0) && (
+            <div className="space-y-1 py-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{aiProgress.done}/{aiProgress.total} processed</span>
+                <span>{aiProgress.total ? Math.round((aiProgress.done / aiProgress.total) * 100) : 0}%</span>
+              </div>
+              <Progress value={aiProgress.total ? (aiProgress.done / aiProgress.total) * 100 : 0} className="h-2" />
+            </div>
+          )}
+
+          <div className="overflow-auto flex-1 space-y-3">
+            {aiResults.length === 0 && !aiRunning && (
+              <p className="text-center text-muted-foreground py-6 text-sm">এখনো কোনো result নেই।</p>
+            )}
+            {aiResults.map((r) => (
+              <div
+                key={r.id}
+                className={`border rounded-lg p-3 ${
+                  r.error ? "border-destructive/50 bg-destructive/5" :
+                  r.titleValid ? "border-border" : "border-yellow-500/40 bg-yellow-500/5"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                  <div className="text-xs font-mono text-muted-foreground truncate max-w-[60%]">{r.productName}</div>
+                  <div className="flex gap-1 flex-wrap">
+                    {r.error ? (
+                      <Badge variant="destructive" className="text-[10px]">ERROR: {r.error.slice(0, 50)}</Badge>
+                    ) : r.titleValid ? (
+                      <Badge variant="secondary" className="text-[10px]">Title valid ✓</Badge>
+                    ) : (
+                      r.titleWarnings.map((w, i) => (
+                        <Badge key={i} variant="outline" className="text-[10px] border-yellow-500/50">{w}</Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
+                {!r.error && (
+                  <div className="grid md:grid-cols-2 gap-3 text-xs">
+                    <div className="space-y-2">
+                      <div className="text-muted-foreground uppercase text-[10px]">Before</div>
+                      <div className="font-medium line-through text-muted-foreground">{r.beforeName || "—"}</div>
+                      <div className="whitespace-pre-wrap text-muted-foreground line-clamp-4">{r.beforeDesc || "—"}</div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-primary uppercase text-[10px]">After (staged in edits)</div>
+                      <div className="font-medium">{r.afterName || <span className="text-muted-foreground">(unchanged)</span>}</div>
+                      <div className="whitespace-pre-wrap line-clamp-6">{r.afterDesc || <span className="text-muted-foreground">(unchanged)</span>}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="flex-wrap gap-2">
+            {aiProgress.fail > 0 && (
+              <Button variant="outline" onClick={retryFailed} disabled={aiRunning}>
+                <RotateCcw className="w-4 h-4 mr-2" /> Retry {aiProgress.fail} failed
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setAiPanelOpen(false)}>Close</Button>
+            <Button onClick={() => { setAiPanelOpen(false); setDryRunOpen(true); }} disabled={editCount === 0}>
+              <Eye className="w-4 h-4 mr-2" /> Open Dry-run & Save ({editCount})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };
