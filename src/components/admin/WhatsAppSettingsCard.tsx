@@ -253,9 +253,11 @@ export default function WhatsAppSettingsCard() {
         {verifyResult && (
           <Alert variant={verifyResult.ok ? "default" : "destructive"}>
             <AlertDescription className="text-xs">
-              {verifyResult.ok
-                ? `✓ Webhook handshake OK · ${verifyResult.latencyMs}ms`
-                : `✗ ${verifyResult.error}`}
+              {verifyResult.ok ? (
+                <>✓ Webhook handshake OK · {verifyResult.latencyMs}ms</>
+              ) : (
+                <>✗ {verifyResult.error}</>
+              )}
             </AlertDescription>
           </Alert>
         )}
