@@ -35,6 +35,7 @@
 // serverTrack (CAPI/edge function). One function instead of repeating the
 // four-block pattern in every trackX wrapper.
 import { serverTrack, type ServerTrackUserData } from "@/lib/server-tracking";
+import { emitDebug } from "./debug";
 
 /** Convenience alias — any plain object with string keys. */
 type AnyObj = Record<string, unknown>;
