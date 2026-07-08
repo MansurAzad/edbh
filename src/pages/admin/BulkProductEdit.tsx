@@ -302,6 +302,38 @@ const BulkProductEdit = () => {
     toast.info("সব pending পরিবর্তন বাতিল করা হলো");
   };
 
+  const runAiEnrich = async () => {
+    if (selected.size === 0) { toast.error("প্রোডাক্ট সিলেক্ট করুন"); return; }
+    if (!aiFields.title && !aiFields.description) { toast.error("অন্তত title বা description বেছে নিন"); return; }
+    if (selected.size > 50) { toast.error("এক বারে সর্বোচ্চ ৫০টি প্রোডাক্ট"); return; }
+
+    setAiRunning(true);
+    const fields = [aiFields.title && "title", aiFields.description && "description"].filter(Boolean) as string[];
+    try {
+      const { data, error } = await supabase.functions.invoke("enrich-product", {
+        body: { productIds: Array.from(selected), fields, dryRun: true },
+      });
+      if (error) throw error;
+      const results = (data?.results || []) as Array<{ id: string; title?: string; description?: string; error?: string }>;
+      let ok = 0, fail = 0;
+      results.forEach(r => {
+        if (r.error) { fail++; return; }
+        const patch: EditPatch = {};
+        if (aiFields.title && r.title) patch.name = r.title;
+        if (aiFields.description && r.description) patch.description = r.description;
+        if (Object.keys(patch).length) {
+          setEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], ...patch } }));
+          ok++;
+        }
+      });
+      toast.success(`AI-জেনারেটেড: ${ok}টি সফল, ${fail}টি ব্যর্থ — Dry-run দেখুন তারপর Save`);
+    } catch (e: any) {
+      toast.error(`AI ব্যর্থ: ${e?.message || "unknown"}`);
+    } finally {
+      setAiRunning(false);
+    }
+  };
+
   const editCount = Object.keys(edits).length;
 
   return (
