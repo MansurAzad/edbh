@@ -1092,6 +1092,9 @@ export type Database = {
           transaction_id: string | null
           updated_at: string
           user_id: string | null
+          whatsapp_share_error: string | null
+          whatsapp_share_status: string | null
+          whatsapp_shared_at: string | null
         }
         Insert: {
           advance_amount?: number | null
@@ -1124,6 +1127,9 @@ export type Database = {
           transaction_id?: string | null
           updated_at?: string
           user_id?: string | null
+          whatsapp_share_error?: string | null
+          whatsapp_share_status?: string | null
+          whatsapp_shared_at?: string | null
         }
         Update: {
           advance_amount?: number | null
@@ -1156,6 +1162,9 @@ export type Database = {
           transaction_id?: string | null
           updated_at?: string
           user_id?: string | null
+          whatsapp_share_error?: string | null
+          whatsapp_share_status?: string | null
+          whatsapp_shared_at?: string | null
         }
         Relationships: [
           {

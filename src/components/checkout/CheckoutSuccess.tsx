@@ -1,117 +1,122 @@
 /**
  * @file CheckoutSuccess.tsx
- * @description Full-page confirmation screen displayed immediately after an
- * order is successfully placed. Shows an animated checkmark, the short order
- * ID, a download-invoice CTA, and navigation links back to the shop or the
- * user's order history (only when logged in).
+ * @description Post-order confirmation screen. Shows the order id, invoice
+ * download, WhatsApp share status (opened / blocked / failed / retried),
+ * and a "Retry WhatsApp share" fallback for when the browser popup was blocked.
  */
 
 import { motion } from "framer-motion";
-import { CheckCircle, FileText, MessageCircle } from "lucide-react";
+import {
+  CheckCircle,
+  FileText,
+  MessageCircle,
+  AlertTriangle,
+  XCircle,
+  RefreshCw,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
+import type { WhatsAppShareStatus } from "@/lib/checkout/whatsappShare";
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
-/**
- * Props accepted by {@link CheckoutSuccess}.
- */
 interface Props {
-  /**
-   * The UUID of the newly created order, as returned by Supabase.
-   * Only the first 8 characters are shown in the UI (uppercased).
-   * May be `null` while the parent is still resolving the order ID.
-   */
   orderId: string | null;
-
-  /**
-   * Whether the current user is authenticated.
-   * Controls visibility of the "View Order History" link – guests do not
-   * have a profile page to redirect to.
-   */
   isLoggedIn: boolean;
-
-  /**
-   * Callback invoked when the user clicks "Download Invoice".
-   * The parent is responsible for calling {@link downloadInvoice} and
-   * handling any loading/error state.
-   */
   onDownloadInvoice: () => void;
-
-  /** Optional: re-open WhatsApp with the order receipt message. */
+  /** Re-attempt the WhatsApp share (for popup-blocked cases). */
   onShareWhatsApp?: () => void;
+  /** Auto-share result recorded on order placement. */
+  whatsappStatus?: WhatsAppShareStatus | null;
+  /** Human-readable reason when whatsappStatus is "blocked" or "failed". */
+  whatsappError?: string | null;
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function WhatsAppStatusCard({
+  status, error, onRetry,
+}: { status: WhatsAppShareStatus | null | undefined; error?: string | null; onRetry?: () => void }) {
+  if (!status) return null;
 
-/**
- * `CheckoutSuccess` – order-confirmation page.
- *
- * Wraps the standard site chrome (Header + Footer) around a centred card
- * that animates in with a scale + fade transition via Framer Motion.
- *
- * @example
- * ```tsx
- * <CheckoutSuccess
- *   orderId="abc12345-..."
- *   isLoggedIn={true}
- *   onDownloadInvoice={handleDownload}
- * />
- * ```
- *
- * @param props - {@link Props}
- * @returns A full-viewport success screen.
- */
+  const map = {
+    opened: {
+      icon: <MessageCircle className="w-5 h-5 text-green-600" />,
+      title: "✅ WhatsApp-এ রিসিট পাঠানো হয়েছে",
+      body: "আপনার অর্ডারের সম্পূর্ণ রিসিট আমাদের WhatsApp-এ শেয়ার করা হয়েছে।",
+      className: "border-green-500/40 bg-green-500/5",
+    },
+    retried: {
+      icon: <MessageCircle className="w-5 h-5 text-green-600" />,
+      title: "✅ WhatsApp রি-শেয়ার সফল",
+      body: "আবার শেয়ার করা হয়েছে।",
+      className: "border-green-500/40 bg-green-500/5",
+    },
+    blocked: {
+      icon: <AlertTriangle className="w-5 h-5 text-amber-600" />,
+      title: "⚠️ WhatsApp popup ব্লক হয়েছে",
+      body: error || "ব্রাউজার popup ব্লক করেছে। নিচের বাটনে ক্লিক করে ম্যানুয়ালি খুলুন।",
+      className: "border-amber-500/40 bg-amber-500/5",
+    },
+    failed: {
+      icon: <XCircle className="w-5 h-5 text-destructive" />,
+      title: "❌ WhatsApp শেয়ার ব্যর্থ",
+      body: error || "কোনো কারণে শেয়ার করা যায়নি। আবার চেষ্টা করুন।",
+      className: "border-destructive/40 bg-destructive/5",
+    },
+  }[status];
+
+  return (
+    <div className={`mt-4 mb-6 rounded-xl border p-4 text-left ${map.className}`}>
+      <div className="flex items-start gap-3">
+        {map.icon}
+        <div className="flex-1">
+          <p className="font-medium text-sm">{map.title}</p>
+          <p className="text-xs text-muted-foreground mt-1">{map.body}</p>
+          {(status === "blocked" || status === "failed") && onRetry && (
+            <Button
+              size="sm"
+              onClick={onRetry}
+              className="mt-3 gap-2 bg-green-500 hover:bg-green-600 text-white"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              আবার শেয়ার করুন
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CheckoutSuccess({
   orderId,
   isLoggedIn,
   onDownloadInvoice,
   onShareWhatsApp,
+  whatsappStatus,
+  whatsappError,
 }: Props) {
   return (
-    /* Full-height page wrapper – shares the global background colour */
     <div className="min-h-screen bg-background">
-      {/* Site-wide navigation header */}
       <Header />
-
       <main className="pt-24 pb-20">
         <div className="container mx-auto px-4">
-          {/*
-           * Animated card – scales from 90 % → 100 % opacity 0 → 1.
-           * `max-w-md` keeps the card narrow and centred on all breakpoints.
-           */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             className="max-w-md mx-auto text-center"
           >
-            {/* Large circular badge housing the success checkmark icon */}
             <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-12 h-12 text-primary" />
             </div>
 
-            {/* Primary heading */}
             <h1 className="font-display text-3xl font-bold text-foreground mb-4">
-              Order Placed!
+              অর্ডার সফল!
             </h1>
 
-            {/* Reassurance copy – mentions email confirmation & tracking */}
             <p className="text-muted-foreground mb-6">
-              Thank you for your order. We'll send you a confirmation email
-              with order details and tracking information.
+              ধন্যবাদ! আপনার অর্ডার সংরক্ষণ করা হয়েছে। শীঘ্রই আমরা যোগাযোগ করব।
             </p>
 
-            {/*
-             * Short order ID display.
-             * `orderId?.slice(0, 8).toUpperCase()` trims the UUID to a
-             * human-readable 8-char reference code, e.g. "ABC12345".
-             */}
             <p className="text-sm text-muted-foreground mb-4">
               Order ID:{" "}
               <span className="text-primary font-medium font-mono">
@@ -119,40 +124,34 @@ export default function CheckoutSuccess({
               </span>
             </p>
 
-            {/* Invoice download button – delegates to parent callback */}
+            <WhatsAppStatusCard
+              status={whatsappStatus}
+              error={whatsappError}
+              onRetry={onShareWhatsApp}
+            />
+
             <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
-              <Button
-                onClick={onDownloadInvoice}
-                variant="outline"
-                className="gap-2"
-              >
+              <Button onClick={onDownloadInvoice} variant="outline" className="gap-2">
                 <FileText className="w-4 h-4" />
                 Download Invoice
               </Button>
-              {onShareWhatsApp && (
+              {onShareWhatsApp && whatsappStatus !== "blocked" && whatsappStatus !== "failed" && (
                 <Button
                   onClick={onShareWhatsApp}
                   className="gap-2 bg-green-500 hover:bg-green-600 text-white"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  WhatsApp-এ রিসিট শেয়ার
+                  WhatsApp-এ আবার শেয়ার
                 </Button>
               )}
             </div>
 
-            {/* Post-order navigation – stacks vertically on mobile */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              {/*
-               * "View Order History" is only shown to authenticated users
-               * because guests have no profile page.
-               */}
               {isLoggedIn && (
                 <Link to="/profile" className="btn-outline-gold">
                   View Order History
                 </Link>
               )}
-
-              {/* Always available – returns user to the product catalogue */}
               <Link to="/shop" className="btn-gold">
                 Continue Shopping
               </Link>
@@ -160,8 +159,6 @@ export default function CheckoutSuccess({
           </motion.div>
         </div>
       </main>
-
-      {/* Site-wide footer */}
       <Footer />
     </div>
   );
