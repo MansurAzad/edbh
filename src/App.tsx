@@ -57,6 +57,7 @@ const AdminShipping = lazy(() => import("./pages/admin/Shipping"));
 const ContentEditor = lazy(() => import("./pages/admin/ContentEditor"));
 const CustomerSegments = lazy(() => import("./pages/admin/CustomerSegments"));
 const HomepageSections = lazy(() => import("./pages/admin/HomepageSections"));
+const HotSaleAdmin = lazy(() => import("./pages/admin/HotSaleAdmin"));
 const BlogPosts = lazy(() => import("./pages/admin/BlogPosts"));
 const DeliveryZones = lazy(() => import("./pages/admin/DeliveryZones"));
 const AdminNotifications = lazy(() => import("./pages/admin/Notifications"));
