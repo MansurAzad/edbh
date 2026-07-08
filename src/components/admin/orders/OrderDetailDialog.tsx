@@ -13,7 +13,7 @@
 // =============================================================================
 
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Zap, Download } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import TrackingForm from "./TrackingForm";
+import ZoomableThumb from "@/components/admin/ZoomableThumb";
 import {
   type AdminOrder,
   type AdminOrderItem,
@@ -31,7 +32,11 @@ import {
   fetchWhatsAppShareEvents,
   type WhatsAppShareEvent,
 } from "@/lib/checkout/whatsappShare";
-import { retryWhatsAppShareForOrder } from "@/lib/admin/adminWhatsAppRetry";
+import {
+  retryWhatsAppShareForOrder,
+  retryWithEscalation,
+} from "@/lib/admin/adminWhatsAppRetry";
+import { exportWhatsAppHistoryCSV } from "@/lib/admin/whatsappHistoryCsv";
 import WhatsAppShareTimeline from "@/components/checkout/WhatsAppShareTimeline";
 import OrderWhatsAppHistory from "@/components/admin/orders/OrderWhatsAppHistory";
 
