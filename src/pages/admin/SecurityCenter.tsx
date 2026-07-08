@@ -386,17 +386,26 @@ export default function SecurityCenter() {
         {/* Live scan status */}
         {running && (
           <Card className="border-primary/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary animate-pulse" />
-                Scan in progress · {running.status}
-              </CardTitle>
-              <CardDescription>Started {new Date(running.created_at).toLocaleTimeString()} · trigger: {running.triggered_by}</CardDescription>
+            <CardHeader className="pb-2 flex flex-row items-start justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary animate-pulse" />
+                  Scan in progress · {running.status}
+                </CardTitle>
+                <CardDescription>Started {new Date(running.created_at).toLocaleTimeString()} · trigger: {running.triggered_by}</CardDescription>
+              </div>
+              <Button size="sm" variant="destructive"
+                onClick={() => cancelScan.mutate(running.id)}
+                disabled={cancelScan.isPending || running.cancel_requested}>
+                <XCircle className="mr-2 h-3 w-3" />
+                {running.cancel_requested ? "Canceling…" : "Cancel scan"}
+              </Button>
             </CardHeader>
             <CardContent>
               <Progress value={running.progress ?? 0} />
               <p className="mt-2 text-xs text-muted-foreground">
                 {running.progress ?? 0}% · {running.total_findings ?? 0} findings so far ({running.critical_count ?? 0} critical)
+                {running.last_message ? ` · ${running.last_message}` : ""}
               </p>
             </CardContent>
           </Card>
