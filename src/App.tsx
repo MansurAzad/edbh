@@ -58,6 +58,7 @@ const ContentEditor = lazy(() => import("./pages/admin/ContentEditor"));
 const CustomerSegments = lazy(() => import("./pages/admin/CustomerSegments"));
 const HomepageSections = lazy(() => import("./pages/admin/HomepageSections"));
 const HotSaleAdmin = lazy(() => import("./pages/admin/HotSaleAdmin"));
+const SeoDebug = lazy(() => import("./pages/admin/SeoDebug"));
 const BlogPosts = lazy(() => import("./pages/admin/BlogPosts"));
 const DeliveryZones = lazy(() => import("./pages/admin/DeliveryZones"));
 const AdminNotifications = lazy(() => import("./pages/admin/Notifications"));
@@ -136,6 +137,7 @@ const App = () => (
                     <Route path="/admin" element={<PermissionGuard><AdminDashboard /></PermissionGuard>} />
                     <Route path="/admin/homepage" element={<PermissionGuard><HomepageSections /></PermissionGuard>} />
                     <Route path="/admin/hot-sale" element={<PermissionGuard><HotSaleAdmin /></PermissionGuard>} />
+                    <Route path="/admin/seo-debug" element={<PermissionGuard><SeoDebug /></PermissionGuard>} />
                     <Route path="/admin/categories" element={<PermissionGuard><AdminCategories /></PermissionGuard>} />
                     <Route path="/admin/blog" element={<PermissionGuard><BlogPosts /></PermissionGuard>} />
                     <Route path="/admin/products" element={<PermissionGuard><AdminProducts /></PermissionGuard>} />
