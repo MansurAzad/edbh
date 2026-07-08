@@ -167,7 +167,7 @@ async function renderProduct(idOrSlug: string): Promise<Response> {
   <p><a href="${canonical}">View full product page →</a></p>
 </article>`;
 
-  const jsonLd: Record<string, unknown> = {
+  const productSchema: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: p.name,
@@ -208,8 +208,16 @@ async function renderProduct(idOrSlug: string): Promise<Response> {
     },
   };
 
+  const crumbs = [
+    { name: "Home", url: `${SITE_URL}/` },
+    ...(p.category ? [{ name: p.category, url: `${SITE_URL}/shop?category=${encodeURIComponent(p.category)}` }] : []),
+    { name: p.name, url: canonical },
+  ];
+
+  const jsonLd: Array<Record<string, unknown>> = [productSchema, breadcrumbSchema(crumbs)];
+
   return new Response(
-    shell({ title, description, canonical, ogImage: absoluteImage(p.image_url), body, jsonLd }),
+    shell({ title, description, canonical, ogImage: absoluteImage(p.image_url), body, jsonLd, ogType: "product" }),
     { headers: htmlHeaders("public, max-age=300, s-maxage=600") },
   );
 }
