@@ -84,11 +84,18 @@ export default function SecurityCenter() {
       if (error) throw error;
       return data as ScanReport[];
     },
-    refetchInterval: (q) => {
-      const rows = (q.state.data as ScanReport[] | undefined) ?? [];
-      return rows.some(r => r.status === "running" || r.status === "queued") ? 2000 : false;
-    },
   });
+
+  // Realtime: update cache on scan-report changes instead of polling.
+  useEffect(() => {
+    const ch = supabase
+      .channel("security_scan_reports_rt")
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "security_scan_reports" },
+        () => { qc.invalidateQueries({ queryKey: ["security-scan-reports"] }); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
   const [scanQuery, setScanQuery] = useState("");
   const [scanSeverity, setScanSeverity] = useState<string>("all");
   const [scanStatus, setScanStatus] = useState<string>("all");
