@@ -57,26 +57,13 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
         return;
       }
 
-      // Product CSV — includes standardized catalogue fields.
-      const pHeaders = [
-        "name", "category", "price", "sale_price", "stock", "featured",
-        "description", "image_url", "sizes", "colors", "material",
-        "sku", "subcategory", "fabric", "work_type", "part",
-        "hijab_included", "inner_included", "purchase_cost",
-        "image_alt_text", "meta_title", "meta_description",
-      ];
-      const pRows = products.map((p: any) => [
-        esc(p.name), esc(p.category), p.price, p.sale_price || "", p.stock || 0,
-        p.featured ? "true" : "false", esc(p.description || ""), esc(p.image_url || ""),
-        esc((p.sizes || []).join("; ")), esc((p.colors || []).join("; ")), esc(p.material || ""),
-        esc(p.sku || ""), esc(p.subcategory || ""), esc(p.fabric || ""),
-        esc(p.work_type || ""), esc(p.part || ""),
-        p.hijab_included ? "true" : "false", p.inner_included ? "true" : "false",
-        p.purchase_cost ?? "",
-        esc(p.image_alt_text || ""), esc(p.meta_title || ""), esc(p.meta_description || ""),
-      ]);
-      downloadCSV([pHeaders.join(","), ...pRows.map((r) => r.join(","))].join("\n"),
-        `products_export_${new Date().toISOString().split("T")[0]}.csv`);
+      // Product CSV — uses the shared module so tests can round-trip the
+      // exact same serialization the admin sees.
+      const pRows = products.map((p: any) => serializeProduct(p));
+      downloadCSV(
+        [PRODUCT_CSV_HEADERS.join(","), ...pRows.map((r) => r.join(","))].join("\n"),
+        `products_export_${new Date().toISOString().split("T")[0]}.csv`,
+      );
 
       // Variants CSV
       if (variants?.length) {
