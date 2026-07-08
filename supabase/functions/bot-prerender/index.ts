@@ -242,14 +242,23 @@ async function renderCategoryOrShop(category: string | null): Promise<Response> 
 ${(rows || []).map(r => `  <li><a href="${SITE_URL}/product/${r.slug || r.id}">${escapeHtml(r.name)}</a> — ৳${r.sale_price ?? r.price}${(r.stock ?? 0) > 0 ? "" : " (Out of Stock)"}</li>`).join("\n")}
 </ul>`;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    name: title,
-    url: canonical,
-    description,
-    numberOfItems: rows?.length || 0,
-  };
+  const crumbs = [
+    { name: "Home", url: `${SITE_URL}/` },
+    { name: "Shop", url: `${SITE_URL}/shop` },
+    ...(category ? [{ name: category, url: canonical }] : []),
+  ];
+
+  const jsonLd: Array<Record<string, unknown>> = [
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: title,
+      url: canonical,
+      description,
+      numberOfItems: rows?.length || 0,
+    },
+    breadcrumbSchema(crumbs),
+  ];
 
   return new Response(
     shell({ title, description, canonical, ogImage: `${SITE_URL}/og-image.jpg`, body, jsonLd }),
