@@ -75,6 +75,12 @@ const Contact = () => {
                       <h3 className="font-semibold text-foreground text-sm leading-tight">{branch.name}</h3>
                       {branch.main && <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Main Showroom</span>}
                       <p className="text-muted-foreground text-xs mt-1 leading-relaxed">{branch.address}</p>
+                      <p className="text-[11px] mt-2">
+                        <a href="https://dubaiborkahouse.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          dubaiborkahouse.com
+                        </a>
+                        <span className="text-muted-foreground"> — Official Website</span>
+                      </p>
                     </div>
                   </div>
                 </motion.div>
