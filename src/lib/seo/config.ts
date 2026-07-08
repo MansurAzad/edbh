@@ -95,12 +95,17 @@ export function buildProductSeo(p: ProductSeoInput): SeoMeta {
     typeof effectivePrice === "number" ? `৳${effectivePrice.toLocaleString()}` : "";
   const cat = p.category?.trim() || "ইসলামিক ফ্যাশন";
 
+  // Unique per-product title: "<name> – <category> – ৳price"
+  // Prevents SERP-duplicate titles across the catalog.
+  const titleParts = [p.name, cat, priceLabel].filter(Boolean);
+  const uniqueTitle = titleParts.join(" – ");
+
   const fallbackDesc = `${p.name} কিনুন দুবাই বোরকা হাউস থেকে — প্রিমিয়াম ${cat}${
     priceLabel ? `, মূল্য ${priceLabel}` : ""
   }। সারা বাংলাদেশে ক্যাশ অন ডেলিভারি।`;
 
   return {
-    title: clamp(p.name, TITLE_MAX),
+    title: clamp(uniqueTitle, TITLE_MAX),
     description: clamp(p.description?.trim() || fallbackDesc, DESCRIPTION_MAX),
     canonical: `/product/${p.slug || p.id}`,
     ogImage: absoluteUrl(p.image),
