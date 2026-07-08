@@ -127,6 +127,7 @@ const Checkout = () => {
     const res = await shareOrderToWhatsApp(lastReceiptRef.current, { isRetry: true });
     setWaStatus(res.status);
     setWaError(res.error ?? null);
+    setWaEvents((prev) => [res, ...prev]);
     if (res.status === "blocked") {
       toast({
         title: "WhatsApp popup ব্লক হয়েছে",
