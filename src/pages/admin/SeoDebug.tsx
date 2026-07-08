@@ -197,6 +197,38 @@ const SeoDebug = () => {
 
           {/* ── Product schema linter ───────────────────────────────── */}
           <TabsContent value="schema" className="space-y-4">
+            {productChecks.length > 0 && (
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const report = {
+                      generatedAt: new Date().toISOString(),
+                      site: SITE_URL,
+                      results: productChecks.map(({ label, product, schema, lint }) => ({
+                        label,
+                        productId: product.id,
+                        productName: product.name,
+                        sale: !!product.sale_price,
+                        errors: lint.errors,
+                        warnings: lint.warnings,
+                        schema,
+                      })),
+                    };
+                    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `seo-schema-lint-${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                    toast.success("Report downloaded");
+                  }}
+                >
+                  <Download className="w-3 h-3 mr-1" /> Download JSON report
+                </Button>
+              </div>
+            )}
             {productChecks.length === 0 && <Alert><AlertDescription>Sample products লোড হচ্ছে…</AlertDescription></Alert>}
             {productChecks.map(({ label, product, meta, schema, lint }) => {
               const url = `${SITE_URL}${meta.canonical}`;
