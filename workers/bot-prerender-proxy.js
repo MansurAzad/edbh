@@ -44,7 +44,14 @@ const BOT_UA = new RegExp(
 );
 
 // Paths we want to prerender. Everything else passes straight to origin.
-const PRERENDER_PATHS = [/^\/$/, /^\/product(\/|$)/, /^\/shop(\/|\?|$)/, /^\/categories(\/|$)/, /^\/blog(\/|$)/];
+const PRERENDER_PATHS = [
+  /^\/$/,
+  /^\/product(\/|$)/,
+  /^\/shop(\/|\?|$)/,
+  /^\/categories?(\/|\?|$)/,   // /category, /categories, /categories/abaya, /categories?foo=…
+  /^\/category(\/|\?|$)/,
+  /^\/blog(\/|\?|$)/,
+];
 
 function isBot(ua) {
   return !!ua && BOT_UA.test(ua);
