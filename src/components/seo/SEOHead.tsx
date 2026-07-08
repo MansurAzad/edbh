@@ -34,7 +34,7 @@ const SEOHead = ({
   const canonicalUrl = canonical ? `${BASE_URL}${canonical}` : undefined;
 
   useEffect(() => {
-    document.title = fullTitle;
+    document.title = fullTitleStr;
 
     const setMeta = (name: string, content: string, attr = "name") => {
       let el = document.querySelector(`meta[${attr}="${name}"]`) as HTMLMetaElement;
@@ -48,12 +48,12 @@ const SEOHead = ({
 
     setMeta("description", description);
     if (keywords) setMeta("keywords", keywords);
-    setMeta("og:title", fullTitle, "property");
+    setMeta("og:title", fullTitleStr, "property");
     setMeta("og:description", description, "property");
     setMeta("og:type", ogType, "property");
     setMeta("og:image", ogImage, "property");
     if (canonicalUrl) setMeta("og:url", canonicalUrl, "property");
-    setMeta("twitter:title", fullTitle, "name");
+    setMeta("twitter:title", fullTitleStr, "name");
     setMeta("twitter:description", description, "name");
 
     if (noIndex) {
@@ -79,7 +79,7 @@ const SEOHead = ({
     return () => {
       document.title = `${SITE_NAME} - প্রিমিয়াম ইসলামিক ফ্যাশন`;
     };
-  }, [fullTitle, description, canonicalUrl, ogImage, ogType, noIndex, keywords]);
+  }, [fullTitleStr, description, canonicalUrl, ogImage, ogType, noIndex, keywords]);
 
   return null;
 };
