@@ -144,41 +144,35 @@ export default function CheckoutSuccess({
                 <FileText className="w-4 h-4" />
                 Download Invoice
               </Button>
-              {onShareWhatsApp && whatsappStatus !== "blocked" && whatsappStatus !== "failed" && (
+              {onShareWhatsApp && (
                 <Button
+                  data-testid="customer-share-wa-again"
                   onClick={onShareWhatsApp}
-                  className="gap-2 bg-green-500 hover:bg-green-600 text-white"
+                  className={`gap-2 text-white ${
+                    whatsappStatus === "blocked" || whatsappStatus === "failed"
+                      ? "bg-amber-500 hover:bg-amber-600 animate-pulse"
+                      : "bg-green-500 hover:bg-green-600"
+                  }`}
                 >
                   <MessageCircle className="w-4 h-4" />
-                  WhatsApp-এ আবার শেয়ার
+                  {whatsappStatus === "blocked" || whatsappStatus === "failed"
+                    ? "আবার শেয়ার করুন (WhatsApp)"
+                    : "WhatsApp-এ আবার শেয়ার"}
                 </Button>
               )}
             </div>
 
             {events.length > 0 && (
-              <div className="mb-6 rounded-lg border border-border/40 bg-muted/30 p-3 text-left">
-                <p className="text-xs font-semibold text-muted-foreground mb-2">
-                  WhatsApp শেয়ার লগ ({events.length})
-                </p>
-                <ul className="space-y-1 text-xs font-mono">
-                  {events.map((e, i) => (
-                    <li key={i} className="flex justify-between gap-2">
-                      <span className={
-                        e.status === "opened" || e.status === "retried"
-                          ? "text-green-600"
-                          : e.status === "blocked"
-                            ? "text-amber-600"
-                            : "text-destructive"
-                      }>
-                        {e.status}
-                      </span>
-                      <span className="text-muted-foreground truncate">
-                        {new Date(e.timestamp).toLocaleTimeString()}
-                        {e.error ? ` — ${e.error}` : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              <div className="mb-6">
+                <WhatsAppShareTimeline
+                  events={events.map((e) => ({
+                    status: e.status,
+                    at: e.timestamp,
+                    actor: e.actor,
+                    error: e.error ?? null,
+                  }))}
+                  title="WhatsApp শেয়ার লগ"
+                />
               </div>
             )}
 
