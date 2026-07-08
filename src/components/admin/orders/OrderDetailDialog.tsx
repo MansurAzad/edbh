@@ -338,18 +338,41 @@ const OrderDetailDialog = ({
                   <h4 className="text-sm font-medium text-muted-foreground">
                     📱 WhatsApp রিসিট শেয়ার
                   </h4>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleAdminRetryWa}
-                    disabled={waRetrying}
-                    data-testid="admin-wa-retry"
-                    aria-busy={waRetrying}
-                    className="gap-1.5 h-7 text-xs"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${waRetrying ? "animate-spin" : ""}`} />
-                    {waRetrying ? "চেষ্টা করা হচ্ছে..." : "আবার শেয়ার করুন"}
-                  </Button>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAdminRetryWa("primary")}
+                      disabled={waRetrying}
+                      data-testid="admin-wa-retry"
+                      aria-busy={waRetrying}
+                      className="gap-1.5 h-7 text-xs"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${waRetrying ? "animate-spin" : ""}`} />
+                      {waRetrying ? "চেষ্টা করা হচ্ছে..." : "Resend WhatsApp"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleAdminRetryWa("escalate")}
+                      disabled={waRetrying}
+                      data-testid="admin-wa-retry-escalate"
+                      className="gap-1.5 h-7 text-xs"
+                      title="Escalate with a shorter fallback template"
+                    >
+                      <Zap className="w-3 h-3" /> Escalate
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => exportWhatsAppHistoryCSV(order.id, waEvents)}
+                      disabled={waEvents.length === 0}
+                      data-testid="admin-wa-export-csv"
+                      className="gap-1.5 h-7 text-xs"
+                    >
+                      <Download className="w-3 h-3" /> CSV
+                    </Button>
+                  </div>
                 </div>
 
                 {order.whatsapp_share_status && (
