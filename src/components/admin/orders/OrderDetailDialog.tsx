@@ -253,6 +253,41 @@ const OrderDetailDialog = ({
             </div>
 
             {/* ----------------------------------------------------------------
+                Section 2b — WhatsApp receipt share status
+            ---------------------------------------------------------------- */}
+            {order.whatsapp_share_status && (
+              <div className={`p-4 border rounded-lg text-sm ${
+                order.whatsapp_share_status === "opened" || order.whatsapp_share_status === "retried"
+                  ? "border-green-500/40 bg-green-500/5"
+                  : order.whatsapp_share_status === "blocked"
+                  ? "border-amber-500/40 bg-amber-500/5"
+                  : "border-destructive/40 bg-destructive/5"
+              }`}>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">
+                  📱 WhatsApp রিসিট শেয়ার
+                </h4>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="font-medium">
+                    স্ট্যাটাস:{" "}
+                    <span className="uppercase font-mono text-xs">
+                      {order.whatsapp_share_status}
+                    </span>
+                  </span>
+                  {order.whatsapp_shared_at && (
+                    <span className="text-xs text-muted-foreground">
+                      সময়: {new Date(order.whatsapp_shared_at).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                {order.whatsapp_share_error && (
+                  <p className="mt-1 text-xs text-destructive">
+                    কারণ: {order.whatsapp_share_error}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ----------------------------------------------------------------
                 Section 3 — Tracking information
                 "🚚 ট্র্যাকিং তথ্য" = Tracking Information
                 TrackingForm manages its own local state pre-populated from the
