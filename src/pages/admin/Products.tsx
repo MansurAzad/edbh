@@ -14,6 +14,7 @@ import ProductsFilters from "@/components/admin/products/ProductsFilters";
 import ProductsTable from "@/components/admin/products/ProductsTable";
 import ProductsPagination from "@/components/admin/products/ProductsPagination";
 import ProductFormDialog from "@/components/admin/products/ProductFormDialog";
+import BulkInventoryDialog from "@/components/admin/products/BulkInventoryDialog";
 import { useAdminProducts } from "@/hooks/admin/useAdminProducts";
 import {
   emptyProduct, PRODUCTS_PER_PAGE,
