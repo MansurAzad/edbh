@@ -191,6 +191,7 @@ export const ROUTE_PERMISSIONS: Record<string, PermissionKey | "admin_only"> = {
   "/admin/google-analytics": "admin_only",
   "/admin/settings": "admin_only",
   "/admin/inventory-sync": "admin_only",
+  "/admin/security": "admin_only",
 };
 
 /**
