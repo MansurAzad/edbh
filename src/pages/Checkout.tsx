@@ -95,28 +95,7 @@ const Checkout = () => {
   const finalTotal = Math.max(0, total - discountAmount) + shippingCost;
 
   const validate = (): boolean => {
-    const errs: FieldErrors = {};
-    if (!shippingInfo.fullName.trim()) {
-      errs.fullName = "নাম দিন — এটি বাধ্যতামূলক";
-    } else if (shippingInfo.fullName.trim().length < 3) {
-      errs.fullName = "নাম কমপক্ষে ৩ অক্ষরের হতে হবে";
-    }
-
-    const digits = shippingInfo.phone.replace(/\D/g, "");
-    if (!shippingInfo.phone.trim()) {
-      errs.phone = "মোবাইল নম্বর দিন — এটি বাধ্যতামূলক";
-    } else if (digits.length < 11 || digits.length > 14) {
-      errs.phone = "সঠিক মোবাইল নম্বর দিন (১১ সংখ্যা, যেমন 01XXXXXXXXX)";
-    } else if (!/^01[3-9]\d{8}$/.test(digits.slice(-11))) {
-      errs.phone = "বাংলাদেশি মোবাইল ফরম্যাট নয় (01 দিয়ে শুরু, ১১ সংখ্যা)";
-    }
-
-    if (!shippingInfo.address.trim()) {
-      errs.address = "পুরো ঠিকানা দিন — এটি বাধ্যতামূলক";
-    } else if (shippingInfo.address.trim().length < 10) {
-      errs.address = "ঠিকানাটি সম্পূর্ণ লিখুন (কমপক্ষে ১০ অক্ষর)";
-    }
-
+    const errs = validateCheckoutFields(shippingInfo);
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
       toast({
