@@ -49,7 +49,8 @@ export default function WhatsAppSettingsCard() {
         .eq("key", SETTING_KEY)
         .maybeSingle();
       const raw = data?.value as unknown;
-      const v = (raw && typeof raw === "object" ? (raw as Partial<WhatsappWebhookSettings>) : null);
+      const v = raw && typeof raw === "object" ? (raw as Partial<WhatsappWebhookSettings>) : null;
+      if (v) {
         if (v.webhook_url) setWebhookUrl(v.webhook_url);
         if (v.verify_token) setVerifyToken(v.verify_token);
       }
