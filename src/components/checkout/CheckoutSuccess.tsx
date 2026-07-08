@@ -71,7 +71,12 @@ function WhatsAppStatusCard({
   }[status];
 
   return (
-    <div className={`mt-4 mb-6 rounded-xl border p-4 text-left ${map.className}`}>
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className={`mt-4 mb-6 rounded-xl border p-4 text-left ${map.className}`}
+    >
       <div className="flex items-start gap-3">
         {map.icon}
         <div className="flex-1">
