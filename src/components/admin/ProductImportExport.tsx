@@ -9,6 +9,16 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  PRODUCT_CSV_HEADERS,
+  serializeProduct,
+  parseCSVLine,
+  parseProductRow,
+  parseCsvField,
+  validateProductRow,
+  esc,
+  type CsvRowError,
+} from "@/lib/admin/productCsv";
 
 interface ProductImportExportProps {
   onImportComplete: () => void;
@@ -19,6 +29,7 @@ interface ImportResult {
   failed: number;
   variantsAdded: number;
   errors: string[];
+  fieldErrors?: CsvRowError[];
 }
 
 const BATCH_SIZE = 50;
@@ -47,26 +58,13 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
         return;
       }
 
-      // Product CSV — includes standardized catalogue fields.
-      const pHeaders = [
-        "name", "category", "price", "sale_price", "stock", "featured",
-        "description", "image_url", "sizes", "colors", "material",
-        "sku", "subcategory", "fabric", "work_type", "part",
-        "hijab_included", "inner_included", "purchase_cost",
-        "image_alt_text", "meta_title", "meta_description",
-      ];
-      const pRows = products.map((p: any) => [
-        esc(p.name), esc(p.category), p.price, p.sale_price || "", p.stock || 0,
-        p.featured ? "true" : "false", esc(p.description || ""), esc(p.image_url || ""),
-        esc((p.sizes || []).join("; ")), esc((p.colors || []).join("; ")), esc(p.material || ""),
-        esc(p.sku || ""), esc(p.subcategory || ""), esc(p.fabric || ""),
-        esc(p.work_type || ""), esc(p.part || ""),
-        p.hijab_included ? "true" : "false", p.inner_included ? "true" : "false",
-        p.purchase_cost ?? "",
-        esc(p.image_alt_text || ""), esc(p.meta_title || ""), esc(p.meta_description || ""),
-      ]);
-      downloadCSV([pHeaders.join(","), ...pRows.map((r) => r.join(","))].join("\n"),
-        `products_export_${new Date().toISOString().split("T")[0]}.csv`);
+      // Product CSV — uses the shared module so tests can round-trip the
+      // exact same serialization the admin sees.
+      const pRows = products.map((p: any) => serializeProduct(p));
+      downloadCSV(
+        [PRODUCT_CSV_HEADERS.join(","), ...pRows.map((r) => r.join(","))].join("\n"),
+        `products_export_${new Date().toISOString().split("T")[0]}.csv`,
+      );
 
       // Variants CSV
       if (variants?.length) {
@@ -140,22 +138,29 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
   };
 
   const importProductsOnly = async (headers: string[], dataRows: string[], results: ImportResult) => {
-    // Batch insert for speed
     const allProducts: Record<string, any>[] = [];
+    const fieldErrors: CsvRowError[] = (results.fieldErrors ??= []);
 
     for (let i = 0; i < dataRows.length; i++) {
+      const rowNumber = i + 2;
       try {
         const values = parseCSVLine(dataRows[i]);
         const product = parseProductRow(headers, values);
-        if (!product.name || !product.category || !product.price) throw new Error("প্রয়োজনীয় ফিল্ড নেই");
+        const rowErrs = validateProductRow(product, rowNumber);
+        if (rowErrs.length) {
+          results.failed++;
+          fieldErrors.push(...rowErrs);
+          rowErrs.forEach((e) => results.errors.push(`রো ${e.row} · ${e.field ?? "row"}: ${e.message}`));
+          continue;
+        }
         allProducts.push(product);
       } catch (err: any) {
         results.failed++;
-        results.errors.push(`রো ${i + 2}: ${err.message}`);
+        results.errors.push(`রো ${rowNumber}: ${err.message}`);
+        fieldErrors.push({ row: rowNumber, message: err.message });
       }
     }
 
-    // Insert in batches
     for (let i = 0; i < allProducts.length; i += BATCH_SIZE) {
       const batch = allProducts.slice(i, i + BATCH_SIZE);
       setImportProgress(Math.round(((i + batch.length) / allProducts.length) * 100));
@@ -170,27 +175,31 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
   };
 
   const importWithInlineVariants = async (headers: string[], dataRows: string[], results: ImportResult) => {
-    // Group rows by product name - each row can have variant_size, variant_color, variant_stock, variant_sku, variant_price_adjustment, variant_image_url
     const productMap = new Map<string, { product: Record<string, any>; variants: Record<string, any>[] }>();
+    const fieldErrors: CsvRowError[] = (results.fieldErrors ??= []);
 
     for (let i = 0; i < dataRows.length; i++) {
+      const rowNumber = i + 2;
       try {
         const values = parseCSVLine(dataRows[i]);
         const product = parseProductRow(headers, values);
         const variant = parseVariantFromRow(headers, values);
-
-        if (!product.name || !product.category || !product.price) throw new Error("প্রয়োজনীয় ফিল্ড নেই");
-
-        const key = product.name;
-        if (!productMap.has(key)) {
-          productMap.set(key, { product, variants: [] });
+        const rowErrs = validateProductRow(product, rowNumber);
+        if (rowErrs.length) {
+          results.failed++;
+          fieldErrors.push(...rowErrs);
+          rowErrs.forEach((e) => results.errors.push(`রো ${e.row} · ${e.field ?? "row"}: ${e.message}`));
+          continue;
         }
+        const key = product.name;
+        if (!productMap.has(key)) productMap.set(key, { product, variants: [] });
         if (variant && (variant.size || variant.color)) {
           productMap.get(key)!.variants.push(variant);
         }
       } catch (err: any) {
         results.failed++;
-        results.errors.push(`রো ${i + 2}: ${err.message}`);
+        results.errors.push(`রো ${rowNumber}: ${err.message}`);
+        fieldErrors.push({ row: rowNumber, message: err.message });
       }
     }
 
@@ -319,73 +328,10 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
     }
   };
 
-  // ============ HELPERS ============
-  const esc = (field: string): string => {
-    if (!field) return '""';
-    if (field.includes(",") || field.includes('"') || field.includes("\n")) {
-      return `"${field.replace(/"/g, '""')}"`;
-    }
-    return `"${field}"`;
-  };
+  // CSV helpers (esc / parseCsvField / parseCSVLine / parseProductRow /
+  // validateProductRow) live in @/lib/admin/productCsv so we can unit-test
+  // the round-trip without pulling in the whole component.
 
-  const parseCsvField = (field: string): string => {
-    if (!field) return "";
-    field = field.trim();
-    if (field.startsWith('"') && field.endsWith('"')) field = field.slice(1, -1).replace(/""/g, '"');
-    return field;
-  };
-
-  const parseCSVLine = (line: string): string[] => {
-    const result: string[] = [];
-    let current = "";
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (inQuotes) {
-        if (char === '"' && line[i + 1] === '"') { current += '"'; i++; }
-        else if (char === '"') { inQuotes = false; }
-        else { current += char; }
-      } else {
-        if (char === '"') { inQuotes = true; }
-        else if (char === ",") { result.push(current); current = ""; }
-        else { current += char; }
-      }
-    }
-    result.push(current);
-    return result;
-  };
-
-  const parseProductRow = (headers: string[], values: string[]): Record<string, any> => {
-    const product: Record<string, any> = {};
-    headers.forEach((header, index) => {
-      const value = parseCsvField(values[index] || "");
-      switch (header) {
-        case "name": case "category": case "description": case "image_url": case "material":
-        case "sku": case "subcategory": case "fabric": case "work_type": case "part":
-        case "image_alt_text": case "meta_title": case "meta_description":
-          if (value) product[header] = value; break;
-        case "price": case "sale_price":
-          const num = parseFloat(value);
-          if (!isNaN(num) && num > 0) product[header] = num;
-          else if (header === "price") throw new Error("অবৈধ মূল্য");
-          break;
-        case "stock": product.stock = parseInt(value) || 0; break;
-        case "purchase_cost":
-          const pc = parseFloat(value);
-          if (!isNaN(pc)) product.purchase_cost = pc;
-          break;
-        case "featured": product.featured = value.toLowerCase() === "true"; break;
-        case "hijab_included": product.hijab_included = value.toLowerCase() === "true"; break;
-        case "inner_included": product.inner_included = value.toLowerCase() === "true"; break;
-        case "sizes": product.sizes = value ? value.split(";").map((s) => s.trim()).filter(Boolean) : []; break;
-        case "colors": product.colors = value ? value.split(";").map((c) => c.trim()).filter(Boolean) : []; break;
-      }
-    });
-    // Back-compat: mirror fabric ↔ material if only one is provided.
-    if (product.fabric && !product.material) product.material = product.fabric;
-    if (product.material && !product.fabric) product.fabric = product.material;
-    return product;
-  };
 
   const parseVariantFromRow = (headers: string[], values: string[]): Record<string, any> | null => {
     const row: Record<string, string> = {};
@@ -494,12 +440,17 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      <div className="max-h-32 overflow-y-auto text-sm">
-                        {importResult.errors.slice(0, 5).map((error, i) => (
-                          <div key={i}>{error}</div>
+                      <div className="text-sm font-semibold mb-1">
+                        {importResult.failed}টি রো-তে সমস্যা — নিচের ফিল্ডগুলো ঠিক করে আবার আপলোড করুন:
+                      </div>
+                      <div className="max-h-40 overflow-y-auto text-xs space-y-0.5">
+                        {importResult.errors.slice(0, 20).map((error, i) => (
+                          <div key={i} className="font-mono">• {error}</div>
                         ))}
-                        {importResult.errors.length > 5 && (
-                          <div className="mt-1 text-muted-foreground">...আরো {importResult.errors.length - 5}টি এরর</div>
+                        {importResult.errors.length > 20 && (
+                          <div className="mt-1 text-muted-foreground">
+                            ...আরো {importResult.errors.length - 20}টি এরর
+                          </div>
                         )}
                       </div>
                     </AlertDescription>

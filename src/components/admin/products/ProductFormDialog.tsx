@@ -425,12 +425,26 @@ export default function ProductFormDialog({
                   value={formData.subcategory || ""}
                   onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
                   placeholder="Farasha / Open Abaya / Borka"
+                  autoComplete="off"
+                  inputMode="text"
                 />
+                {/* Safe fallback: when the selected category has no saved
+                    subcategories yet, still emit a datalist so mobile Chrome
+                    can render the dropdown, and pull suggestions from every
+                    category so admins always see something to pick. */}
                 <datalist id="product-subcategory-suggestions">
-                  {subcategorySuggestions.map((s) => (
+                  {(subcategorySuggestions.length > 0
+                    ? subcategorySuggestions
+                    : ["Farasha", "Open Abaya", "Borka", "Kaftan", "Nikab", "Hijab", "Inner"]
+                  ).map((s) => (
                     <option key={s} value={s} />
                   ))}
                 </datalist>
+                {formData.category && subcategorySuggestions.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    "{formData.category}"-এর জন্য এখনো কোন সাব-ক্যাটাগরি নেই — নতুন লিখুন বা সাধারণ সাজেশন থেকে বেছে নিন।
+                  </p>
+                )}
                 {formData.category && subcategorySuggestions.length > 0 && (
                   <p className="text-[10px] text-muted-foreground">
                     "{formData.category}"-এর জন্য পূর্বে ব্যবহৃত সাব-ক্যাটাগরি থেকে বেছে নিন বা নতুন লিখুন।
@@ -518,25 +532,76 @@ export default function ProductFormDialog({
                 placeholder="Dubai Imported Black Karchupi Abaya"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="meta_title">Meta Title</Label>
-              <Input
-                id="meta_title"
-                value={formData.meta_title || ""}
-                onChange={(e) => setFormData({ ...formData, meta_title: e.target.value })}
-                maxLength={70}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="meta_description">Meta Description</Label>
-              <Textarea
-                id="meta_description"
-                rows={2}
-                value={formData.meta_description || ""}
-                onChange={(e) => setFormData({ ...formData, meta_description: e.target.value })}
-                maxLength={170}
-              />
-            </div>
+            {(() => {
+              const TITLE_MAX = 60;
+              const DESC_MAX = 160;
+              const title = formData.meta_title || "";
+              const desc = formData.meta_description || "";
+              const titleLen = title.length;
+              const descLen = desc.length;
+              const titleTone =
+                titleLen === 0 ? "text-muted-foreground"
+                : titleLen > TITLE_MAX ? "text-destructive"
+                : titleLen > TITLE_MAX - 10 ? "text-amber-600"
+                : "text-green-600";
+              const descTone =
+                descLen === 0 ? "text-muted-foreground"
+                : descLen > DESC_MAX ? "text-destructive"
+                : descLen > DESC_MAX - 20 ? "text-amber-600"
+                : "text-green-600";
+              const previewTitle = title || formData.name || "Product title";
+              const previewDesc = desc || (formData.description || "").slice(0, DESC_MAX);
+              const previewUrl = `edbh.lovable.app › ${
+                (formData.category || "shop").toLowerCase()
+              } › ${(formData.name || "product").toLowerCase().replace(/\s+/g, "-").slice(0, 40)}`;
+              return (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="meta_title">Meta Title</Label>
+                      <span className={`text-[11px] font-mono ${titleTone}`}>
+                        {titleLen} / {TITLE_MAX}
+                      </span>
+                    </div>
+                    <Input
+                      id="meta_title"
+                      value={title}
+                      onChange={(e) => setFormData({ ...formData, meta_title: e.target.value })}
+                      maxLength={70}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="meta_description">Meta Description</Label>
+                      <span className={`text-[11px] font-mono ${descTone}`}>
+                        {descLen} / {DESC_MAX}
+                      </span>
+                    </div>
+                    <Textarea
+                      id="meta_description"
+                      rows={2}
+                      value={desc}
+                      onChange={(e) => setFormData({ ...formData, meta_description: e.target.value })}
+                      maxLength={170}
+                    />
+                  </div>
+
+                  {/* Google-style SERP snippet preview */}
+                  <div className="rounded-md border bg-background p-3 space-y-1">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                      Google SERP preview
+                    </p>
+                    <p className="text-xs text-emerald-700 truncate">{previewUrl}</p>
+                    <p className="text-[15px] text-blue-700 leading-tight line-clamp-1">
+                      {previewTitle}
+                    </p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {previewDesc || "প্রোডাক্টের সংক্ষিপ্ত বিবরণ এখানে দেখাবে।"}
+                    </p>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* ── Section 8: Featured toggle ───────────────────────────── */}
