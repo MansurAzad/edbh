@@ -117,15 +117,31 @@ serve(async (req) => {
   // Schedule gate — if this is a scheduled poll, only run when due.
   if (checkSchedule && settingsRow) {
     const sch = settingsRow.schedule ?? {};
-    if (!sch.enabled) {
-      return new Response(JSON.stringify({ ok: true, skipped: "schedule_disabled" }),
+    const skip = (reason: string, extra: Record<string, unknown> = {}) =>
+      new Response(JSON.stringify({ ok: true, skipped: reason, ...extra }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    if (!sch.enabled) return skip("schedule_disabled");
+
+    const tz = sch.timezone ?? "UTC";
+    const weekdays: number[] = Array.isArray(sch.weekdays) ? sch.weekdays : [0,1,2,3,4,5,6];
+    const startTime: string = sch.start_time_of_day ?? "00:00";
+    let parts: Record<string, string> = {};
+    try {
+      const fmt = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+      });
+      for (const p of fmt.formatToParts(new Date())) parts[p.type] = p.value;
+    } catch { parts = {}; }
+    const dayMap: Record<string, number> = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+    const wd = dayMap[parts.weekday ?? ""] ?? new Date().getUTCDay();
+    if (!weekdays.includes(wd)) return skip("weekday_excluded", { wd });
+    const hhmm = `${parts.hour ?? "00"}:${parts.minute ?? "00"}`;
+    if (hhmm < startTime) return skip("before_start_time", { hhmm, startTime });
+
     const freq = Number(sch.frequency_hours ?? 24);
     const last = sch.last_run_at ? new Date(sch.last_run_at).getTime() : 0;
     if (Date.now() - last < freq * 3600 * 1000) {
-      return new Response(JSON.stringify({ ok: true, skipped: "not_due", next_in_ms: freq * 3600 * 1000 - (Date.now() - last) }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return skip("not_due", { next_in_ms: freq * 3600 * 1000 - (Date.now() - last) });
     }
   }
 
