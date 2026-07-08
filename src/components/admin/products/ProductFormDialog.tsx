@@ -172,6 +172,8 @@ export default function ProductFormDialog({
   setGalleryUrls,
   onSubmit,
   submitting,
+  categorySuggestions = [],
+  subcategorySuggestions = [],
 }: Props) {
   return (
     /**
