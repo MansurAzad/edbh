@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import RoleManagement from "@/components/admin/RoleManagement";
 import AIProviderSettings from "@/components/admin/AIProviderSettings";
+import WhatsAppSettingsCard from "@/components/admin/WhatsAppSettingsCard";
 
  const CloudinaryMigrationCard = () => {
    const [migrating, setMigrating] = useState(false);
