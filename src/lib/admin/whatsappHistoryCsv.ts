@@ -45,13 +45,31 @@ export function whatsappEventsToCsv(events: WhatsAppShareEvent[]): string {
   return "\uFEFF" + [HEADERS.join(","), ...rows].join("\n");
 }
 
-export function exportWhatsAppHistoryCSV(orderId: string, events: WhatsAppShareEvent[]) {
-  const csv = whatsappEventsToCsv(events);
+/**
+ * Download a CSV of the given WhatsApp share events for `orderId`.
+ *
+ * When `variant` is `"failed"`, only events with status `failed` or `blocked`
+ * (or delivery_status `failed`) are included and the filename is suffixed
+ * with `-failed` so admins can tell exports apart in their downloads folder.
+ */
+export function exportWhatsAppHistoryCSV(
+  orderId: string,
+  events: WhatsAppShareEvent[],
+  variant: "all" | "failed" = "all",
+) {
+  const filtered =
+    variant === "failed"
+      ? events.filter(
+          (e) => e.status === "failed" || e.status === "blocked" || e.delivery_status === "failed",
+        )
+      : events;
+  const csv = whatsappEventsToCsv(filtered);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `whatsapp-history-${orderId.slice(0, 8)}-${new Date()
+  const suffix = variant === "failed" ? "-failed" : "";
+  a.download = `whatsapp-history-${orderId.slice(0, 8)}${suffix}-${new Date()
     .toISOString()
     .split("T")[0]}.csv`;
   document.body.appendChild(a);
