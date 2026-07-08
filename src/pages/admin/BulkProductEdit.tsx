@@ -538,10 +538,28 @@ const BulkProductEdit = () => {
                     Description regenerate
                   </label>
                 </div>
-                <Button onClick={runAiEnrich} disabled={selected.size === 0 || aiRunning || (!aiFields.title && !aiFields.description)}>
-                  {aiRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
-                  {aiRunning ? "Generating…" : `Generate for ${selected.size} selected`}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={runAiEnrich} disabled={selected.size === 0 || aiRunning || (!aiFields.title && !aiFields.description)}>
+                    {aiRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
+                    {aiRunning ? "Generating…" : `Generate for ${selected.size} selected`}
+                  </Button>
+                  {aiResults.length > 0 && (
+                    <Button variant="outline" onClick={() => setAiPanelOpen(true)}>
+                      Show last results ({aiResults.length})
+                    </Button>
+                  )}
+                </div>
+
+                {(aiRunning || aiProgress.total > 0) && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Progress: {aiProgress.done}/{aiProgress.total} · ✓ {aiProgress.ok} · ✗ {aiProgress.fail}</span>
+                      {aiRateLimited && <span className="text-destructive font-medium">Rate limit hit — slowing down</span>}
+                    </div>
+                    <Progress value={aiProgress.total ? (aiProgress.done / aiProgress.total) * 100 : 0} className="h-2" />
+                  </div>
+                )}
+
                 {selected.size > 50 && (
                   <p className="text-xs text-destructive">এক বারে সর্বোচ্চ ৫০টি — কম সিলেক্ট করুন।</p>
                 )}
