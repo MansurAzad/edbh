@@ -266,7 +266,7 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
     try {
       const res = await shareOrderToWhatsApp(lastReceipt, { isRetry: true });
       const ok = res.status === "opened" || res.status === "retried" || res.status === "queued";
-      setShareStatus(ok ? "opened" : res.status);
+      setShareStatus(ok ? "opened" : (res.status as "blocked" | "failed"));
       setShareError(res.error ?? null);
       toast({
         title: res.status === "blocked" ? "আবার popup ব্লক হয়েছে" :
