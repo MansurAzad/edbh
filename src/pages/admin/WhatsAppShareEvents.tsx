@@ -26,6 +26,7 @@ import {
   type WhatsAppShareEvent,
 } from "@/lib/checkout/whatsappShare";
 import { retryWhatsAppShareForOrder } from "@/lib/admin/adminWhatsAppRetry";
+import { supabase } from "@/integrations/supabase/client";
 
 type StatusFilter = "all" | WhatsAppShareEvent["status"];
 type ActorFilter = "all" | WhatsAppShareEvent["actor"];
