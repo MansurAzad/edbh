@@ -81,6 +81,49 @@ serve(async (req) => {
     const folder = (formData.get('folder') as string) || 'products';
     const resourceType = (formData.get('resource_type') as string) || 'image';
 
+    // === Strict upload validation: block SVG/HTML/JS/executable content ===
+    const BLOCKED_MIME = /^(image\/svg|text\/html|application\/(x-?)?(javascript|xhtml|xml|x-msdownload|x-sh|x-httpd-php))/i;
+    const BLOCKED_EXT = /\.(svg|svgz|html?|htm|xht|xhtml|js|mjs|php|phtml|phar|exe|sh|bat|cmd|jsp|asp|aspx)$/i;
+    const rejectReason = async (): Promise<string | null> => {
+      if (file) {
+        if (BLOCKED_MIME.test(file.type)) return `blocked_mime:${file.type}`;
+        if (BLOCKED_EXT.test(file.name || '')) return `blocked_ext:${file.name}`;
+        // Sniff first 2KB for embedded scripts
+        try {
+          const head = new Uint8Array(await file.slice(0, 2048).arrayBuffer());
+          const sig = new TextDecoder('utf-8', { fatal: false }).decode(head).toLowerCase();
+          if (/<\s*script|<\s*svg[\s>]|<\s*iframe|javascript\s*:|<!doctype\s+html|<\s*html/.test(sig)) {
+            return 'blocked_content_sniff';
+          }
+        } catch (_) { /* ignore */ }
+      }
+      if (fileUrl) {
+        if (BLOCKED_EXT.test(fileUrl.split('?')[0])) return `blocked_url_ext:${fileUrl}`;
+      }
+      return null;
+    };
+    const badReason = await rejectReason();
+    if (badReason) {
+      // Best-effort log to injection_block_log
+      try {
+        const SB_URL = Deno.env.get('SUPABASE_URL');
+        const SR = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        if (SB_URL && SR) {
+          await fetch(`${SB_URL}/rest/v1/injection_block_log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', apikey: SR, Authorization: `Bearer ${SR}` },
+            body: JSON.stringify({
+              source: 'upload',
+              reason: badReason,
+              payload_excerpt: file?.name || fileUrl || '',
+              metadata: { mime: file?.type ?? null, size: file?.size ?? null },
+            }),
+          });
+        }
+      } catch (_) { /* ignore */ }
+      return jsonResponse({ success: false, error: 'File type blocked by security policy', reason: badReason }, 400);
+    }
+
     // Build Cloudinary upload form
     const uploadData = new FormData();
     

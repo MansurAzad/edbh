@@ -10,6 +10,33 @@
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(), camera=(), payment=()" />
 
+    <!-- CSP violation reporter: forwards any browser-enforced policy hit to our edge function -->
+    <script>
+      (function () {
+        var ENDPOINT = 'https://izeabmhtxtrelfqgkuua.supabase.co/functions/v1/csp-report';
+        var lastKey = '';
+        var lastAt = 0;
+        window.addEventListener('securitypolicyviolation', function (e) {
+          try {
+            var payload = {
+              'document-uri': e.documentURI, 'referrer': e.referrer,
+              'violated-directive': e.violatedDirective, 'effective-directive': e.effectiveDirective,
+              'original-policy': e.originalPolicy, 'blocked-uri': e.blockedURI,
+              'status-code': e.statusCode, 'source-file': e.sourceFile,
+              'line-number': e.lineNumber, 'column-number': e.columnNumber,
+            };
+            // Debounce identical reports within 5s
+            var key = (e.violatedDirective || '') + '|' + (e.blockedURI || '') + '|' + (e.sourceFile || '');
+            var now = Date.now();
+            if (key === lastKey && now - lastAt < 5000) return;
+            lastKey = key; lastAt = now;
+            (navigator.sendBeacon && navigator.sendBeacon(ENDPOINT, new Blob([JSON.stringify({'csp-report': payload})], {type:'application/csp-report'}))) ||
+              fetch(ENDPOINT, { method:'POST', headers:{'Content-Type':'application/csp-report'}, body: JSON.stringify({'csp-report': payload}), keepalive:true });
+          } catch (_) { /* ignore */ }
+        }, true);
+      })();
+    </script>
+
     <!-- Google Tag Manager (placed as high as possible for max event capture) -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],

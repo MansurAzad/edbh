@@ -9,4 +9,11 @@ verify_jwt = false
 [functions.push-to-external-inventory]
 verify_jwt = false
 
+[functions.csp-report]
+verify_jwt = false
+
+[functions.security-scan]
+verify_jwt = false
+
+
 

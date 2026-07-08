@@ -53,6 +53,7 @@ const navItems = [
   { path: "/admin/tracking-guide", icon: BookOpen, label: "Tracking Guide" },
   { path: "/admin/sgtm-setup", icon: Server, label: "sGTM Setup Guide" },
   { path: "/admin/inventory-sync", icon: Plug, label: "Inventory Sync API" },
+  { path: "/admin/security", icon: Shield, label: "Security Center" },
   { path: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 
