@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Search, Sparkles, Wand2, RotateCcw, Eye, ShieldAlert, History } from "lucide-react";
+import { Save, Search, Sparkles, Wand2, RotateCcw, Eye, ShieldAlert, History, Bot, Loader2 } from "lucide-react";
 
 interface ProductRow {
   id: string;
@@ -93,6 +93,8 @@ const BulkProductEdit = () => {
   const [edits, setEdits] = useState<Record<string, EditPatch>>({});
   const [saving, setSaving] = useState(false);
   const [dryRunOpen, setDryRunOpen] = useState(false);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiFields, setAiFields] = useState<{ title: boolean; description: boolean }>({ title: true, description: true });
 
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkStock, setBulkStock] = useState("");
