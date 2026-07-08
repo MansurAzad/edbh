@@ -248,6 +248,7 @@ const Checkout = () => {
         onShareWhatsApp={handleShareWhatsApp}
         whatsappStatus={waStatus}
         whatsappError={waError}
+        whatsappEvents={waEvents}
       />
     );
   }
