@@ -444,14 +444,8 @@ const OrderDetailDialog = ({
               <div className="border rounded-lg divide-y">
                 {items.map((item) => (
                   <div key={item.id} className="p-3 flex items-center gap-3">
-                    {/* Product thumbnail — placeholder used until real images are wired */}
-                    <div className="w-14 h-14 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
-                      <img
-                        src="/placeholder.svg"
-                        alt={item.product_name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+                    {/* Product thumbnail — real image_url with click-to-zoom */}
+                    <ZoomableThumb src={item.image_url} alt={item.product_name} sizeClass="w-14 h-14" />
 
                     {/* Product name + size/color chips + quantity */}
                     <div className="flex-1 min-w-0">
