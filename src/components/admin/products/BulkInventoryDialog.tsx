@@ -157,7 +157,22 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
     .map(([id]) => id);
   const hasInvalidSelected = invalidSelectedIds.length > 0;
 
-  const handleSave = async () => {
+  /** Pending changes for the confirmation dialog — computed at the moment
+   *  the admin clicks Save, then committed only after they confirm. */
+  const pendingChanges = useMemo(
+    () =>
+      selectedEntries.map(([id, d]) => ({
+        id,
+        name: products.find((p) => p.id === id)?.name || id,
+        prevStock: originalById[id]?.stock ?? "",
+        nextStock: Number(d.stock),
+        prevPurchase: originalById[id]?.purchase_cost ?? "",
+        nextPurchase: d.purchase_cost.trim() === "" ? null : Number(d.purchase_cost),
+      })),
+    [selectedEntries, products, originalById],
+  );
+
+  const openConfirm = () => {
     if (hasInvalidSelected) {
       toast({
         title: "ভুল মান আছে",
@@ -166,41 +181,54 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
       });
       return;
     }
-
-    const changes = selectedEntries.map(([id, d]) => ({
-      id,
-      stock: Number(d.stock),
-      purchase_cost: d.purchase_cost.trim() === "" ? null : Number(d.purchase_cost),
-    }));
-
-    if (changes.length === 0) {
+    if (pendingChanges.length === 0) {
       toast({ title: "কোনো পরিবর্তন নির্বাচন করা হয়নি", variant: "destructive" });
       return;
     }
+    setConfirmOpen(true);
+  };
 
+  /** Commit path — runs after the admin confirms in the AlertDialog.
+   *  Optimistic UI: parent list refresh happens as soon as any update
+   *  succeeds. On per-row failure we roll that row's draft back to its
+   *  original values so the visible state matches the DB. */
+  const commit = async () => {
+    setConfirmOpen(false);
     setSaving(true);
+    const failedIds: string[] = [];
     let ok = 0;
-    let failed = 0;
-    for (const c of changes) {
+    for (const c of pendingChanges) {
       const { error } = await supabase
         .from("products")
-        .update({ stock: c.stock, purchase_cost: c.purchase_cost })
+        .update({ stock: c.nextStock, purchase_cost: c.nextPurchase })
         .eq("id", c.id);
-      if (error) failed++;
+      if (error) failedIds.push(c.id);
       else ok++;
     }
     setSaving(false);
 
+    // Rollback failed rows to their original snapshot values.
+    if (failedIds.length > 0) {
+      setDrafts((prev) => {
+        const next = { ...prev };
+        for (const id of failedIds) {
+          const orig = originalById[id];
+          if (orig && next[id]) {
+            next[id] = { ...next[id], stock: orig.stock, purchase_cost: orig.purchase_cost };
+          }
+        }
+        return next;
+      });
+    }
+
     toast({
-      title: failed === 0 ? "ইনভেন্টরি আপডেট হয়েছে" : "কিছু আপডেট ব্যর্থ",
-      description: `${ok}টি সফল · ${failed}টি ব্যর্থ`,
-      variant: failed === 0 ? "default" : "destructive",
+      title: failedIds.length === 0 ? "ইনভেন্টরি আপডেট হয়েছে" : "কিছু আপডেট ব্যর্থ — রোলব্যাক করা হয়েছে",
+      description: `${ok}টি সফল · ${failedIds.length}টি ব্যর্থ`,
+      variant: failedIds.length === 0 ? "default" : "destructive",
     });
 
-    if (ok > 0) {
-      onSaved();
-      onOpenChange(false);
-    }
+    if (ok > 0) onSaved();
+    if (failedIds.length === 0) onOpenChange(false);
   };
 
   const allVisibleSelected =
