@@ -250,19 +250,18 @@ export default function WhatsAppSettingsCard() {
         </Alert>
 
         {/* Handshake test result */}
-        {verifyResult ? (
-          verifyResult.ok ? (
-            <Alert>
-              <AlertDescription className="text-xs">
-                ✓ Webhook handshake OK · {verifyResult.latencyMs}ms
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <Alert variant="destructive">
-              <AlertDescription className="text-xs">✗ {verifyResult.error}</AlertDescription>
-            </Alert>
-          )
-        ) : null}
+        {verifyResult && verifyResult.ok === true && (
+          <Alert>
+            <AlertDescription className="text-xs">
+              ✓ Webhook handshake OK · {verifyResult.latencyMs}ms
+            </AlertDescription>
+          </Alert>
+        )}
+        {verifyResult && verifyResult.ok === false && (
+          <Alert variant="destructive">
+            <AlertDescription className="text-xs">✗ {verifyResult.error}</AlertDescription>
+          </Alert>
+        )}
 
         <div className="flex flex-wrap justify-end gap-2">
           <Button
