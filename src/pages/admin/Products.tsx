@@ -73,8 +73,21 @@ const Products = () => {
     if (categoryFilter) filtered = filtered.filter((p) => p.category === categoryFilter);
     if (minPrice) filtered = filtered.filter((p) => (p.sale_price || p.price) >= Number(minPrice));
     if (maxPrice) filtered = filtered.filter((p) => (p.sale_price || p.price) <= Number(maxPrice));
+    if (lowStockOnly) filtered = filtered.filter((p) => (p.stock ?? 0) <= lowStockThreshold);
+    if (sortMode !== "newest") {
+      filtered = [...filtered].sort((a, b) => {
+        const sa = a.stock ?? 0;
+        const sb = b.stock ?? 0;
+        return sortMode === "stock_asc" ? sa - sb : sb - sa;
+      });
+    }
     return filtered;
-  }, [products, searchQuery, categoryFilter, minPrice, maxPrice]);
+  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode]);
+
+  const lowStockCount = useMemo(
+    () => products.filter((p) => (p.stock ?? 0) <= lowStockThreshold).length,
+    [products, lowStockThreshold],
+  );
 
   const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
   const paginatedProducts = useMemo(() => {
