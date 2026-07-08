@@ -26,6 +26,7 @@ import {
   type WhatsAppShareEvent,
 } from "@/lib/checkout/whatsappShare";
 import { retryWhatsAppShareForOrder } from "@/lib/admin/adminWhatsAppRetry";
+import { supabase } from "@/integrations/supabase/client";
 
 type StatusFilter = "all" | WhatsAppShareEvent["status"];
 type ActorFilter = "all" | WhatsAppShareEvent["actor"];
@@ -40,9 +41,18 @@ function fmt(iso: string) {
 }
 
 function statusColor(s: WhatsAppShareEvent["status"]) {
-  if (s === "opened" || s === "retried") return "text-green-600 bg-green-500/10";
+  if (s === "opened" || s === "retried" || s === "queued") return "text-green-600 bg-green-500/10";
   if (s === "blocked") return "text-amber-600 bg-amber-500/10";
   return "text-destructive bg-destructive/10";
+}
+
+function deliveryColor(s: string | null | undefined) {
+  if (!s) return "bg-muted text-muted-foreground";
+  if (s === "read") return "bg-emerald-500/10 text-emerald-700 font-semibold";
+  if (s === "delivered") return "bg-green-500/10 text-green-600";
+  if (s === "sent") return "bg-blue-500/10 text-blue-600";
+  if (s === "failed") return "bg-destructive/10 text-destructive";
+  return "bg-muted text-muted-foreground";
 }
 
 export default function WhatsAppShareEventsAdmin() {
@@ -70,6 +80,21 @@ export default function WhatsAppShareEventsAdmin() {
 
   useEffect(() => {
     if (orderId) void load(orderId);
+  }, [orderId, load]);
+
+  // Realtime — delivery_status flips arriving via whatsapp-webhook show up
+  // without the admin needing to refresh.
+  useEffect(() => {
+    if (!orderId) return;
+    const channel = supabase
+      .channel(`admin-wa-events-${orderId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "whatsapp_share_events", filter: `order_id=eq.${orderId}` },
+        () => { void load(orderId); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [orderId, load]);
 
   const submit = (e: React.FormEvent) => {
@@ -236,8 +261,16 @@ export default function WhatsAppShareEventsAdmin() {
             <span className={`px-2 py-0.5 rounded text-xs font-mono uppercase w-fit ${statusColor(ev.status)}`}>
               {ev.status}
             </span>
+            {ev.delivery_status && (
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase w-fit ${deliveryColor(ev.delivery_status)}`}>
+                📡 {ev.delivery_status}
+              </span>
+            )}
             <span className="text-xs text-muted-foreground font-mono">{fmt(ev.created_at)}</span>
             <span className="text-xs text-muted-foreground">actor: {ev.actor}</span>
+            {ev.attempt_variant && (
+              <span className="text-[10px] font-mono text-muted-foreground">v:{ev.attempt_variant}</span>
+            )}
             {ev.error && (
               <span className="text-xs text-destructive/90 break-words sm:ml-auto">
                 {ev.error}

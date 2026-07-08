@@ -18,6 +18,13 @@ verify_jwt = false
 [functions.security-cleanup]
 verify_jwt = false
 
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.whatsapp-send]
+verify_jwt = false
+
+
 
 
 

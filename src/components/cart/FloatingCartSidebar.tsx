@@ -48,8 +48,11 @@ import {
 import { createSubmitGuard } from "@/lib/checkout/submitGuard";
 import {
   shareOrderToWhatsApp,
+  buildWhatsAppPayload,
   type OrderReceipt,
+  type WhatsAppPayload,
 } from "@/lib/checkout/whatsappShare";
+import WhatsAppSharePreview from "@/components/checkout/WhatsAppSharePreview";
 
 /** Fixed flat delivery charge (Bangladesh-wide) when no zone is picked. */
 const FLAT_SHIPPING = 150;
@@ -74,6 +77,12 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
   const [shareError, setShareError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<OrderReceipt | null>(null);
   const [reshareLoading, setReshareLoading] = useState(false);
+
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewPayload, setPreviewPayload] = useState<WhatsAppPayload | null>(null);
+  const [previewSending, setPreviewSending] = useState(false);
+  const pendingReceiptRef = useRef<OrderReceipt | null>(null);
+  const pendingIsRetryRef = useRef(false);
 
 
   // Simplified checkout state
@@ -205,26 +214,14 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
       setLastReceipt(receipt);
       setOrderPlaced(true);
 
-      // Auto-share to WhatsApp — track visible status for the success screen
+      // Open the preview modal — user reviews receipt + images before sending.
+      // Actual dispatch happens on preview confirm.
       setShareStatus("sharing");
       setShareError(null);
-      const shareRes = await shareOrderToWhatsApp(receipt);
-      setShareStatus(shareRes.status === "opened" || shareRes.status === "retried" ? "opened" : shareRes.status);
-      setShareError(shareRes.error ?? null);
-      if (shareRes.status === "blocked") {
-        toast({
-          title: "WhatsApp popup ব্লক হয়েছে",
-          description: shareRes.error ?? 'নিচে "আবার শেয়ার করুন" বাটনে ক্লিক করুন।',
-        });
-      } else if (shareRes.status === "failed") {
-        toast({
-          title: "WhatsApp শেয়ার ব্যর্থ",
-          description: shareRes.error ?? "আবার চেষ্টা করুন।",
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "WhatsApp রিসিট শেয়ার হয়েছে ✅" });
-      }
+      pendingReceiptRef.current = receipt;
+      pendingIsRetryRef.current = false;
+      setPreviewPayload(buildWhatsAppPayload(receipt));
+      setPreviewOpen(true);
 
 
       trackPurchase(
@@ -254,23 +251,49 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
     }
   };
 
-  const handleReshare = async () => {
+  const handleReshare = () => {
     if (!lastReceipt || reshareLoading) return;
-    setReshareLoading(true);
-    setShareStatus("sharing");
-    setShareError(null);
+    pendingReceiptRef.current = lastReceipt;
+    pendingIsRetryRef.current = true;
+    setPreviewPayload(buildWhatsAppPayload(lastReceipt));
+    setPreviewOpen(true);
+  };
+
+  const handlePreviewCancel = () => {
+    setPreviewOpen(false);
+    if (shareStatus === "sharing") {
+      // Never actually sent — mark as blocked so admin/customer sees the state.
+      setShareStatus("blocked");
+      setShareError("প্রিভিউ বাতিল করা হয়েছে");
+    }
+  };
+
+  const handlePreviewSend = async () => {
+    const receipt = pendingReceiptRef.current;
+    if (!receipt) return;
+    const isRetry = pendingIsRetryRef.current;
+    setPreviewSending(true);
+    if (isRetry) setReshareLoading(true);
     try {
-      const res = await shareOrderToWhatsApp(lastReceipt, { isRetry: true });
-      setShareStatus(res.status === "opened" || res.status === "retried" ? "opened" : res.status);
+      const res = await shareOrderToWhatsApp(receipt, { isRetry });
+      const ok = res.status === "opened" || res.status === "retried" || res.status === "queued";
+      setShareStatus(ok ? "opened" : (res.status as "blocked" | "failed"));
       setShareError(res.error ?? null);
-      toast({
-        title: res.status === "blocked" ? "আবার popup ব্লক হয়েছে" :
-               res.status === "failed"  ? "শেয়ার ব্যর্থ" : "WhatsApp খোলা হয়েছে ✅",
-        description: res.error ?? undefined,
-        variant: res.status === "opened" || res.status === "retried" ? "default" : "destructive",
-      });
+      if (res.status === "blocked") {
+        toast({ title: "WhatsApp popup ব্লক হয়েছে", description: res.error ?? undefined });
+      } else if (res.status === "failed") {
+        toast({ title: "WhatsApp শেয়ার ব্যর্থ", description: res.error, variant: "destructive" });
+      } else {
+        toast({
+          title: res.channel === "cloud_api"
+            ? "WhatsApp Cloud API-এ পাঠানো হয়েছে ✅"
+            : "WhatsApp রিসিট শেয়ার হয়েছে ✅",
+        });
+      }
     } finally {
+      setPreviewSending(false);
       setReshareLoading(false);
+      setPreviewOpen(false);
     }
   };
 
@@ -292,6 +315,14 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
     : `কার্ট (${itemCount})`;
 
   return (
+    <>
+    <WhatsAppSharePreview
+      open={previewOpen}
+      payload={previewPayload}
+      onCancel={handlePreviewCancel}
+      onSend={handlePreviewSend}
+      sending={previewSending}
+    />
     <AnimatePresence>
       {open && (
         <>
@@ -514,6 +545,7 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
         </>
       )}
     </AnimatePresence>
+    </>
   );
 };
 

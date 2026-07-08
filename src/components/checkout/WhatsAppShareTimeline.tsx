@@ -20,10 +20,10 @@ interface Props {
   title?: string;
 }
 
-const STATUS_ORDER: WhatsAppShareStatus[] = ["opened", "retried", "blocked", "failed"];
+const STATUS_ORDER: WhatsAppShareStatus[] = ["opened", "queued", "retried", "blocked", "failed"];
 
 function statusClass(s: WhatsAppShareStatus) {
-  if (s === "opened" || s === "retried") return "text-green-600";
+  if (s === "opened" || s === "retried" || s === "queued") return "text-green-600";
   if (s === "blocked") return "text-amber-600";
   return "text-destructive";
 }
@@ -32,6 +32,7 @@ function statusLabel(s: WhatsAppShareStatus) {
   return (
     {
       opened: "খোলা হয়েছে",
+      queued: "Cloud API-এ পাঠানো হয়েছে",
       retried: "পুনরায় শেয়ার",
       blocked: "পপআপ ব্লকড",
       failed: "ব্যর্থ",
@@ -73,7 +74,7 @@ export default function WhatsAppShareTimeline({ events, title = "WhatsApp শে
       <div
         data-testid="wa-latest-attempt"
         className={`mb-3 rounded-md border p-2 text-xs ${
-          latest.status === "opened" || latest.status === "retried"
+          latest.status === "opened" || latest.status === "retried" || latest.status === "queued"
             ? "border-green-500/40 bg-green-500/5"
             : latest.status === "blocked"
               ? "border-amber-500/40 bg-amber-500/5"

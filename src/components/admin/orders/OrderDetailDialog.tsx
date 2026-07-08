@@ -33,6 +33,7 @@ import {
 } from "@/lib/checkout/whatsappShare";
 import { retryWhatsAppShareForOrder } from "@/lib/admin/adminWhatsAppRetry";
 import WhatsAppShareTimeline from "@/components/checkout/WhatsAppShareTimeline";
+import OrderWhatsAppHistory from "@/components/admin/orders/OrderWhatsAppHistory";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -349,19 +350,9 @@ const OrderDetailDialog = ({
                   </p>
                 )}
 
-                {waEvents.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-border/40">
-                    <WhatsAppShareTimeline
-                      title="শেয়ার লগ"
-                      events={waEvents.map((ev) => ({
-                        status: ev.status,
-                        at: ev.created_at,
-                        actor: ev.actor,
-                        error: ev.error,
-                      }))}
-                    />
-                  </div>
-                )}
+                <div className="mt-3 pt-3 border-t border-border/40">
+                  <OrderWhatsAppHistory orderId={order.id} />
+                </div>
               </div>
             )}
 
