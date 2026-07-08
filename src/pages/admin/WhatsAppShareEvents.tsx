@@ -261,8 +261,16 @@ export default function WhatsAppShareEventsAdmin() {
             <span className={`px-2 py-0.5 rounded text-xs font-mono uppercase w-fit ${statusColor(ev.status)}`}>
               {ev.status}
             </span>
+            {ev.delivery_status && (
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase w-fit ${deliveryColor(ev.delivery_status)}`}>
+                📡 {ev.delivery_status}
+              </span>
+            )}
             <span className="text-xs text-muted-foreground font-mono">{fmt(ev.created_at)}</span>
             <span className="text-xs text-muted-foreground">actor: {ev.actor}</span>
+            {ev.attempt_variant && (
+              <span className="text-[10px] font-mono text-muted-foreground">v:{ev.attempt_variant}</span>
+            )}
             {ev.error && (
               <span className="text-xs text-destructive/90 break-words sm:ml-auto">
                 {ev.error}
