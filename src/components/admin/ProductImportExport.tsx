@@ -16,6 +16,7 @@ import {
   parseProductRow,
   parseCsvField,
   validateProductRow,
+  esc,
   type CsvRowError,
 } from "@/lib/admin/productCsv";
 
