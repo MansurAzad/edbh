@@ -73,9 +73,23 @@ function textHeaders(): HeadersInit {
 }
 
 // ── page renderers ─────────────────────────────────────────────────────────
-function shell({ title, description, canonical, ogImage, body, jsonLd }: {
+function breadcrumbSchema(crumbs: Array<{ name: string; url: string }>): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((c, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: c.name,
+      item: c.url,
+    })),
+  };
+}
+
+function shell({ title, description, canonical, ogImage, body, jsonLd, ogType = "website" }: {
   title: string; description: string; canonical: string; ogImage: string;
   body: string; jsonLd?: Record<string, unknown> | Array<Record<string, unknown>>;
+  ogType?: string;
 }): string {
   const ld = jsonLd
     ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, "\\u003c")}</script>`
@@ -88,16 +102,22 @@ function shell({ title, description, canonical, ogImage, body, jsonLd }: {
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
 <link rel="canonical" href="${escapeHtml(canonical)}">
+<link rel="alternate" hreflang="bn-BD" href="${escapeHtml(canonical)}">
+<link rel="alternate" hreflang="bn" href="${escapeHtml(canonical)}">
+<link rel="alternate" hreflang="x-default" href="${escapeHtml(canonical)}">
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
 <meta property="og:url" content="${escapeHtml(canonical)}">
 <meta property="og:image" content="${escapeHtml(ogImage)}">
-<meta property="og:type" content="website">
+<meta property="og:image:alt" content="${escapeHtml(title)}">
+<meta property="og:type" content="${escapeHtml(ogType)}">
 <meta property="og:site_name" content="${SITE_NAME}">
+<meta property="og:locale" content="bn_BD">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
 <meta name="twitter:image" content="${escapeHtml(ogImage)}">
+<meta name="twitter:url" content="${escapeHtml(canonical)}">
 <meta name="robots" content="index,follow,max-image-preview:large">
 ${ld}
 </head>
