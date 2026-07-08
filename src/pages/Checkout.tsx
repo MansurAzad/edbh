@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { consumeHotSaleAttribution, trackHotSale } from "@/lib/hotSaleTracking";
 import { ArrowLeft } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -10,8 +10,6 @@ import { trackPurchase } from "@/components/seo/AnalyticsTracker";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
-import { useDeliveryZones } from "@/hooks/checkout/useDeliveryZones";
-import { useCheckoutTracking } from "@/hooks/checkout/useCheckoutTracking";
 import { placeOrder } from "@/lib/order-placement";
 import { downloadInvoice } from "@/lib/checkout/invoice";
 import {
@@ -21,14 +19,14 @@ import {
 } from "@/lib/checkout/types";
 import CheckoutAuthChoice from "@/components/checkout/CheckoutAuthChoice";
 import CheckoutSuccess from "@/components/checkout/CheckoutSuccess";
-import CheckoutSteps from "@/components/checkout/CheckoutSteps";
-import ShippingStep from "@/components/checkout/ShippingStep";
-import PaymentStep from "@/components/checkout/PaymentStep";
-import ReviewStep from "@/components/checkout/ReviewStep";
+import SimpleCheckoutForm from "@/components/checkout/SimpleCheckoutForm";
 import CheckoutOrderSummary from "@/components/checkout/CheckoutOrderSummary";
+import { shareOrderToWhatsApp } from "@/lib/checkout/whatsappShare";
+
+/** Fixed flat delivery charge (Bangladesh-wide). */
+const FLAT_SHIPPING = 150;
 
 const Checkout = () => {
-  const [step, setStep] = useState(1);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethodId>("cod");
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -49,36 +47,32 @@ const Checkout = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const { deliveryZones, selectedZone, selectZone } = useDeliveryZones(shippingInfo.city);
-  useCheckoutTracking(items, total);
+  // Snapshot of last-placed order used for the "Share on WhatsApp" button on
+  // the success screen (cart is cleared by then, so we need a snapshot).
+  const lastReceiptRef = useRef<Parameters<typeof shareOrderToWhatsApp>[0] | null>(null);
 
-  // Hot Sale checkout attribution — fire once per checkout entry when the visitor
-  // arrived from a Hot Sale click within this session.
   useEffect(() => {
     const attr = consumeHotSaleAttribution();
     if (attr) trackHotSale("hot_sale_checkout", { variant: attr.variant, product_id: attr.productId, value: total });
-    // total captured at mount is fine — we only want a single attribution event
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const shippingCost = selectedZone?.shipping_charge ?? 0;
-  const finalTotal = total - discountAmount + (total > 0 ? shippingCost : 0);
+  const shippingCost = items.length > 0 ? FLAT_SHIPPING : 0;
+  const finalTotal = Math.max(0, total - discountAmount) + shippingCost;
 
   const validateShippingInfo = () => {
-    if (!shippingInfo.fullName || !shippingInfo.phone || !shippingInfo.address) {
+    if (!shippingInfo.fullName.trim() || !shippingInfo.phone.trim() || !shippingInfo.address.trim()) {
       toast({
         title: "তথ্য অসম্পূর্ণ",
-        description: "নাম, মোবাইল নম্বর এবং ঠিকানা অবশ্যই পূরণ করুন",
+        description: "নাম, মোবাইল নম্বর এবং পুরো ঠিকানা অবশ্যই পূরণ করুন",
         variant: "destructive",
       });
       return false;
     }
-    if (deliveryZones.length > 0 && !selectedZone) {
-      toast({
-        title: "ডেলিভারি জোন নির্বাচন করুন",
-        description: "অর্ডার সম্পন্ন করার আগে একটি ডেলিভারি জোন নির্বাচন করুন",
-        variant: "destructive",
-      });
+    // Rudimentary BD mobile check
+    const digits = shippingInfo.phone.replace(/\D/g, "");
+    if (digits.length < 11) {
+      toast({ title: "মোবাইল নম্বর ভুল", description: "সঠিক ১১ সংখ্যার মোবাইল নম্বর দিন", variant: "destructive" });
       return false;
     }
     return true;
@@ -92,6 +86,10 @@ const Checkout = () => {
       console.error("Error generating invoice:", e);
       toast({ title: "Error", description: "Failed to generate invoice", variant: "destructive" });
     }
+  };
+
+  const handleShareWhatsApp = () => {
+    if (lastReceiptRef.current) shareOrderToWhatsApp(lastReceiptRef.current);
   };
 
   const handlePlaceOrder = async () => {
@@ -112,27 +110,51 @@ const Checkout = () => {
 
     setProcessing(true);
     try {
+      const advNum = selectedPayment === "advance_cod" ? Number(advanceAmount) || 0 : null;
+
+      // Snapshot cart before it gets cleared
+      const itemsSnapshot = [...items];
+
       const { orderId: generatedOrderId, finalTotal: confirmedTotal } = await placeOrder({
         items,
         shippingInfo,
-        selectedZoneId: selectedZone?.id || null,
+        selectedZoneId: null, // hidden – edge function applies flat ৳150
         deliveryNotes,
         selectedPayment,
         transactionId,
         paymentPhone,
         advancePaymentMethod,
-        advanceAmount: selectedPayment === "advance_cod" ? Number(advanceAmount) || 0 : null,
+        advanceAmount: advNum,
         appliedCoupon: appliedCoupon ? { id: appliedCoupon.id, code: appliedCoupon.code } : null,
       });
+
+      const receipt = {
+        orderId: generatedOrderId,
+        items: itemsSnapshot,
+        shippingInfo,
+        subtotal: total,
+        discountAmount,
+        shippingCost,
+        finalTotal: confirmedTotal,
+        selectedPayment,
+        advanceAmount: advNum ?? undefined,
+        transactionId,
+        paymentPhone,
+        deliveryNotes,
+      };
+      lastReceiptRef.current = receipt;
 
       await clearCart();
       setOrderId(generatedOrderId);
       setOrderPlaced(true);
 
+      // Auto-open WhatsApp with receipt
+      shareOrderToWhatsApp(receipt);
+
       trackPurchase(
         generatedOrderId,
         confirmedTotal,
-        items.map((item) => ({
+        itemsSnapshot.map((item) => ({
           id: item.product_id,
           name: item.product.name,
           price: item.product.sale_price || item.product.price,
@@ -140,7 +162,7 @@ const Checkout = () => {
         })),
       );
 
-      toast({ title: "Order placed!", description: "Thank you for your order. Check your email for confirmation." });
+      toast({ title: "অর্ডার সফল!", description: "ধন্যবাদ! হোয়াটসঅ্যাপে রিসিট শেয়ার করা হয়েছে।" });
     } catch (error: any) {
       console.error("Error placing order:", error);
       const msg = error?.message || error?.details || "";
@@ -156,12 +178,29 @@ const Checkout = () => {
   };
 
   if (orderPlaced) {
-    return <CheckoutSuccess orderId={orderId} isLoggedIn={!!user} onDownloadInvoice={handleDownloadInvoice} />;
+    return (
+      <CheckoutSuccess
+        orderId={orderId}
+        isLoggedIn={!!user}
+        onDownloadInvoice={handleDownloadInvoice}
+        onShareWhatsApp={handleShareWhatsApp}
+      />
+    );
   }
 
-  if (!user && step === 1 && !isGuest) {
+  if (!user && !isGuest) {
     return <CheckoutAuthChoice onGuest={() => setIsGuest(true)} />;
   }
+
+  // Synthetic zone for the summary component so it shows "৳150" instead of "Select city"
+  const flatZone = {
+    id: "flat",
+    zone_name: "ফিক্সড",
+    city: "Bangladesh",
+    shipping_charge: FLAT_SHIPPING,
+    estimated_days: null,
+    areas: null,
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -169,7 +208,7 @@ const Checkout = () => {
       <Header />
       <main className="pt-24 pb-20">
         <div className="container mx-auto px-4">
-          <Link to="/cart" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary mb-8">
+          <Link to="/cart" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary mb-6">
             <ArrowLeft className="w-4 h-4" />
             Back to Cart
           </Link>
@@ -179,64 +218,41 @@ const Checkout = () => {
             animate={{ opacity: 1, y: 0 }}
             className="font-display text-4xl font-bold mb-2"
           >
-            <span className="text-foreground">Secure </span>
-            <span className="text-gradient-gold">Checkout</span>
+            <span className="text-foreground">দ্রুত </span>
+            <span className="text-gradient-gold">চেকআউট</span>
           </motion.h1>
+          <p className="text-muted-foreground mb-8">মাত্র ৩টি তথ্য দিন — অর্ডার কনফার্ম হয়ে যাবে।</p>
 
           {isGuest && !user && (
-            <p className="text-muted-foreground mb-8">
-              Checking out as guest •{" "}
-              <Link to="/auth?redirect=/checkout" className="text-primary hover:underline">Sign in instead</Link>
+            <p className="text-muted-foreground mb-6 text-sm">
+              গেস্ট হিসেবে অর্ডার করছেন •{" "}
+              <Link to="/auth?redirect=/checkout" className="text-primary hover:underline">
+                সাইন-ইন করুন
+              </Link>
             </p>
           )}
 
-          <CheckoutSteps step={step} />
-
           <div className="grid lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
-              {step === 1 && (
-                <ShippingStep
-                  shippingInfo={shippingInfo}
-                  setShippingInfo={setShippingInfo}
-                  deliveryZones={deliveryZones}
-                  selectedZone={selectedZone}
-                  onSelectZone={selectZone}
-                  deliveryNotes={deliveryNotes}
-                  setDeliveryNotes={setDeliveryNotes}
-                  onContinue={() => validateShippingInfo() && setStep(2)}
-                />
-              )}
-              {step === 2 && (
-                <PaymentStep
-                  selectedPayment={selectedPayment}
-                  setSelectedPayment={setSelectedPayment}
-                  finalTotal={finalTotal}
-                  transactionId={transactionId}
-                  setTransactionId={setTransactionId}
-                  paymentPhone={paymentPhone}
-                  setPaymentPhone={setPaymentPhone}
-                  advancePaymentMethod={advancePaymentMethod}
-                  setAdvancePaymentMethod={setAdvancePaymentMethod}
-                  advanceAmount={advanceAmount}
-                  setAdvanceAmount={setAdvanceAmount}
-                  onBack={() => setStep(1)}
-                  onContinue={() => setStep(3)}
-                />
-              )}
-              {step === 3 && (
-                <ReviewStep
-                  shippingInfo={shippingInfo}
-                  deliveryNotes={deliveryNotes}
-                  selectedPayment={selectedPayment}
-                  transactionId={transactionId}
-                  paymentPhone={paymentPhone}
-                  advanceAmount={advanceAmount}
-                  finalTotal={finalTotal}
-                  processing={processing}
-                  onBack={() => setStep(2)}
-                  onPlaceOrder={handlePlaceOrder}
-                />
-              )}
+              <SimpleCheckoutForm
+                shippingInfo={shippingInfo}
+                setShippingInfo={setShippingInfo}
+                deliveryNotes={deliveryNotes}
+                setDeliveryNotes={setDeliveryNotes}
+                selectedPayment={selectedPayment}
+                setSelectedPayment={setSelectedPayment}
+                advanceAmount={advanceAmount}
+                setAdvanceAmount={setAdvanceAmount}
+                advancePaymentMethod={advancePaymentMethod}
+                setAdvancePaymentMethod={setAdvancePaymentMethod}
+                transactionId={transactionId}
+                setTransactionId={setTransactionId}
+                paymentPhone={paymentPhone}
+                setPaymentPhone={setPaymentPhone}
+                finalTotal={finalTotal}
+                processing={processing}
+                onPlaceOrder={handlePlaceOrder}
+              />
             </div>
 
             <div>
@@ -245,7 +261,7 @@ const Checkout = () => {
                 total={total}
                 discountAmount={discountAmount}
                 appliedCoupon={appliedCoupon}
-                selectedZone={selectedZone}
+                selectedZone={flatZone}
                 shippingCost={shippingCost}
                 finalTotal={finalTotal}
                 onApplyCoupon={(coupon, discount) => {
