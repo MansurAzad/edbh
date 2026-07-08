@@ -402,3 +402,37 @@ export function trackPageView(path: string, title: string, href: string) {
     capi: { name: "page_view", params: { page_path: path, page_location: href, page_title: title } },
   });
 }
+
+/**
+ * Fires a Meta `Contact` standard event when the user initiates contact via
+ * WhatsApp, Messenger, phone call, or the contact form. Meta recommends
+ * `Contact` for messaging-app clicks and `Lead` for form submissions —
+ * this wrapper handles the Contact side; use {@link trackLead} for forms.
+ *
+ * Channels covered:
+ * - **GA4** — `contact` custom event with `method` parameter.
+ * - **GTM dataLayer** — `dl.method` passthrough.
+ * - **Meta Pixel** — `Contact` standard event.
+ * - **Meta CAPI** — `contact` server event.
+ *
+ * @param {string} method - Which channel the user used: `"whatsapp"`, `"messenger"`,
+ *   `"call"`, `"email"`, `"contact_form"`, etc.
+ * @param {ServerTrackUserData} [userData] - Optional hashed PII for CAPI enhanced match.
+ *
+ * @example
+ * trackContact("whatsapp");
+ *
+ * বাংলা: WhatsApp/Messenger/Call ক্লিকের ইভেন্ট। Meta `Contact` standard event
+ * হিসেবে পাঠায় — ফর্ম সাবমিটের জন্য `trackLead` ব্যবহার করুন।
+ */
+export function trackContact(method: string, userData?: ServerTrackUserData) {
+  fanout({
+    event: "contact",
+    event_id: dedupKey("contact", method),
+    user_data: userData,
+    dl: { method },
+    ga: { method },
+    fb: { name: "Contact", params: { content_name: method } },
+    capi: { name: "contact", user_data: userData, params: { content_name: method } },
+  });
+}
