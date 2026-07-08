@@ -43,7 +43,7 @@ export const organizationSchema = {
     availableLanguage: ["Bengali", "English"],
   },
   sameAs: [
-    "https://facebook.com/dubaiborkehouse",
+    "https://www.facebook.com/dborkahouse",
     "https://instagram.com/dubaiborkehouse",
   ],
 };

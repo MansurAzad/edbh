@@ -104,23 +104,44 @@
       "@context": "https://schema.org",
       "@graph": [
         {
-          "@type": "Organization",
+          "@type": ["Organization", "OnlineStore"],
           "@id": "https://dubaiborkahouse.com/#organization",
           "name": "Dubai Borka House",
-          "alternateName": "দুবাই বোরকা হাউস",
+          "legalName": "Dubai Borka House Bangladesh",
+          "alternateName": ["দুবাই বোরকা হাউস", "Dubai Borka House Bangladesh"],
           "url": "https://dubaiborkahouse.com",
           "logo": "https://dubaiborkahouse.com/favicon.jpg",
-          "description": "Bangladesh's leading premium online shop for borka, abaya, hijab, and kaftan — authentic Dubai-imported Islamic fashion.",
+          "description": "Official Website of Dubai Borka House Bangladesh — the leading premium online shop for borka, abaya, hijab, and kaftan; authentic Dubai-imported Islamic fashion.",
+          "foundingDate": "2009",
+          "areaServed": { "@type": "Country", "name": "Bangladesh" },
+          "slogan": "Premium Dubai-imported Islamic fashion",
+          "brand": {
+            "@type": "Brand",
+            "name": "Dubai Borka House",
+            "logo": "https://dubaiborkahouse.com/favicon.jpg",
+            "url": "https://dubaiborkahouse.com"
+          },
           "telephone": "+880-1845-853634",
+          "email": "info@dubaiborkehouse.com",
+          "contactPoint": [{
+            "@type": "ContactPoint",
+            "telephone": "+880-1845-853634",
+            "contactType": "customer service",
+            "areaServed": "BD",
+            "availableLanguage": ["Bengali", "English"]
+          }],
           "address": {
             "@type": "PostalAddress",
-            "streetAddress": "Kohinoor City, 3rd Floor, Shop #342",
+            "streetAddress": "Kohinoor City, 3rd Floor, Shop #342, Police Lane, WASA",
             "addressLocality": "Chattogram",
+            "addressRegion": "Chattogram Division",
+            "postalCode": "4000",
             "addressCountry": "BD"
           },
           "sameAs": [
-            "https://facebook.com/dubaiborkehouse",
-            "https://instagram.com/dubaiborkehouse"
+            "https://www.facebook.com/dborkahouse",
+            "https://www.instagram.com/dubaiborkahousebd",
+            "https://www.youtube.com/@dubaiborkahousebd"
           ]
         },
         {

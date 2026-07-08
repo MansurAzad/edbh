@@ -75,6 +75,12 @@ const Contact = () => {
                       <h3 className="font-semibold text-foreground text-sm leading-tight">{branch.name}</h3>
                       {branch.main && <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Main Showroom</span>}
                       <p className="text-muted-foreground text-xs mt-1 leading-relaxed">{branch.address}</p>
+                      <p className="text-[11px] mt-2">
+                        <a href="https://dubaiborkahouse.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          dubaiborkahouse.com
+                        </a>
+                        <span className="text-muted-foreground"> — Official Website</span>
+                      </p>
                     </div>
                   </div>
                 </motion.div>
@@ -100,7 +106,7 @@ const Contact = () => {
                 <p className="text-muted-foreground">শনি - বৃহস্পতি: সকাল ১০টা - রাত ৯টা<br />শুক্রবার: বন্ধ</p>
               </div>
               <div className="flex gap-3">
-                <a href="https://www.facebook.com/dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"><Facebook className="w-5 h-5" /></a>
+                <a href="https://www.facebook.com/dborkahouse" target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"><Facebook className="w-5 h-5" /></a>
                 <a href="https://www.instagram.com/dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"><Instagram className="w-5 h-5" /></a>
                 <a href="https://wa.me/8801845853634" target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"><MessageCircle className="w-5 h-5" /></a>
               </div>

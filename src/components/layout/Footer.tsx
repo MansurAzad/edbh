@@ -67,8 +67,16 @@ const Footer = () => {
             <p className="text-muted-foreground leading-relaxed text-sm">
               Premium Bangladeshi fabric & fashion brand — the finest Dubai-imported fashion delivered to your doorstep.
             </p>
+            <p className="text-xs text-primary font-semibold">
+              Official Website of Dubai Borka House Bangladesh
+            </p>
+            <p className="text-xs text-muted-foreground">
+              <a href="https://dubaiborkahouse.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary">
+                https://dubaiborkahouse.com
+              </a>
+            </p>
             <div className="flex gap-3">
-              <a href="https://www.facebook.com/dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all"><Facebook className="w-4 h-4" /></a>
+              <a href="https://www.facebook.com/dborkahouse" target="_blank" rel="noopener noreferrer" aria-label="Facebook — Dubai Borka House official page" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all"><Facebook className="w-4 h-4" /></a>
               <a href="https://www.instagram.com/dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all"><Instagram className="w-4 h-4" /></a>
               <a href="https://www.youtube.com/@dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all"><Youtube className="w-4 h-4" /></a>
             </div>
@@ -104,8 +112,16 @@ const Footer = () => {
             <p className="text-muted-foreground leading-relaxed text-sm">
               Premium Dubai-imported fashion delivered to your doorstep.
             </p>
+            <p className="text-xs text-primary font-semibold mt-3">
+              Official Website of Dubai Borka House Bangladesh
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              <a href="https://dubaiborkahouse.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary">
+                https://dubaiborkahouse.com
+              </a>
+            </p>
             <div className="flex gap-3 mt-4">
-              <a href="https://www.facebook.com/dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-full bg-muted flex items-center justify-center"><Facebook className="w-4 h-4" /></a>
+              <a href="https://www.facebook.com/dborkahouse" target="_blank" rel="noopener noreferrer" aria-label="Facebook — Dubai Borka House official page" className="w-9 h-9 rounded-full bg-muted flex items-center justify-center"><Facebook className="w-4 h-4" /></a>
               <a href="https://www.instagram.com/dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-full bg-muted flex items-center justify-center"><Instagram className="w-4 h-4" /></a>
               <a href="https://www.youtube.com/@dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-full bg-muted flex items-center justify-center"><Youtube className="w-4 h-4" /></a>
             </div>
