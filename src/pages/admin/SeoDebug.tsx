@@ -139,6 +139,7 @@ const SeoDebug = () => {
           <TabsList>
             <TabsTrigger value="previews">OG / Twitter Previews</TabsTrigger>
             <TabsTrigger value="schema">Product Schema Lint</TabsTrigger>
+            <TabsTrigger value="verify">Prerender Verify</TabsTrigger>
             <TabsTrigger value="checklist">Crawl Checklist</TabsTrigger>
           </TabsList>
 
