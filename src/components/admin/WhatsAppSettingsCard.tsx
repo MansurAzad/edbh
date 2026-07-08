@@ -65,6 +65,10 @@ export default function WhatsAppSettingsCard() {
   const [verifyResult, setVerifyResult] = useState<
     { ok: true; latencyMs: number } | { ok: false; error: string } | null
   >(null);
+  /** Original token loaded from DB — used to detect changes and show the
+   *  confirmation modal only when the verify token is actually being modified. */
+  const [initialVerifyToken, setInitialVerifyToken] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
