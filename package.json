@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "perf:budget": "node scripts/check-bundle-budget.mjs",
-    "seo:prerender-smoke": "node scripts/prerender-smoke-test.mjs"
+    "seo:prerender-smoke": "node scripts/prerender-smoke-test.mjs",
+    "seo:validate-sitemap": "node scripts/validate-sitemap-robots.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
