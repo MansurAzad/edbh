@@ -331,6 +331,9 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
                   <div
                     data-testid="wa-share-status"
                     data-status={shareStatus}
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
                     className={`rounded-xl border p-3 text-sm ${
                       shareStatus === "opened"
                         ? "border-green-500/40 bg-green-500/5 text-green-700 dark:text-green-400"
