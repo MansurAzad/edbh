@@ -312,9 +312,18 @@ const ProductDetail = () => {
     );
   }
 
+  // Build base SEO from the helper, then override title/description when the
+  // admin has authored custom meta_title / meta_description for this product.
+  const baseSeo = buildProductSeo({ id: product.id, name: product.name, description: product.description, price: product.price, salePrice: product.sale_price, category: product.category, image: getProductImage(), slug: product.slug });
+  const seoOverrides = {
+    ...baseSeo,
+    ...(product.meta_title ? { title: product.meta_title, fullTitle: true } : {}),
+    ...(product.meta_description ? { description: product.meta_description } : {}),
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead {...buildProductSeo({ id: product.id, name: product.name, description: product.description, price: product.price, salePrice: product.sale_price, category: product.category, image: getProductImage(), slug: product.slug })} />
+      <SEOHead {...seoOverrides} />
       <StructuredData data={buildProductJsonLd({ id: product.id, name: product.name, description: product.description, price: product.price, salePrice: product.sale_price, image: getProductImage(), category: product.category, slug: product.slug, stock: product.stock, reviewCount: reviewStats.count, averageRating: reviewStats.avg, sizes: (product as any).sizes, colors: (product as any).colors, material: (product as any).material, sku: (product as any).sku })} />
       <Header />
       <Breadcrumbs />
