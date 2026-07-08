@@ -164,6 +164,20 @@ function checkProduct(html) {
     ["description block", /<p[^>]*>[^<]{20,}/i.test(html)],
   ];
 }
+function checkCategoryOrHome(html) {
+  return [["product links present", /\/product\/(show\/)?[^"'\s]+/.test(html)]];
+}
+function checkBlog(html) {
+  return [["blog link/title", /\/blog\/|blog|blogposting/i.test(html)]];
+}
+function checkFaq(html) {
+  return [
+    ["FAQ questions rendered", /<dt>[^<]{4,}<\/dt>/i.test(html)],
+    ["FAQPage schema", /"@type"\s*:\s*"FAQPage"/.test(html)],
+  ];
+}
+
+
 
 // Extract a single meta tag value by property/name.
 function metaValue(html, attr, key) {
