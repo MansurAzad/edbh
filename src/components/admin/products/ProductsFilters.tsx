@@ -120,6 +120,10 @@ interface Props {
   setSortMode: (v: "newest" | "stock_asc" | "stock_desc") => void;
   /** Number of products currently at or below the threshold. */
   lowStockCount: number;
+  /** Export the current filtered/sorted list as CSV. */
+  onExportFiltered: () => void;
+  /** Count of currently visible (filtered) products for the export button label. */
+  filteredCount: number;
   /** Open the bulk inventory update modal. */
   onOpenBulkInventory: () => void;
 }
