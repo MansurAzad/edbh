@@ -194,6 +194,8 @@ const Products = () => {
           setSortMode={onFilterChange(setSortMode)}
           lowStockCount={lowStockCount}
           onOpenBulkInventory={() => setBulkInventoryOpen(true)}
+          onExportFiltered={handleExportFiltered}
+          filteredCount={filteredProducts.length}
         />
 
         <BulkInventoryDialog
