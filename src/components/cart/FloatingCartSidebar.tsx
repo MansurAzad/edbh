@@ -315,6 +315,14 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
     : `কার্ট (${itemCount})`;
 
   return (
+    <>
+    <WhatsAppSharePreview
+      open={previewOpen}
+      payload={previewPayload}
+      onCancel={handlePreviewCancel}
+      onSend={handlePreviewSend}
+      sending={previewSending}
+    />
     <AnimatePresence>
       {open && (
         <>
