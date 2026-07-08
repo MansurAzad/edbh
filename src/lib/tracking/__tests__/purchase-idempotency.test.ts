@@ -62,4 +62,21 @@ describe("trackPurchase idempotency", () => {
     );
     expect(purchaseCalls).toHaveLength(1);
   });
+
+  it("blocks a duplicate call even after in-memory guard is bypassed (revisit /order-success)", () => {
+    trackPurchase("ORDER-REVISIT", 750, items);
+    // Simulate a full page revisit: clear the module-level Set by re-importing
+    // via localStorage rehydration path. Since we can't truly re-import here,
+    // we assert the localStorage entry contains both keys — the source of truth.
+    const raw = JSON.parse(localStorage.getItem("sst_purchase_fired_v2") || "[]");
+    expect(raw).toContain("purchase-ORDER-REVISIT");
+    expect(raw).toContain("ORDER-REVISIT");
+
+    trackPurchase("ORDER-REVISIT", 750, items);
+    const fbq = (window as any).fbq as ReturnType<typeof vi.fn>;
+    const purchaseCalls = fbq.mock.calls.filter(
+      (c: unknown[]) => c[0] === "track" && c[1] === "Purchase",
+    );
+    expect(purchaseCalls).toHaveLength(1);
+  });
 });

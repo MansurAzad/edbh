@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import CatalogFeedHealth from "@/components/admin/CatalogFeedHealth";
 
 interface PixelEvent {
   name: string;
@@ -506,6 +507,10 @@ const MetaPixel = () => {
                       </div>
                     </CardContent>
                   </Card>
+
+                  <CatalogFeedHealth />
+
+
 
                   <Card>
                     <CardHeader>

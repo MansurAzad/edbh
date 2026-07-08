@@ -126,31 +126,39 @@ export function trackAddToCart(p: Product & { category: string }, quantity: numb
  * বাংলা: ক্রয় সম্পন্ন হওয়ার ইভেন্ট। অর্ডার আইডি দিয়ে ইউনিক ইভেন্ট আইডি তৈরি।
  * সার্ভার CAPI-তে ব্যবহারকারীর হ্যাশ করা তথ্যও পাঠানো যায়।
  */
-const PURCHASE_FIRED_KEY = "sst_purchase_fired_v1";
+const PURCHASE_FIRED_KEY = "sst_purchase_fired_v2";
+// Synchronous in-memory guard so back-to-back calls in the same tick
+// (StrictMode double invoke, rapid double-click) are blocked before the
+// async localStorage read/write completes.
+const purchaseFiredMemory = new Set<string>();
 
-/** Persisted set of orderIds for which Purchase has already been fired. */
-function purchaseAlreadyFired(orderId: string): boolean {
-  if (typeof window === "undefined" || !orderId) return false;
+/** Persisted set of eventIds for which Purchase has already been fired. */
+function purchaseAlreadyFired(eventId: string, orderId: string): boolean {
+  if (purchaseFiredMemory.has(eventId) || purchaseFiredMemory.has(orderId)) return true;
+  if (typeof window === "undefined" || !eventId) return false;
   try {
     const raw = localStorage.getItem(PURCHASE_FIRED_KEY) || "[]";
     const arr = JSON.parse(raw) as string[];
-    return Array.isArray(arr) && arr.includes(orderId);
+    return Array.isArray(arr) && (arr.includes(eventId) || arr.includes(orderId));
   } catch { return false; }
 }
-function markPurchaseFired(orderId: string) {
-  if (typeof window === "undefined" || !orderId) return;
+function markPurchaseFired(eventId: string, orderId: string) {
+  purchaseFiredMemory.add(eventId);
+  purchaseFiredMemory.add(orderId);
+  if (typeof window === "undefined" || !eventId) return;
   try {
     const raw = localStorage.getItem(PURCHASE_FIRED_KEY) || "[]";
     const arr = JSON.parse(raw) as string[];
     const next = Array.isArray(arr) ? arr : [];
-    if (!next.includes(orderId)) next.push(orderId);
-    // Cap at 100 most-recent ids to keep localStorage bounded.
-    while (next.length > 100) next.shift();
+    for (const k of [eventId, orderId]) if (k && !next.includes(k)) next.push(k);
+    // Cap at 200 most-recent keys to keep localStorage bounded.
+    while (next.length > 200) next.shift();
     localStorage.setItem(PURCHASE_FIRED_KEY, JSON.stringify(next));
   } catch { /* private mode / quota — degrade to non-persistent */ }
 }
 /** Test-only reset helper. */
 export function __resetPurchaseIdempotencyForTests() {
+  purchaseFiredMemory.clear();
   try { localStorage.removeItem(PURCHASE_FIRED_KEY); } catch { /* noop */ }
 }
 
@@ -160,23 +168,24 @@ export function trackPurchase(
   items: CartItem[],
   userData?: ServerTrackUserData,
 ) {
-  // Idempotency: Meta ad optimisation goes off the rails if Purchase double-fires
-  // for the same order. Guard on orderId so component remounts, StrictMode double
-  // renders, and rapid double-clicks all no-op after the first successful call.
-  // বাংলা: একই orderId-এর জন্য Purchase একবারই fire করবে।
-  if (purchaseAlreadyFired(orderId)) {
+  const eventId = `purchase-${orderId}`;
+  // Idempotency: guard on both event_id and orderId so component remounts,
+  // StrictMode double renders, revisits to /order-success, and rapid double-
+  // clicks all no-op after the first successful call.
+  // বাংলা: একই event_id / orderId-এর জন্য Purchase একবারই fire করবে।
+  if (purchaseAlreadyFired(eventId, orderId)) {
     if (typeof console !== "undefined") {
-      console.info("[tracking] Purchase already fired for order", orderId, "— skipping duplicate");
+      console.info("[tracking] Purchase already fired for", eventId, "— skipping duplicate");
     }
     return;
   }
-  markPurchaseFired(orderId);
+  markPurchaseFired(eventId, orderId);
 
   const gaItems = items.map(i => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity }));
 
   fanout({
     event: "purchase",
-    event_id: `purchase-${orderId}`,
+    event_id: eventId,
     user_data: userData,
     ecommerce: { transaction_id: orderId, currency: "BDT", value: total, items: gaItems },
     fb: { name: "Purchase", params: {
