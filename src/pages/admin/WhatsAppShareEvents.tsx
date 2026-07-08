@@ -81,6 +81,21 @@ export default function WhatsAppShareEventsAdmin() {
     if (orderId) void load(orderId);
   }, [orderId, load]);
 
+  // Realtime — delivery_status flips arriving via whatsapp-webhook show up
+  // without the admin needing to refresh.
+  useEffect(() => {
+    if (!orderId) return;
+    const channel = supabase
+      .channel(`admin-wa-events-${orderId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "whatsapp_share_events", filter: `order_id=eq.${orderId}` },
+        () => { void load(orderId); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [orderId, load]);
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setParams(orderId ? { order: orderId } : {});
