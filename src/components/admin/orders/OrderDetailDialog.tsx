@@ -319,6 +319,8 @@ const OrderDetailDialog = ({
                     variant="outline"
                     onClick={handleAdminRetryWa}
                     disabled={waRetrying}
+                    data-testid="admin-wa-retry"
+                    aria-busy={waRetrying}
                     className="gap-1.5 h-7 text-xs"
                   >
                     <RefreshCw className={`w-3 h-3 ${waRetrying ? "animate-spin" : ""}`} />
