@@ -161,19 +161,16 @@ const ProductCard = ({
             gridView ? "aspect-[3/4] mb-3 md:mb-4" : "w-28 h-28 md:w-48 md:h-48 flex-shrink-0"
           }`}
         >
-          {/* Lazy-loaded product image. decoding="async" offloads to a worker thread. */}
-          <img
-            src={getProductImage(product)}
-            /*
-             * Alt text includes the Bengali category name for SEO in Bengali search.
-             * Pattern: "{product name} — {বাংলা category} দুবাই বোরকা হাউস"
-             * "দুবাই বোরকা হাউস" = "Dubai Borka House" — brand name in Bengali
-             */
-            alt={`${product.name} — ${categoryBnName} দুবাই বোরকা হাউস`}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-            decoding="async"
-          />
+          {/* Clicking the image opens the Product Detail Page (which has full zoom viewer + gallery) */}
+          <Link to={productUrl} aria-label={`View ${product.name}`} className="block w-full h-full">
+            <img
+              src={getProductImage(product)}
+              alt={`${product.name} — ${categoryBnName} দুবাই বোরকা হাউস`}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-zoom-in"
+              loading="lazy"
+              decoding="async"
+            />
+          </Link>
 
           {/* Sale badge — only rendered when sale_price exists (conditional rendering) */}
           {product.sale_price && (

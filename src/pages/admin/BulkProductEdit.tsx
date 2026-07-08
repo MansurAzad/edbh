@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -95,6 +96,16 @@ const BulkProductEdit = () => {
   const [dryRunOpen, setDryRunOpen] = useState(false);
   const [aiRunning, setAiRunning] = useState(false);
   const [aiFields, setAiFields] = useState<{ title: boolean; description: boolean }>({ title: true, description: true });
+  const [aiProgress, setAiProgress] = useState<{ done: number; total: number; ok: number; fail: number }>({ done: 0, total: 0, ok: 0, fail: 0 });
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiResults, setAiResults] = useState<Array<{
+    id: string; productName: string;
+    beforeName: string; afterName?: string;
+    beforeDesc: string; afterDesc?: string;
+    titleValid: boolean; titleWarnings: string[];
+    error?: string;
+  }>>([]);
+  const [aiRateLimited, setAiRateLimited] = useState(false);
 
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkStock, setBulkStock] = useState("");
@@ -302,36 +313,101 @@ const BulkProductEdit = () => {
     toast.info("সব pending পরিবর্তন বাতিল করা হলো");
   };
 
-  const runAiEnrich = async () => {
-    if (selected.size === 0) { toast.error("প্রোডাক্ট সিলেক্ট করুন"); return; }
+  // Title format validator: expects "[Origin] [Fabric...] [Type] – [Color] [– Set/Part]?"
+  const validateAiTitle = (title: string): { valid: boolean; warnings: string[] } => {
+    const w: string[] = [];
+    if (!title) return { valid: false, warnings: ["empty"] };
+    if (title.length < 40) w.push(`too short (${title.length})`);
+    if (title.length > 100) w.push(`too long (${title.length})`);
+    if (!/(Dubai|Imported|Premium)/i.test(title)) w.push("origin missing");
+    if (!/(Nida|Chiffon|Barbie|Georgette|Crepe|Organza|Silk|Fabric)/i.test(title)) w.push("fabric missing");
+    if (!/(Abaya|Borka|Farasha|Kaftan|Hijab)/i.test(title)) w.push("product type missing");
+    if (!/–|-/.test(title)) w.push("no separator (–)");
+    if (/dubai collection$/i.test(title.trim())) w.push('remove "Dubai Collection" suffix');
+    return { valid: w.length === 0, warnings: w };
+  };
+
+  const runAiEnrichBatch = async (ids: string[]) => {
+    if (ids.length === 0) { toast.error("প্রোডাক্ট সিলেক্ট করুন"); return; }
     if (!aiFields.title && !aiFields.description) { toast.error("অন্তত title বা description বেছে নিন"); return; }
-    if (selected.size > 50) { toast.error("এক বারে সর্বোচ্চ ৫০টি প্রোডাক্ট"); return; }
+    if (ids.length > 50) { toast.error("এক বারে সর্বোচ্চ ৫০টি প্রোডাক্ট"); return; }
 
     setAiRunning(true);
+    setAiRateLimited(false);
+    setAiProgress({ done: 0, total: ids.length, ok: 0, fail: 0 });
+    setAiResults([]);
+    setAiPanelOpen(true);
+
     const fields = [aiFields.title && "title", aiFields.description && "description"].filter(Boolean) as string[];
-    try {
-      const { data, error } = await supabase.functions.invoke("enrich-product", {
-        body: { productIds: Array.from(selected), fields, dryRun: true },
-      });
-      if (error) throw error;
-      const results = (data?.results || []) as Array<{ id: string; title?: string; description?: string; error?: string }>;
-      let ok = 0, fail = 0;
-      results.forEach(r => {
-        if (r.error) { fail++; return; }
-        const patch: EditPatch = {};
-        if (aiFields.title && r.title) patch.name = r.title;
-        if (aiFields.description && r.description) patch.description = r.description;
-        if (Object.keys(patch).length) {
-          setEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], ...patch } }));
-          ok++;
+    const CHUNK = 5;
+    const collected: typeof aiResults = [];
+
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunkIds = ids.slice(i, i + CHUNK);
+      try {
+        const { data, error } = await supabase.functions.invoke("enrich-product", {
+          body: { productIds: chunkIds, fields, dryRun: true },
+        });
+        if (error) {
+          const msg = String(error.message || error);
+          if (/429|rate limit/i.test(msg)) setAiRateLimited(true);
+          if (/402|credit/i.test(msg)) toast.error("AI credits শেষ — Workspace billing-এ credits যোগ করুন");
+          throw new Error(msg);
         }
-      });
-      toast.success(`AI-জেনারেটেড: ${ok}টি সফল, ${fail}টি ব্যর্থ — Dry-run দেখুন তারপর Save`);
-    } catch (e: any) {
-      toast.error(`AI ব্যর্থ: ${e?.message || "unknown"}`);
-    } finally {
-      setAiRunning(false);
+        const results = (data?.results || []) as Array<{ id: string; title?: string; description?: string; error?: string }>;
+        for (const r of results) {
+          const orig = productMap.get(r.id);
+          const beforeName = orig?.name || "";
+          const beforeDesc = orig?.description || "";
+          if (r.error) {
+            collected.push({
+              id: r.id, productName: beforeName, beforeName, beforeDesc,
+              titleValid: false, titleWarnings: [], error: r.error,
+            });
+            setAiProgress(p => ({ ...p, done: p.done + 1, fail: p.fail + 1 }));
+            continue;
+          }
+          const validation = r.title ? validateAiTitle(r.title) : { valid: true, warnings: [] };
+          const patch: EditPatch = {};
+          if (aiFields.title && r.title) patch.name = r.title;
+          if (aiFields.description && r.description) patch.description = r.description;
+          if (Object.keys(patch).length) {
+            setEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], ...patch } }));
+          }
+          collected.push({
+            id: r.id, productName: beforeName, beforeName, beforeDesc,
+            afterName: r.title, afterDesc: r.description,
+            titleValid: validation.valid, titleWarnings: validation.warnings,
+          });
+          setAiProgress(p => ({ ...p, done: p.done + 1, ok: p.ok + 1 }));
+        }
+      } catch (e: any) {
+        // Mark all items in this chunk as failed
+        for (const id of chunkIds) {
+          const orig = productMap.get(id);
+          collected.push({
+            id, productName: orig?.name || id, beforeName: orig?.name || "", beforeDesc: orig?.description || "",
+            titleValid: false, titleWarnings: [], error: e?.message || "unknown",
+          });
+          setAiProgress(p => ({ ...p, done: p.done + 1, fail: p.fail + 1 }));
+        }
+      }
+      setAiResults([...collected]);
+      // Gentle spacing between chunks to reduce rate-limit risk
+      if (i + CHUNK < ids.length) await new Promise(r => setTimeout(r, 400));
     }
+
+    setAiRunning(false);
+    const okCount = collected.filter(r => !r.error).length;
+    const failCount = collected.filter(r => !!r.error).length;
+    toast.success(`AI-জেনারেটেড: ${okCount} সফল, ${failCount} ব্যর্থ — নিচের প্যানেলে দেখুন`);
+  };
+
+  const runAiEnrich = () => runAiEnrichBatch(Array.from(selected));
+  const retryFailed = () => {
+    const failedIds = aiResults.filter(r => !!r.error).map(r => r.id);
+    if (failedIds.length === 0) { toast.info("Retry করার কিছু নেই"); return; }
+    runAiEnrichBatch(failedIds);
   };
 
   const editCount = Object.keys(edits).length;
@@ -463,10 +539,28 @@ const BulkProductEdit = () => {
                     Description regenerate
                   </label>
                 </div>
-                <Button onClick={runAiEnrich} disabled={selected.size === 0 || aiRunning || (!aiFields.title && !aiFields.description)}>
-                  {aiRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
-                  {aiRunning ? "Generating…" : `Generate for ${selected.size} selected`}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={runAiEnrich} disabled={selected.size === 0 || aiRunning || (!aiFields.title && !aiFields.description)}>
+                    {aiRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
+                    {aiRunning ? "Generating…" : `Generate for ${selected.size} selected`}
+                  </Button>
+                  {aiResults.length > 0 && (
+                    <Button variant="outline" onClick={() => setAiPanelOpen(true)}>
+                      Show last results ({aiResults.length})
+                    </Button>
+                  )}
+                </div>
+
+                {(aiRunning || aiProgress.total > 0) && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Progress: {aiProgress.done}/{aiProgress.total} · ✓ {aiProgress.ok} · ✗ {aiProgress.fail}</span>
+                      {aiRateLimited && <span className="text-destructive font-medium">Rate limit hit — slowing down</span>}
+                    </div>
+                    <Progress value={aiProgress.total ? (aiProgress.done / aiProgress.total) * 100 : 0} className="h-2" />
+                  </div>
+                )}
+
                 {selected.size > 50 && (
                   <p className="text-xs text-destructive">এক বারে সর্বোচ্চ ৫০টি — কম সিলেক্ট করুন।</p>
                 )}
@@ -642,6 +736,95 @@ const BulkProductEdit = () => {
             <Button onClick={handleBulkSave} disabled={saving || diffRows.length === 0 || spamCount > 0}>
               <Save className="w-4 h-4 mr-2" />
               {saving ? "সেভ হচ্ছে..." : `Confirm & Save ${diffRows.length} change${diffRows.length !== 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Enrich Results Panel */}
+      <Dialog open={aiPanelOpen} onOpenChange={setAiPanelOpen}>
+        <DialogContent className="max-w-5xl max-h-[88vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              <Bot className="w-4 h-4" /> AI Enrich Results
+              <Badge variant="secondary">✓ {aiProgress.ok}</Badge>
+              {aiProgress.fail > 0 && <Badge variant="destructive">✗ {aiProgress.fail}</Badge>}
+              {aiRunning && <Badge variant="outline" className="animate-pulse">Running…</Badge>}
+            </DialogTitle>
+          </DialogHeader>
+
+          {aiRateLimited && (
+            <Alert variant="destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertDescription>
+                AI Gateway rate limit (429) — কিছু chunk ব্যর্থ হয়েছে। কিছুক্ষণ পর <b>Retry Failed</b> চাপুন।
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {(aiRunning || aiProgress.total > 0) && (
+            <div className="space-y-1 py-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{aiProgress.done}/{aiProgress.total} processed</span>
+                <span>{aiProgress.total ? Math.round((aiProgress.done / aiProgress.total) * 100) : 0}%</span>
+              </div>
+              <Progress value={aiProgress.total ? (aiProgress.done / aiProgress.total) * 100 : 0} className="h-2" />
+            </div>
+          )}
+
+          <div className="overflow-auto flex-1 space-y-3">
+            {aiResults.length === 0 && !aiRunning && (
+              <p className="text-center text-muted-foreground py-6 text-sm">এখনো কোনো result নেই।</p>
+            )}
+            {aiResults.map((r) => (
+              <div
+                key={r.id}
+                className={`border rounded-lg p-3 ${
+                  r.error ? "border-destructive/50 bg-destructive/5" :
+                  r.titleValid ? "border-border" : "border-yellow-500/40 bg-yellow-500/5"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                  <div className="text-xs font-mono text-muted-foreground truncate max-w-[60%]">{r.productName}</div>
+                  <div className="flex gap-1 flex-wrap">
+                    {r.error ? (
+                      <Badge variant="destructive" className="text-[10px]">ERROR: {r.error.slice(0, 50)}</Badge>
+                    ) : r.titleValid ? (
+                      <Badge variant="secondary" className="text-[10px]">Title valid ✓</Badge>
+                    ) : (
+                      r.titleWarnings.map((w, i) => (
+                        <Badge key={i} variant="outline" className="text-[10px] border-yellow-500/50">{w}</Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
+                {!r.error && (
+                  <div className="grid md:grid-cols-2 gap-3 text-xs">
+                    <div className="space-y-2">
+                      <div className="text-muted-foreground uppercase text-[10px]">Before</div>
+                      <div className="font-medium line-through text-muted-foreground">{r.beforeName || "—"}</div>
+                      <div className="whitespace-pre-wrap text-muted-foreground line-clamp-4">{r.beforeDesc || "—"}</div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-primary uppercase text-[10px]">After (staged in edits)</div>
+                      <div className="font-medium">{r.afterName || <span className="text-muted-foreground">(unchanged)</span>}</div>
+                      <div className="whitespace-pre-wrap line-clamp-6">{r.afterDesc || <span className="text-muted-foreground">(unchanged)</span>}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="flex-wrap gap-2">
+            {aiProgress.fail > 0 && (
+              <Button variant="outline" onClick={retryFailed} disabled={aiRunning}>
+                <RotateCcw className="w-4 h-4 mr-2" /> Retry {aiProgress.fail} failed
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setAiPanelOpen(false)}>Close</Button>
+            <Button onClick={() => { setAiPanelOpen(false); setDryRunOpen(true); }} disabled={editCount === 0}>
+              <Eye className="w-4 h-4 mr-2" /> Open Dry-run & Save ({editCount})
             </Button>
           </DialogFooter>
         </DialogContent>

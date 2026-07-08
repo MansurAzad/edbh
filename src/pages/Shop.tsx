@@ -124,10 +124,11 @@ const Shop = () => {
     gcTime: 10 * 60 * 1000,
   });
 
-  const allProducts = useMemo(
-    () => productPages?.pages.flatMap((p) => p.products) || [],
-    [productPages]
-  );
+  const allProducts = useMemo(() => {
+    const seen = new Set<string>();
+    const flat = productPages?.pages.flatMap((p) => p.products) || [];
+    return flat.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+  }, [productPages]);
   const totalCount = productPages?.pages[0]?.totalCount ?? 0;
 
   // Infinite scroll observer
