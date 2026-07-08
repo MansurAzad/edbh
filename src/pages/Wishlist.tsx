@@ -55,7 +55,7 @@ const Wishlist = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead title="আমার উইশলিস্ট" noIndex />
+      <SEOHead title="My Wishlist – Saved Abaya & Borka Items" noIndex canonical="/wishlist" />
       <Header />
       <Breadcrumbs />
       <main className="pt-4 pb-20">

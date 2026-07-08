@@ -190,15 +190,24 @@ const Shop = () => {
   };
 
   const catBn = getCategoryBnName(selectedCategory);
-  const seoTitle = selectedCategory === "All"
-    ? "বোরকা, আবায়া ও হিজাব কিনুন"
-    : `${catBn} কিনুন — সেরা দাম`;
-  const seoDescription = selectedCategory === "All"
-    ? "দুবাই বোরকা হাউসের প্রিমিয়াম আবায়া, বোরকা, হিজাব, কাফতান ও ফেব্রিক কালেকশন। দুবাই থেকে সরাসরি আমদানি। সেরা দামে অনলাইনে কিনুন।"
-    : `${catBn} অনলাইনে কিনুন — দুবাই বোরকা হাউস। দুবাই ইম্পোর্ট, প্রিমিয়াম কোয়ালিটি, সেরা দাম।`;
-  const seoKeywords = selectedCategory === "All"
-    ? "বোরকা দাম, আবায়া অনলাইন, হিজাব কিনুন, কাফতান দাম, ফেব্রিক বাংলাদেশ, dubai borka, abaya price bd, hijab online shop"
-    : `${catBn} দাম, ${catBn} অনলাইন, ${selectedCategory} price bangladesh, buy ${selectedCategory.toLowerCase()} online bd`;
+  const catEn = selectedCategory;
+  // Per-category unique titles to prevent SERP duplicates.
+  const categoryTitleMap: Record<string, { title: string; desc: string; kw: string }> = {
+    Abaya:   { title: "Dubai Imported Abaya Collection in Bangladesh",              desc: "Premium Dubai imported abaya collection — embroidery, karchupi, stone work. Cash on Delivery সারা বাংলাদেশে।",           kw: "dubai imported abaya, abaya collection bangladesh, karchupi abaya, embroidery abaya bd" },
+    Borka:   { title: "Premium Dubai Borka Collection – Cash on Delivery in Bangladesh", desc: "প্রিমিয়াম দুবাই বোরকা কালেকশন — ম্যাচিং হিজাবসহ, সেরা দামে, Cash on Delivery বাংলাদেশে।",                          kw: "dubai borka collection, premium borka bangladesh, borka cash on delivery, বোরকা কালেকশন" },
+    Hijab:   { title: "Premium Hijab & Scarf Collection Bangladesh",                  desc: "দুবাই ইম্পোর্টেড হিজাব ও স্কার্ফ — সিল্ক, শিফন, জর্জেট। সেরা দাম, ফ্রি হোম ডেলিভারি।",                          kw: "hijab bangladesh, silk hijab bd, chiffon hijab, dubai hijab collection" },
+    Kaftan:  { title: "Dubai Kaftan & Party Wear Collection Bangladesh",              desc: "প্রিমিয়াম দুবাই কাফতান ও পার্টি ওয়্যার — স্টোন, বিডস, এমব্রয়ডারি ডিটেইল।",                                       kw: "dubai kaftan bangladesh, kaftan party wear, stone work kaftan" },
+  };
+  const isAll = selectedCategory === "All";
+  const seoTitle = isAll
+    ? "Shop – Dubai Imported Abaya, Borka & Hijab Collection Bangladesh"
+    : (categoryTitleMap[catEn]?.title || `${catEn} Collection – Dubai Borka House`);
+  const seoDescription = isAll
+    ? "Dubai Borka House shop — সবচেয়ে বড় দুবাই ইম্পোর্টেড আবায়া, বোরকা, হিজাব ও কাফতান কালেকশন। Cash on Delivery, সারা বাংলাদেশে।"
+    : (categoryTitleMap[catEn]?.desc || `${catBn} অনলাইনে কিনুন — Dubai Borka House।`);
+  const seoKeywords = isAll
+    ? "shop dubai borka house, abaya borka hijab collection bd, dubai imported islamic fashion"
+    : (categoryTitleMap[catEn]?.kw || `${catEn} bangladesh, buy ${catEn.toLowerCase()} online`);
 
   const collectionSchema = {
     "@context": "https://schema.org",

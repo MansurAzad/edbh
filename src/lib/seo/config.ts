@@ -95,12 +95,17 @@ export function buildProductSeo(p: ProductSeoInput): SeoMeta {
     typeof effectivePrice === "number" ? `৳${effectivePrice.toLocaleString()}` : "";
   const cat = p.category?.trim() || "ইসলামিক ফ্যাশন";
 
+  // Unique per-product title: "<name> – <category> – ৳price"
+  // Prevents SERP-duplicate titles across the catalog.
+  const titleParts = [p.name, cat, priceLabel].filter(Boolean);
+  const uniqueTitle = titleParts.join(" – ");
+
   const fallbackDesc = `${p.name} কিনুন দুবাই বোরকা হাউস থেকে — প্রিমিয়াম ${cat}${
     priceLabel ? `, মূল্য ${priceLabel}` : ""
   }। সারা বাংলাদেশে ক্যাশ অন ডেলিভারি।`;
 
   return {
-    title: clamp(p.name, TITLE_MAX),
+    title: clamp(uniqueTitle, TITLE_MAX),
     description: clamp(p.description?.trim() || fallbackDesc, DESCRIPTION_MAX),
     canonical: `/product/${p.slug || p.id}`,
     ogImage: absoluteUrl(p.image),
@@ -143,14 +148,14 @@ export function buildBlogPostSeo(post: BlogPostSeoInput): SeoMeta {
 /** SEO metadata for the blog index/listing page (/blog). */
 export function buildBlogListSeo(): SeoMeta {
   return {
-    title: "ব্লগ — ফ্যাশন টিপস ও স্টাইলিং গাইড",
+    title: "Abaya, Borka & Hijab Style Guide Bangladesh",
     description:
-      "দুবাই বোরকা হাউস ব্লগ — ইসলামিক ফ্যাশন ট্রেন্ড, বোরকা স্টাইলিং টিপস, আবায়া কেনার গাইড ও আরো অনেক কিছু।",
+      "দুবাই বোরকা হাউস ব্লগ — আবায়া, বোরকা, হিজাব ও কাফতান স্টাইলিং গাইড, ট্রেন্ড ও কেনার টিপস বাংলাদেশে।",
     canonical: "/blog",
     ogImage: DEFAULT_OG_IMAGE,
     ogType: "website",
     keywords:
-      "বোরকা স্টাইলিং, আবায়া ফ্যাশন টিপস, হিজাব স্টাইল গাইড, ইসলামিক ফ্যাশন ব্লগ, borka styling tips, abaya fashion blog",
+      "abaya style guide bangladesh, borka styling tips, hijab style guide, islamic fashion blog bd, দুবাই বোরকা হাউস ব্লগ",
   };
 }
 

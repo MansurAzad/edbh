@@ -8,6 +8,8 @@ interface SEOHeadProps {
   ogType?: string;
   noIndex?: boolean;
   keywords?: string;
+  /** If true, use `title` as-is without appending " | Dubai Borka House". */
+  fullTitle?: boolean;
 }
 
 const SITE_NAME = "Dubai Borka House";
@@ -22,12 +24,17 @@ const SEOHead = ({
   ogType = "website",
   noIndex = false,
   keywords,
+  fullTitle = false,
 }: SEOHeadProps) => {
-  const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} - প্রিমিয়াম ইসলামিক ফ্যাশন`;
+  const fullTitleStr = !title
+    ? `${SITE_NAME} – Premium Dubai Imported Borka, Abaya & Hijab in Bangladesh`
+    : fullTitle
+      ? title
+      : `${title} | ${SITE_NAME}`;
   const canonicalUrl = canonical ? `${BASE_URL}${canonical}` : undefined;
 
   useEffect(() => {
-    document.title = fullTitle;
+    document.title = fullTitleStr;
 
     const setMeta = (name: string, content: string, attr = "name") => {
       let el = document.querySelector(`meta[${attr}="${name}"]`) as HTMLMetaElement;
@@ -41,12 +48,12 @@ const SEOHead = ({
 
     setMeta("description", description);
     if (keywords) setMeta("keywords", keywords);
-    setMeta("og:title", fullTitle, "property");
+    setMeta("og:title", fullTitleStr, "property");
     setMeta("og:description", description, "property");
     setMeta("og:type", ogType, "property");
     setMeta("og:image", ogImage, "property");
     if (canonicalUrl) setMeta("og:url", canonicalUrl, "property");
-    setMeta("twitter:title", fullTitle, "name");
+    setMeta("twitter:title", fullTitleStr, "name");
     setMeta("twitter:description", description, "name");
 
     if (noIndex) {
@@ -72,7 +79,7 @@ const SEOHead = ({
     return () => {
       document.title = `${SITE_NAME} - প্রিমিয়াম ইসলামিক ফ্যাশন`;
     };
-  }, [fullTitle, description, canonicalUrl, ogImage, ogType, noIndex, keywords]);
+  }, [fullTitleStr, description, canonicalUrl, ogImage, ogType, noIndex, keywords]);
 
   return null;
 };
