@@ -32,6 +32,7 @@ import {
   validateCheckoutFields,
   type CheckoutFieldErrors,
 } from "@/lib/checkout/validation";
+import { createSubmitGuard } from "@/lib/checkout/submitGuard";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
