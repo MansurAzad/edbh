@@ -280,21 +280,28 @@ async function renderBlogPost(slug: string): Promise<Response> {
   <div>${(post.content || "").toString()}</div>
 </article>`;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    headline: post.title,
-    description,
-    image: absoluteImage(post.featured_image),
-    url: canonical,
-    datePublished: post.created_at,
-    dateModified: post.updated_at,
-    publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.jpg` } },
-    mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
-  };
+  const jsonLd: Array<Record<string, unknown>> = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: post.title,
+      description,
+      image: absoluteImage(post.featured_image),
+      url: canonical,
+      datePublished: post.created_at,
+      dateModified: post.updated_at,
+      publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.jpg` } },
+      mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
+    },
+    breadcrumbSchema([
+      { name: "Home", url: `${SITE_URL}/` },
+      { name: "Blog", url: `${SITE_URL}/blog` },
+      { name: post.title, url: canonical },
+    ]),
+  ];
 
   return new Response(
-    shell({ title, description, canonical, ogImage: absoluteImage(post.featured_image), body, jsonLd }),
+    shell({ title, description, canonical, ogImage: absoluteImage(post.featured_image), body, jsonLd, ogType: "article" }),
     { headers: htmlHeaders("public, max-age=600, s-maxage=3600") },
   );
 }
