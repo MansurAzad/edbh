@@ -50,6 +50,11 @@ export default function WhatsAppSettingsCard() {
   const [verifyToken, setVerifyToken] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<
+    { ok: true; latencyMs: number } | { ok: false; error: string } | null
+  >(null);
 
   useEffect(() => {
     (async () => {
