@@ -342,12 +342,24 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
                     }`}
                   >
                     <div className="flex items-center gap-2 font-medium">
-                      <MessageCircle className="w-4 h-4" />
+                      {shareStatus === "sharing" ? (
+                        <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
+                      ) : (
+                        <MessageCircle className="w-4 h-4" />
+                      )}
                       {shareStatus === "sharing" && "WhatsApp রিসিট শেয়ার হচ্ছে..."}
                       {shareStatus === "opened" && "WhatsApp রিসিট শেয়ার হয়েছে ✅"}
                       {shareStatus === "blocked" && "WhatsApp popup ব্লক হয়েছে"}
                       {shareStatus === "failed" && "WhatsApp শেয়ার ব্যর্থ হয়েছে"}
                     </div>
+                    {(shareStatus === "blocked" || shareStatus === "failed") && shareError && (
+                      <p
+                        data-testid="wa-share-error"
+                        className="mt-1 text-xs text-destructive/90 break-words"
+                      >
+                        কারণ: {shareError}
+                      </p>
+                    )}
                     {(shareStatus === "blocked" || shareStatus === "failed") && (
                       <Button
                         type="button"
@@ -357,7 +369,10 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
                         onClick={handleReshare}
                         disabled={reshareLoading}
                         data-testid="wa-reshare"
+                        aria-busy={reshareLoading}
                       >
+                        {reshareLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden />}
+
                         {reshareLoading ? "চেষ্টা করা হচ্ছে..." : "আবার WhatsApp-এ শেয়ার করুন"}
                       </Button>
                     )}
