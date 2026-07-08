@@ -282,6 +282,23 @@ export default function SecurityCenter() {
     onError: (e: any) => toast.error(`Scan failed: ${e.message ?? e}`),
   });
 
+  const cancelScan = useMutation({
+    mutationFn: async (reportId: string) => {
+      await logAudit("cancel_scan", "action", { report_id: reportId });
+      const { error } = await supabase
+        .from("security_scan_reports")
+        .update({ cancel_requested: true, last_message: "Cancel requested by admin" })
+        .eq("id", reportId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Cancel requested — scan will stop at the next checkpoint.");
+      qc.invalidateQueries({ queryKey: ["security-scan-reports"] });
+      qc.invalidateQueries({ queryKey: ["security-audit-log"] });
+    },
+    onError: (e: any) => toast.error(`Cancel failed: ${e.message}`),
+  });
+
   const runCleanup = useMutation({
     mutationFn: async () => {
       await logAudit("run_cleanup", "action", {});
