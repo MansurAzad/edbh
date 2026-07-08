@@ -65,6 +65,7 @@ async function logAudit(action: string, category: string, metadata: Record<strin
 type ScanReport = {
   id: string; created_at: string; updated_at?: string; triggered_by: string;
   status?: string; progress?: number; error?: string | null;
+  cancel_requested?: boolean; last_message?: string | null;
   total_findings: number; critical_count: number; duration_ms: number | null;
   findings: any;
 };
@@ -84,11 +85,18 @@ export default function SecurityCenter() {
       if (error) throw error;
       return data as ScanReport[];
     },
-    refetchInterval: (q) => {
-      const rows = (q.state.data as ScanReport[] | undefined) ?? [];
-      return rows.some(r => r.status === "running" || r.status === "queued") ? 2000 : false;
-    },
   });
+
+  // Realtime: update cache on scan-report changes instead of polling.
+  useEffect(() => {
+    const ch = supabase
+      .channel("security_scan_reports_rt")
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "security_scan_reports" },
+        () => { qc.invalidateQueries({ queryKey: ["security-scan-reports"] }); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
   const [scanQuery, setScanQuery] = useState("");
   const [scanSeverity, setScanSeverity] = useState<string>("all");
   const [scanStatus, setScanStatus] = useState<string>("all");
@@ -275,6 +283,23 @@ export default function SecurityCenter() {
     onError: (e: any) => toast.error(`Scan failed: ${e.message ?? e}`),
   });
 
+  const cancelScan = useMutation({
+    mutationFn: async (reportId: string) => {
+      await logAudit("cancel_scan", "action", { report_id: reportId });
+      const { error } = await supabase
+        .from("security_scan_reports")
+        .update({ cancel_requested: true, last_message: "Cancel requested by admin" })
+        .eq("id", reportId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Cancel requested — scan will stop at the next checkpoint.");
+      qc.invalidateQueries({ queryKey: ["security-scan-reports"] });
+      qc.invalidateQueries({ queryKey: ["security-audit-log"] });
+    },
+    onError: (e: any) => toast.error(`Cancel failed: ${e.message}`),
+  });
+
   const runCleanup = useMutation({
     mutationFn: async () => {
       await logAudit("run_cleanup", "action", {});
@@ -362,17 +387,26 @@ export default function SecurityCenter() {
         {/* Live scan status */}
         {running && (
           <Card className="border-primary/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary animate-pulse" />
-                Scan in progress · {running.status}
-              </CardTitle>
-              <CardDescription>Started {new Date(running.created_at).toLocaleTimeString()} · trigger: {running.triggered_by}</CardDescription>
+            <CardHeader className="pb-2 flex flex-row items-start justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary animate-pulse" />
+                  Scan in progress · {running.status}
+                </CardTitle>
+                <CardDescription>Started {new Date(running.created_at).toLocaleTimeString()} · trigger: {running.triggered_by}</CardDescription>
+              </div>
+              <Button size="sm" variant="destructive"
+                onClick={() => cancelScan.mutate(running.id)}
+                disabled={cancelScan.isPending || running.cancel_requested}>
+                <XCircle className="mr-2 h-3 w-3" />
+                {running.cancel_requested ? "Canceling…" : "Cancel scan"}
+              </Button>
             </CardHeader>
             <CardContent>
               <Progress value={running.progress ?? 0} />
               <p className="mt-2 text-xs text-muted-foreground">
                 {running.progress ?? 0}% · {running.total_findings ?? 0} findings so far ({running.critical_count ?? 0} critical)
+                {running.last_message ? ` · ${running.last_message}` : ""}
               </p>
             </CardContent>
           </Card>
@@ -962,9 +996,46 @@ function ScheduleEditor({ draft, setDraft, onSave, saving }: any) {
           </Select>
         </div>
 
+        <div>
+          <Label>Timezone</Label>
+          <Select value={schedule.timezone ?? "UTC"} onValueChange={(v) => setSchedule({ timezone: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent className="max-h-64">
+              {["UTC","Asia/Dhaka","Asia/Kolkata","Asia/Dubai","Asia/Singapore","Asia/Tokyo","Europe/London","Europe/Berlin","America/New_York","America/Los_Angeles","Australia/Sydney"].map(z => (
+                <SelectItem key={z} value={z}>{z}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground mt-1">Weekdays and start time are interpreted in this zone.</p>
+        </div>
+
+        <div>
+          <Label>Weekdays</Label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d, i) => {
+              const wds: number[] = Array.isArray(schedule.weekdays) ? schedule.weekdays : [0,1,2,3,4,5,6];
+              const on = wds.includes(i);
+              return (
+                <button key={d} type="button"
+                  onClick={() => setSchedule({ weekdays: on ? wds.filter(x => x !== i) : [...wds, i].sort() })}
+                  className={`px-3 py-1 rounded border text-xs ${on ? "bg-primary text-primary-foreground" : "bg-background"}`}>
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <Label>Start time of day</Label>
+          <Input type="time" value={schedule.start_time_of_day ?? "03:00"}
+            onChange={(e) => setSchedule({ start_time_of_day: e.target.value })} className="w-40" />
+          <p className="text-[11px] text-muted-foreground mt-1">Scans won't start before this local time on eligible weekdays.</p>
+        </div>
+
         <div className="rounded border p-3 text-xs text-muted-foreground">
           Last scheduled run: <b>{schedule.last_run_at ? new Date(schedule.last_run_at).toLocaleString() : "—"}</b><br />
-          Scheduler polls hourly at :00 UTC.
+          Scheduler polls hourly at :00 UTC and evaluates timezone/weekday/start-time gates.
         </div>
 
         <div className="flex justify-end">

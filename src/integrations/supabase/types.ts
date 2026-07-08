@@ -1663,12 +1663,14 @@ export type Database = {
       }
       security_scan_reports: {
         Row: {
+          cancel_requested: boolean
           created_at: string
           critical_count: number
           duration_ms: number | null
           error: string | null
           findings: Json
           id: string
+          last_message: string | null
           progress: number
           status: string
           total_findings: number
@@ -1677,12 +1679,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancel_requested?: boolean
           created_at?: string
           critical_count?: number
           duration_ms?: number | null
           error?: string | null
           findings?: Json
           id?: string
+          last_message?: string | null
           progress?: number
           status?: string
           total_findings?: number
@@ -1691,12 +1695,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancel_requested?: boolean
           created_at?: string
           critical_count?: number
           duration_ms?: number | null
           error?: string | null
           findings?: Json
           id?: string
+          last_message?: string | null
           progress?: number
           status?: string
           total_findings?: number
