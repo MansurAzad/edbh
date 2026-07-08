@@ -1661,6 +1661,39 @@ export type Database = {
         }
         Relationships: []
       }
+      security_scan_settings: {
+        Row: {
+          alerts: Json
+          csp_retention_days: number
+          environment: string
+          id: string
+          rules: Json
+          scan_retention_days: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          alerts?: Json
+          csp_retention_days?: number
+          environment?: string
+          id?: string
+          rules?: Json
+          scan_retention_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          alerts?: Json
+          csp_retention_days?: number
+          environment?: string
+          id?: string
+          rules?: Json
+          scan_retention_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       site_content: {
         Row: {
           content: string | null
@@ -1836,6 +1869,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_security_data: {
+        Args: never
+        Returns: {
+          block_deleted: number
+          csp_deleted: number
+          scan_deleted: number
+        }[]
+      }
       detect_injection: { Args: { input: string }; Returns: string }
       get_active_ai_provider: {
         Args: { _scope: string }
