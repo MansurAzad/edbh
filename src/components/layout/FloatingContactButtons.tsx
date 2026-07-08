@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Phone, MessageCircle, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { trackContact } from "@/lib/tracking";
 
 const PHONE = "+8801845853634";
 const WHATSAPP_URL = `https://wa.me/8801845853634`;
