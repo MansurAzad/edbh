@@ -361,18 +361,29 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
       const value = parseCsvField(values[index] || "");
       switch (header) {
         case "name": case "category": case "description": case "image_url": case "material":
-          product[header] = value; break;
+        case "sku": case "subcategory": case "fabric": case "work_type": case "part":
+        case "image_alt_text": case "meta_title": case "meta_description":
+          if (value) product[header] = value; break;
         case "price": case "sale_price":
           const num = parseFloat(value);
           if (!isNaN(num) && num > 0) product[header] = num;
           else if (header === "price") throw new Error("অবৈধ মূল্য");
           break;
         case "stock": product.stock = parseInt(value) || 0; break;
+        case "purchase_cost":
+          const pc = parseFloat(value);
+          if (!isNaN(pc)) product.purchase_cost = pc;
+          break;
         case "featured": product.featured = value.toLowerCase() === "true"; break;
+        case "hijab_included": product.hijab_included = value.toLowerCase() === "true"; break;
+        case "inner_included": product.inner_included = value.toLowerCase() === "true"; break;
         case "sizes": product.sizes = value ? value.split(";").map((s) => s.trim()).filter(Boolean) : []; break;
         case "colors": product.colors = value ? value.split(";").map((c) => c.trim()).filter(Boolean) : []; break;
       }
     });
+    // Back-compat: mirror fabric ↔ material if only one is provided.
+    if (product.fabric && !product.material) product.material = product.fabric;
+    if (product.material && !product.fabric) product.fabric = product.material;
     return product;
   };
 
