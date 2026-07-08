@@ -48,8 +48,11 @@ import {
 import { createSubmitGuard } from "@/lib/checkout/submitGuard";
 import {
   shareOrderToWhatsApp,
+  buildWhatsAppPayload,
   type OrderReceipt,
+  type WhatsAppPayload,
 } from "@/lib/checkout/whatsappShare";
+import WhatsAppSharePreview from "@/components/checkout/WhatsAppSharePreview";
 
 /** Fixed flat delivery charge (Bangladesh-wide) when no zone is picked. */
 const FLAT_SHIPPING = 150;
@@ -74,6 +77,12 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
   const [shareError, setShareError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<OrderReceipt | null>(null);
   const [reshareLoading, setReshareLoading] = useState(false);
+
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewPayload, setPreviewPayload] = useState<WhatsAppPayload | null>(null);
+  const [previewSending, setPreviewSending] = useState(false);
+  const pendingReceiptRef = useRef<OrderReceipt | null>(null);
+  const pendingIsRetryRef = useRef(false);
 
 
   // Simplified checkout state
