@@ -68,8 +68,9 @@ const Checkout = () => {
   const navigate = useNavigate();
 
   // Double-submit guard — synchronously blocks concurrent order attempts even
-  // before React re-renders with `processing = true`.
-  const submitLockRef = useRef(false);
+  // before React re-renders with `processing = true`. Backed by createSubmitGuard
+  // so the mechanism is covered by src/lib/checkout/__tests__/submitGuard.test.ts.
+  const submitGuardRef = useRef(createSubmitGuard());
 
   // Snapshot for the "Retry WhatsApp share" button on the success page.
   const lastReceiptRef = useRef<OrderReceipt | null>(null);
