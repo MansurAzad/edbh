@@ -1937,27 +1937,42 @@ export type Database = {
       whatsapp_share_events: {
         Row: {
           actor: string
+          attempt_variant: string | null
           created_at: string
+          delivery_status: string | null
+          delivery_updated_at: string | null
           error: string | null
           id: string
           order_id: string
+          payload_snapshot: Json | null
           status: string
+          wa_message_id: string | null
         }
         Insert: {
           actor?: string
+          attempt_variant?: string | null
           created_at?: string
+          delivery_status?: string | null
+          delivery_updated_at?: string | null
           error?: string | null
           id?: string
           order_id: string
+          payload_snapshot?: Json | null
           status: string
+          wa_message_id?: string | null
         }
         Update: {
           actor?: string
+          attempt_variant?: string | null
           created_at?: string
+          delivery_status?: string | null
+          delivery_updated_at?: string | null
           error?: string | null
           id?: string
           order_id?: string
+          payload_snapshot?: Json | null
           status?: string
+          wa_message_id?: string | null
         }
         Relationships: [
           {
