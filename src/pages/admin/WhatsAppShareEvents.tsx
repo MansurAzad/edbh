@@ -40,9 +40,18 @@ function fmt(iso: string) {
 }
 
 function statusColor(s: WhatsAppShareEvent["status"]) {
-  if (s === "opened" || s === "retried") return "text-green-600 bg-green-500/10";
+  if (s === "opened" || s === "retried" || s === "queued") return "text-green-600 bg-green-500/10";
   if (s === "blocked") return "text-amber-600 bg-amber-500/10";
   return "text-destructive bg-destructive/10";
+}
+
+function deliveryColor(s: string | null | undefined) {
+  if (!s) return "bg-muted text-muted-foreground";
+  if (s === "read") return "bg-emerald-500/10 text-emerald-700 font-semibold";
+  if (s === "delivered") return "bg-green-500/10 text-green-600";
+  if (s === "sent") return "bg-blue-500/10 text-blue-600";
+  if (s === "failed") return "bg-destructive/10 text-destructive";
+  return "bg-muted text-muted-foreground";
 }
 
 export default function WhatsAppShareEventsAdmin() {
