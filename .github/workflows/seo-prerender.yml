@@ -1,0 +1,45 @@
+name: SEO Prerender Smoke Test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  schedule:
+    # Run daily to catch regressions in the deployed edge function
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  prerender-smoke:
+    name: bot-prerender UA/path checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run prerender smoke test
+        id: smoke
+        run: node scripts/prerender-smoke-test.mjs | tee prerender-report.txt
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prerender-report-${{ github.run_id }}
+          path: prerender-report.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Failure summary
+        if: failure()
+        run: |
+          echo "## ❌ Prerender smoke test failed" >> $GITHUB_STEP_SUMMARY
+          echo "One or more UA/path combinations failed schema or meta-tag checks." >> $GITHUB_STEP_SUMMARY
+          echo "Download the \`prerender-report-${{ github.run_id }}\` artifact for details." >> $GITHUB_STEP_SUMMARY

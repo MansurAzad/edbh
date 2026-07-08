@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "perf:budget": "node scripts/check-bundle-budget.mjs"
+    "perf:budget": "node scripts/check-bundle-budget.mjs",
+    "seo:prerender-smoke": "node scripts/prerender-smoke-test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
