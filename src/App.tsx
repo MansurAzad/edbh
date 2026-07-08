@@ -176,6 +176,7 @@ const App = () => (
                     <Route path="/admin/sgtm-setup" element={<PermissionGuard><SgtmSetupGuide /></PermissionGuard>} />
                     <Route path="/admin/performance" element={<PermissionGuard><PerformanceBudget /></PermissionGuard>} />
                     <Route path="/admin/inventory-sync" element={<PermissionGuard><InventorySync /></PermissionGuard>} />
+                    <Route path="/admin/security" element={<PermissionGuard><SecurityCenter /></PermissionGuard>} />
 
                     <Route path="/return-policy" element={<ReturnPolicy />} />
                     <Route path="/faq" element={<FAQ />} />
