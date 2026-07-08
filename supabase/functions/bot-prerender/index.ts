@@ -284,6 +284,19 @@ function renderHome(): Response {
 }
 
 // ── entrypoint ─────────────────────────────────────────────────────────────
+// Wrap every response with a fresh Response that reuses the body + status but
+// hard-sets Content-Type. The Supabase edge gateway appears to keep whatever
+// text/plain default the runtime chose otherwise, even when the renderer
+// itself supplied text/html.
+function reheader(res: Response): Response {
+  const status = res.status;
+  const isHtml = status === 200; // renderers only emit 200 for HTML
+  const headers = new Headers(res.headers);
+  headers.set("content-type", isHtml ? "text/html; charset=utf-8" : "text/plain; charset=utf-8");
+  headers.set("access-control-allow-origin", "*");
+  return new Response(res.body, { status, headers });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -291,7 +304,6 @@ Deno.serve(async (req) => {
   const ua = req.headers.get("user-agent") || "";
   const force = url.searchParams.get("force") === "1";
 
-  // Path: prefer `?path=`, else strip everything up to /bot-prerender in the URL.
   let path = url.searchParams.get("path") || "";
   if (!path) {
     const m = url.pathname.match(/\/bot-prerender(\/.*)?$/);
@@ -299,29 +311,23 @@ Deno.serve(async (req) => {
   }
   if (!path.startsWith("/")) path = "/" + path;
 
-  // If a human hits this directly, bounce them to the real SPA URL.
   if (!force && !isBot(ua)) {
     return new Response(null, { status: 302, headers: { ...corsHeaders, Location: `${SITE_URL}${path}` } });
   }
 
   try {
-    // /product/:idOrSlug   or   /p/:idOrSlug
     const productMatch = path.match(/^\/(?:product|p)\/(?:show\/)?([^/?]+)/);
-    if (productMatch) return await renderProduct(decodeURIComponent(productMatch[1]));
+    if (productMatch) return reheader(await renderProduct(decodeURIComponent(productMatch[1])));
 
-    // /blog/:slug
     const blogMatch = path.match(/^\/blog\/([^/?]+)/);
-    if (blogMatch) return await renderBlogPost(decodeURIComponent(blogMatch[1]));
+    if (blogMatch) return reheader(await renderBlogPost(decodeURIComponent(blogMatch[1])));
 
-    // /shop or /shop?category=X   or   /categories
-    if (path.startsWith("/shop") || path.startsWith("/categories")) {
-      // category may be encoded in the raw path query
+    if (path.startsWith("/shop") || path.startsWith("/categor")) {
       const cat = new URL(`${SITE_URL}${path}`).searchParams.get("category");
-      return await renderCategoryOrShop(cat);
+      return reheader(await renderCategoryOrShop(cat));
     }
 
-    // Home / fallback
-    return renderHome();
+    return reheader(renderHome());
   } catch (err) {
     console.error("bot-prerender error:", err);
     return new Response(`Prerender error: ${err instanceof Error ? err.message : String(err)}`, {
