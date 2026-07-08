@@ -1780,6 +1780,7 @@ export type Database = {
           scope: string
         }[]
       }
+      sanitize_html_content: { Args: { input: string }; Returns: string }
       track_order_by_id: {
         Args: { order_id: string }
         Returns: {
