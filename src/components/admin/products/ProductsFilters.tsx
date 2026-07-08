@@ -33,7 +33,7 @@
  * @module ProductsFilters
  */
 
-import { Search, AlertTriangle, ArrowDownWideNarrow } from "lucide-react";
+import { Search, AlertTriangle, ArrowDownWideNarrow, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -120,6 +120,10 @@ interface Props {
   setSortMode: (v: "newest" | "stock_asc" | "stock_desc") => void;
   /** Number of products currently at or below the threshold. */
   lowStockCount: number;
+  /** Export the current filtered/sorted list as CSV. */
+  onExportFiltered: () => void;
+  /** Count of currently visible (filtered) products for the export button label. */
+  filteredCount: number;
   /** Open the bulk inventory update modal. */
   onOpenBulkInventory: () => void;
 }
@@ -143,6 +147,8 @@ export default function ProductsFilters({
   setSortMode,
   lowStockCount,
   onOpenBulkInventory,
+  onExportFiltered,
+  filteredCount,
 }: Props) {
   return (
     <div className="space-y-3">
@@ -189,6 +195,17 @@ export default function ProductsFilters({
             className="w-24"
           />
         </div>
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onExportFiltered}
+          disabled={filteredCount === 0}
+          title="Download the current filtered/sorted list as CSV"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Export {filteredCount > 0 ? `${filteredCount} ` : ""}CSV
+        </Button>
 
         <ProductImportExport onImportComplete={onImportComplete} />
       </div>

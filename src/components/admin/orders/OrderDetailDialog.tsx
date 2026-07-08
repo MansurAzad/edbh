@@ -118,11 +118,14 @@ const OrderDetailDialog = ({
   // WhatsApp share attempt log (append-only from whatsapp_share_events).
   const [waEvents, setWaEvents] = useState<WhatsAppShareEvent[]>([]);
   const [waRetrying, setWaRetrying] = useState(false);
+  /** Event id we're awaiting a terminal delivery_status for. */
+  const [waAwaitingId, setWaAwaitingId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const loadWaEvents = async (orderId: string) => {
     const rows = await fetchWhatsAppShareEvents(orderId);
     setWaEvents(rows);
+    return rows;
   };
 
   useEffect(() => {
@@ -173,7 +176,21 @@ const OrderDetailDialog = ({
             ? "default"
             : "destructive",
       });
-      await loadWaEvents(order.id);
+      const rows = await loadWaEvents(order.id);
+      // If we sent via Cloud API and the newest event doesn't yet have a
+      // terminal delivery_status, hold the button in "Awaiting delivery…"
+      // until the webhook lands (see realtime effect below) or the timeout
+      // expires so admins get a live progress read-out instead of a stale
+      // "Resend" affordance.
+      const newest = rows[0];
+      const terminal = new Set(["delivered", "read", "failed"]);
+      if (
+        newest &&
+        res.channel === "cloud_api" &&
+        !terminal.has((newest.delivery_status ?? "pending") as string)
+      ) {
+        setWaAwaitingId(newest.id);
+      }
     } catch (e) {
       toast({
         title: "রি-শেয়ার ব্যর্থ",
@@ -184,6 +201,51 @@ const OrderDetailDialog = ({
       setWaRetrying(false);
     }
   };
+
+  // Subscribe to delivery_status changes for the current order while a resend
+  // is in-flight so the button re-enables the moment Meta reports a terminal
+  // state via our whatsapp-webhook function.
+  useEffect(() => {
+    if (!order || !waAwaitingId) return;
+    const channel = supabase
+      .channel(`wa-await-${order.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "whatsapp_share_events",
+          filter: `id=eq.${waAwaitingId}`,
+        },
+        (payload) => {
+          const next = payload.new as { delivery_status?: string | null; error?: string | null };
+          const ds = next.delivery_status ?? "pending";
+          if (ds === "delivered" || ds === "read" || ds === "failed") {
+            setWaAwaitingId(null);
+            void loadWaEvents(order.id);
+            if (ds === "failed") {
+              toast({
+                title: "Delivery failed",
+                description: next.error ?? "WhatsApp reported the send as failed",
+                variant: "destructive",
+              });
+            } else {
+              toast({ title: `Delivered (${ds})` });
+            }
+          }
+        },
+      )
+      .subscribe();
+    // Safety net: stop awaiting after 45s so the button can't stay stuck.
+    const timeout = setTimeout(() => setWaAwaitingId(null), 45_000);
+    return () => {
+      supabase.removeChannel(channel);
+      clearTimeout(timeout);
+    };
+  }, [order, waAwaitingId, toast]);
+
+  const waBusy = waRetrying || waAwaitingId !== null;
+  const latestDelivery = waEvents[0]?.delivery_status ?? null;
 
   return (
     <Dialog open={!!order} onOpenChange={(o) => !o && onClose()}>
@@ -343,19 +405,24 @@ const OrderDetailDialog = ({
                       size="sm"
                       variant="outline"
                       onClick={() => handleAdminRetryWa("primary")}
-                      disabled={waRetrying}
+                      disabled={waBusy}
                       data-testid="admin-wa-retry"
-                      aria-busy={waRetrying}
+                      aria-busy={waBusy}
                       className="gap-1.5 h-7 text-xs"
                     >
-                      <RefreshCw className={`w-3 h-3 ${waRetrying ? "animate-spin" : ""}`} />
-                      {waRetrying ? "চেষ্টা করা হচ্ছে..." : "Resend WhatsApp"}
+                      <RefreshCw className={`w-3 h-3 ${waBusy ? "animate-spin" : ""}`} />
+                      {waRetrying
+                        ? "চেষ্টা করা হচ্ছে..."
+                        : waAwaitingId
+                          ? `Awaiting ${latestDelivery ?? "delivery"}…`
+                          : "Resend WhatsApp"}
                     </Button>
                     <Button
                       size="sm"
                       variant="secondary"
                       onClick={() => handleAdminRetryWa("escalate")}
-                      disabled={waRetrying}
+                      disabled={waBusy}
+                      aria-busy={waBusy}
                       data-testid="admin-wa-retry-escalate"
                       className="gap-1.5 h-7 text-xs"
                       title="Escalate with a shorter fallback template"

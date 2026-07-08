@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { productsToCsv } from "@/lib/admin/productCsv";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -162,6 +163,25 @@ const Products = () => {
     setGalleryImages(data || []);
   };
 
+  /**
+   * Download the currently filtered + sorted product list as CSV.
+   * Uses the same serializer as import/export so schema stays in sync,
+   * including the standardized fields (sku, subcategory, meta_*, etc.).
+   */
+  const handleExportFiltered = useCallback(() => {
+    const csv = productsToCsv(filteredProducts as unknown as Record<string, any>[]);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.download = `products-filtered-${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [filteredProducts]);
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -194,6 +214,8 @@ const Products = () => {
           setSortMode={onFilterChange(setSortMode)}
           lowStockCount={lowStockCount}
           onOpenBulkInventory={() => setBulkInventoryOpen(true)}
+          onExportFiltered={handleExportFiltered}
+          filteredCount={filteredProducts.length}
         />
 
         <BulkInventoryDialog

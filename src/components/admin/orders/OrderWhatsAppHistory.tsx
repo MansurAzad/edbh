@@ -10,17 +10,19 @@
  * the whatsapp-webhook flow appear without a manual refresh.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Send, Zap, MessageCircle, Star } from "lucide-react";
+import { Loader2, RefreshCw, Send, Zap, MessageCircle, Star, Search, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   fetchWhatsAppShareEvents,
   type WhatsAppShareEvent,
   type WhatsAppDeliveryStatus,
 } from "@/lib/checkout/whatsappShare";
 import { retryWhatsAppShareForOrder, retryWithEscalation } from "@/lib/admin/adminWhatsAppRetry";
+import { exportWhatsAppHistoryCSV } from "@/lib/admin/whatsappHistoryCsv";
 
 interface Props {
   orderId: string;
@@ -53,10 +55,16 @@ function deliveryBadge(s: WhatsAppDeliveryStatus | null | undefined) {
   );
 }
 
+/** Delivery statuses that mean the send is done — success or terminal failure. */
+const TERMINAL_DELIVERY: readonly WhatsAppDeliveryStatus[] = ["delivered", "read", "failed"];
+
 export default function OrderWhatsAppHistory({ orderId }: Props) {
   const [events, setEvents] = useState<WhatsAppShareEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  /** id of the event we're waiting on a terminal delivery_status for. */
+  const [awaitingDeliveryId, setAwaitingDeliveryId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,7 +106,16 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
       } else {
         toast.error(`Retry failed (${res.variant})`, { description: res.error });
       }
-      await load();
+      const latest = await fetchWhatsAppShareEvents(orderId);
+      setEvents(latest);
+      // Track the newest event so the Resend buttons stay disabled until we
+      // see a terminal delivery_status (delivered/read/failed) or timeout.
+      const newest = latest[0];
+      if (newest && res.channel === "cloud_api" && !TERMINAL_DELIVERY.includes((newest.delivery_status ?? "pending") as WhatsAppDeliveryStatus)) {
+        setAwaitingDeliveryId(newest.id);
+      } else {
+        setAwaitingDeliveryId(null);
+      }
     } catch (e) {
       toast.error("Retry failed", { description: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -106,7 +123,63 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
     }
   };
 
+  // When the awaited event reaches a terminal delivery_status via realtime,
+  // clear the awaiting flag so the Resend buttons re-enable.
+  useEffect(() => {
+    if (!awaitingDeliveryId) return;
+    const ev = events.find((e) => e.id === awaitingDeliveryId);
+    if (ev && TERMINAL_DELIVERY.includes((ev.delivery_status ?? "pending") as WhatsAppDeliveryStatus)) {
+      if (ev.delivery_status === "failed") {
+        toast.error("Delivery failed", { description: ev.error ?? "WhatsApp reported failed" });
+      } else {
+        toast.success(`Delivered (${ev.delivery_status})`);
+      }
+      setAwaitingDeliveryId(null);
+    }
+  }, [events, awaitingDeliveryId]);
+
+  // Safety timeout: give up waiting after 45s so buttons don't stay disabled forever.
+  useEffect(() => {
+    if (!awaitingDeliveryId) return;
+    const t = setTimeout(() => setAwaitingDeliveryId(null), 45_000);
+    return () => clearTimeout(t);
+  }, [awaitingDeliveryId]);
+
+  /**
+   * Filter events by a free-text search against wa_message_id, error, actor,
+   * status, delivery_status, attempt_variant, and any string inside the raw
+   * webhook payload snapshot. Search is case-insensitive.
+   */
+  const visibleEvents = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return events;
+    return events.filter((e) => {
+      const hay = [
+        e.wa_message_id,
+        e.error,
+        e.actor,
+        e.status,
+        e.delivery_status,
+        e.attempt_variant,
+        e.payload_snapshot ? JSON.stringify(e.payload_snapshot) : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [events, search]);
+
+  const failedCount = useMemo(
+    () =>
+      events.filter(
+        (e) => e.status === "failed" || e.status === "blocked" || e.delivery_status === "failed",
+      ).length,
+    [events],
+  );
+
   const latest = events[0];
+  const busy = retryingId !== null || awaitingDeliveryId !== null;
 
   return (
     <section
@@ -115,26 +188,38 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
       aria-label="WhatsApp share history"
       data-testid="order-wa-history"
     >
-      <header className="flex items-center gap-2 mb-3">
+      <header className="flex items-center gap-2 mb-2 flex-wrap">
         <MessageCircle className="w-4 h-4 text-green-600" />
         <h4 className="text-sm font-semibold">WhatsApp Share History</h4>
         <span className="text-xs text-muted-foreground">({events.length} attempts)</span>
-        <div className="ml-auto flex gap-1">
+        <div className="ml-auto flex flex-wrap gap-1">
+          <Button
+            type="button" size="sm" variant="ghost"
+            onClick={() => exportWhatsAppHistoryCSV(orderId, events, "failed")}
+            disabled={failedCount === 0}
+            title="Download only failed/blocked attempts"
+            data-testid="wa-export-failed"
+          >
+            <Download className="w-3.5 h-3.5 mr-1" />
+            Failed CSV {failedCount > 0 ? `(${failedCount})` : ""}
+          </Button>
           <Button
             type="button" size="sm" variant="outline"
             onClick={() => runRetry("primary")}
-            disabled={retryingId !== null}
+            disabled={busy}
+            aria-busy={busy}
             data-testid="wa-retry-primary"
           >
-            {retryingId === "primary"
+            {retryingId === "primary" || (awaitingDeliveryId && retryingId === null)
               ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
               : <Send className="w-3.5 h-3.5 mr-1" />}
-            Retry
+            {awaitingDeliveryId && retryingId === null ? "Awaiting delivery…" : "Resend"}
           </Button>
           <Button
             type="button" size="sm"
             onClick={() => runRetry("escalate")}
-            disabled={retryingId !== null}
+            disabled={busy}
+            aria-busy={busy}
             data-testid="wa-retry-escalate"
             title="Escalate: automatically pick a shorter fallback template on repeated failure"
           >
@@ -146,6 +231,19 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
         </div>
       </header>
 
+      {/* Search box: filters the list by wa_message_id, error text, actor,
+          status/delivery_status, variant, or any key inside the webhook payload. */}
+      <div className="mb-2 relative">
+        <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search wa_message_id, error code, payload…"
+          className="h-8 pl-7 text-xs"
+          data-testid="wa-history-search"
+        />
+      </div>
+
       {loading && events.length === 0 && (
         <p className="text-xs text-muted-foreground flex items-center gap-2">
           <Loader2 className="w-3 h-3 animate-spin" /> Loading…
@@ -153,6 +251,11 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
       )}
       {!loading && events.length === 0 && (
         <p className="text-xs text-muted-foreground">No WhatsApp share attempts yet.</p>
+      )}
+      {!loading && events.length > 0 && visibleEvents.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          No attempts match "{search}". <button className="underline" onClick={() => setSearch("")}>Clear</button>
+        </p>
       )}
 
       {latest && (
@@ -183,7 +286,7 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
       )}
 
       <ol className="space-y-1.5">
-        {events.map((ev) => (
+        {visibleEvents.map((ev) => (
           <li
             key={ev.id}
             className="rounded border border-border/40 bg-background/60 px-2 py-1.5 text-[11px]"

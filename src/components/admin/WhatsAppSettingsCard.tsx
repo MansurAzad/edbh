@@ -12,7 +12,17 @@
  */
 
 import { useEffect, useState } from "react";
-import { Copy, Save, Check, MessageCircle, ExternalLink } from "lucide-react";
+import {
+  Copy,
+  Save,
+  Check,
+  MessageCircle,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Loader2,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +50,11 @@ export default function WhatsAppSettingsCard() {
   const [verifyToken, setVerifyToken] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<
+    { ok: true; latencyMs: number } | { ok: false; error: string } | null
+  >(null);
 
   useEffect(() => {
     (async () => {
@@ -101,6 +116,47 @@ export default function WhatsAppSettingsCard() {
     }
   }
 
+  /**
+   * Verify the webhook handshake by calling the callback URL with the exact
+   * query parameters Meta uses (`hub.mode=subscribe`, our verify token, and a
+   * random challenge). A correctly configured webhook must echo the challenge
+   * back verbatim with HTTP 200. Anything else is surfaced as an error so
+   * admins can fix mismatched tokens before going live in Meta Dashboard.
+   */
+  async function testAndVerify() {
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const url = webhookUrl.trim();
+      const token = verifyToken.trim();
+      if (!/^https?:\/\//i.test(url)) throw new Error("Invalid Callback URL — must start with https://");
+      if (!token) throw new Error("Verify Token খালি রাখা যাবে না");
+      const challenge = `lov-${Math.random().toString(36).slice(2, 12)}`;
+      const target = new URL(url);
+      target.searchParams.set("hub.mode", "subscribe");
+      target.searchParams.set("hub.verify_token", token);
+      target.searchParams.set("hub.challenge", challenge);
+      const started = performance.now();
+      const res = await fetch(target.toString(), { method: "GET" });
+      const body = (await res.text()).trim();
+      const latencyMs = Math.round(performance.now() - started);
+      if (!res.ok) throw new Error(`Webhook returned HTTP ${res.status}`);
+      if (body !== challenge) {
+        throw new Error(
+          "Verify token mismatch — webhook did not echo the challenge (check META_WHATSAPP_VERIFY_TOKEN)",
+        );
+      }
+      setVerifyResult({ ok: true, latencyMs });
+      toast({ title: "Webhook verified", description: `Handshake OK in ${latencyMs}ms` });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setVerifyResult({ ok: false, error: msg });
+      toast({ title: "Verification failed", description: msg, variant: "destructive" });
+    } finally {
+      setVerifying(false);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -136,17 +192,31 @@ export default function WhatsAppSettingsCard() {
           </div>
         </div>
 
-        {/* Verify Token */}
+        {/* Verify Token — masked by default; Show/Hide toggle for safe viewing. */}
         <div className="space-y-1.5">
           <Label htmlFor="wa-verify-token">Verify Token</Label>
           <div className="flex gap-2">
             <Input
               id="wa-verify-token"
+              type={showToken ? "text" : "password"}
               value={verifyToken}
               onChange={(e) => setVerifyToken(e.target.value)}
               className="font-mono text-xs"
               placeholder="ex: my-verify-secret-1234"
+              autoComplete="off"
+              spellCheck={false}
             />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setShowToken((v) => !v)}
+              aria-label={showToken ? "Hide verify token" : "Show verify token"}
+              aria-pressed={showToken}
+              title={showToken ? "Hide" : "Show"}
+            >
+              {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -158,6 +228,10 @@ export default function WhatsAppSettingsCard() {
               {copied === "token" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </Button>
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            Hidden by default — click <span aria-hidden="true">👁</span> to reveal for pasting into
+            Meta Dashboard.
+          </p>
         </div>
 
         <Alert>
@@ -175,8 +249,36 @@ export default function WhatsAppSettingsCard() {
           </AlertDescription>
         </Alert>
 
-        <div className="flex justify-end">
-          <Button onClick={save} disabled={saving} className="gap-2">
+        {/* Handshake test result */}
+        {verifyResult && verifyResult.ok === true && (
+          <Alert>
+            <AlertDescription className="text-xs">
+              ✓ Webhook handshake OK · {verifyResult.latencyMs}ms
+            </AlertDescription>
+          </Alert>
+        )}
+        {verifyResult && verifyResult.ok === false && (
+          <Alert variant="destructive">
+            <AlertDescription className="text-xs">✗ {verifyResult.error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={testAndVerify}
+            disabled={verifying || saving}
+            className="gap-2"
+          >
+            {verifying ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="w-4 h-4" />
+            )}
+            {verifying ? "Verifying…" : "Test & Verify"}
+          </Button>
+          <Button onClick={save} disabled={saving || verifying} className="gap-2">
             <Save className="w-4 h-4" /> {saving ? "সেভ হচ্ছে..." : "সেভ করুন"}
           </Button>
         </div>
