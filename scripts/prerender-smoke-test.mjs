@@ -294,6 +294,12 @@ for (const path of PATHS) {
       const { schemas, errors: parseErrs } = extractJsonLd(html);
       const jsonLd = validateJsonLd(schemas, parseErrs, kind);
 
+      // Snapshot BreadcrumbList + FAQPage per path (once, using first UA response).
+      let snapshotCheck = { ok: true, wrote: false };
+      if (uaName === Object.keys(USER_AGENTS)[0]) {
+        snapshotCheck = compareSnapshot(path, snapshotSchemas(schemas));
+      }
+
       const fieldChecks = [
         ["status 200", res.status === 200],
         // Supabase's edge gateway sometimes rewrites content-type to text/plain
@@ -304,10 +310,13 @@ for (const path of PATHS) {
           /^\s*<!doctype html/i.test(html)],
         ["body length > 500", html.length > 500],
         ...checkCommonHead(html),
+        ...checkOgTwitter(html, kind),
         ...(kind === "product" ? checkProduct(html) : []),
         ...(kind === "category" ? checkCategoryOrHome(html) : []),
         ...(kind === "blog" ? checkBlog(html) : []),
+        ...(kind === "faq" ? checkFaq(html) : []),
         ["JSON-LD schema valid", jsonLd.errors.length === 0],
+        ["schema snapshot matches", snapshotCheck.ok],
       ];
 
       const passed = fieldChecks.filter(([, ok]) => ok).length;
