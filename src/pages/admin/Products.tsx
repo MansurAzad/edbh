@@ -91,7 +91,19 @@ const Products = () => {
       colors: product.colors || [],
       material: product.material || "",
       video_url: product.video_url || "",
+      sku: product.sku ?? "",
+      subcategory: product.subcategory ?? "",
+      fabric: product.fabric ?? product.material ?? "",
+      work_type: product.work_type ?? "",
+      part: product.part ?? "",
+      hijab_included: product.hijab_included ?? false,
+      inner_included: product.inner_included ?? false,
+      purchase_cost: product.purchase_cost ?? null,
+      image_alt_text: product.image_alt_text ?? "",
+      meta_title: product.meta_title ?? "",
+      meta_description: product.meta_description ?? "",
     });
+
     setIsDialogOpen(true);
   };
 
