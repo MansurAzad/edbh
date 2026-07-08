@@ -405,19 +405,24 @@ const OrderDetailDialog = ({
                       size="sm"
                       variant="outline"
                       onClick={() => handleAdminRetryWa("primary")}
-                      disabled={waRetrying}
+                      disabled={waBusy}
                       data-testid="admin-wa-retry"
-                      aria-busy={waRetrying}
+                      aria-busy={waBusy}
                       className="gap-1.5 h-7 text-xs"
                     >
-                      <RefreshCw className={`w-3 h-3 ${waRetrying ? "animate-spin" : ""}`} />
-                      {waRetrying ? "চেষ্টা করা হচ্ছে..." : "Resend WhatsApp"}
+                      <RefreshCw className={`w-3 h-3 ${waBusy ? "animate-spin" : ""}`} />
+                      {waRetrying
+                        ? "চেষ্টা করা হচ্ছে..."
+                        : waAwaitingId
+                          ? `Awaiting ${latestDelivery ?? "delivery"}…`
+                          : "Resend WhatsApp"}
                     </Button>
                     <Button
                       size="sm"
                       variant="secondary"
                       onClick={() => handleAdminRetryWa("escalate")}
-                      disabled={waRetrying}
+                      disabled={waBusy}
+                      aria-busy={waBusy}
                       data-testid="admin-wa-retry-escalate"
                       className="gap-1.5 h-7 text-xs"
                       title="Escalate with a shorter fallback template"
