@@ -72,6 +72,7 @@ export default function CheckoutSuccess({
   orderId,
   isLoggedIn,
   onDownloadInvoice,
+  onShareWhatsApp,
 }: Props) {
   return (
     /* Full-height page wrapper – shares the global background colour */
