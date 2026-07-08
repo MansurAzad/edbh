@@ -192,17 +192,31 @@ export default function WhatsAppSettingsCard() {
           </div>
         </div>
 
-        {/* Verify Token */}
+        {/* Verify Token — masked by default; Show/Hide toggle for safe viewing. */}
         <div className="space-y-1.5">
           <Label htmlFor="wa-verify-token">Verify Token</Label>
           <div className="flex gap-2">
             <Input
               id="wa-verify-token"
+              type={showToken ? "text" : "password"}
               value={verifyToken}
               onChange={(e) => setVerifyToken(e.target.value)}
               className="font-mono text-xs"
               placeholder="ex: my-verify-secret-1234"
+              autoComplete="off"
+              spellCheck={false}
             />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setShowToken((v) => !v)}
+              aria-label={showToken ? "Hide verify token" : "Show verify token"}
+              aria-pressed={showToken}
+              title={showToken ? "Hide" : "Show"}
+            >
+              {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -214,6 +228,10 @@ export default function WhatsAppSettingsCard() {
               {copied === "token" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </Button>
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            Hidden by default — click <span aria-hidden="true">👁</span> to reveal for pasting into
+            Meta Dashboard.
+          </p>
         </div>
 
         <Alert>
@@ -231,8 +249,33 @@ export default function WhatsAppSettingsCard() {
           </AlertDescription>
         </Alert>
 
-        <div className="flex justify-end">
-          <Button onClick={save} disabled={saving} className="gap-2">
+        {/* Handshake test result */}
+        {verifyResult && (
+          <Alert variant={verifyResult.ok ? "default" : "destructive"}>
+            <AlertDescription className="text-xs">
+              {verifyResult.ok
+                ? `✓ Webhook handshake OK · ${verifyResult.latencyMs}ms`
+                : `✗ ${verifyResult.error}`}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={testAndVerify}
+            disabled={verifying || saving}
+            className="gap-2"
+          >
+            {verifying ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="w-4 h-4" />
+            )}
+            {verifying ? "Verifying…" : "Test & Verify"}
+          </Button>
+          <Button onClick={save} disabled={saving || verifying} className="gap-2">
             <Save className="w-4 h-4" /> {saving ? "সেভ হচ্ছে..." : "সেভ করুন"}
           </Button>
         </div>
