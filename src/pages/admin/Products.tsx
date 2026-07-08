@@ -29,6 +29,10 @@ const Products = () => {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [lowStockThreshold, setLowStockThreshold] = useState(5);
+  const [sortMode, setSortMode] = useState<"newest" | "stock_asc" | "stock_desc">("newest");
+  const [bulkInventoryOpen, setBulkInventoryOpen] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
