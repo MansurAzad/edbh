@@ -328,7 +328,7 @@ async function renderHome(): Promise<Response> {
 
   // Emit BOTH schemas as an array — WebSite (with SearchAction) + CollectionPage
   // wrapping an ItemList of featured products.
-  const jsonLd: unknown = [
+  const jsonLd: Array<Record<string, unknown>> = [
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
