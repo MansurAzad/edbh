@@ -113,13 +113,13 @@ const OrdersTable = ({
           {/* ---- Loading state ---- */}
           {loading ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8">Loading...</TableCell>
+              <TableCell colSpan={8} className="text-center py-8">Loading...</TableCell>
             </TableRow>
 
           /* ---- Empty state ---- */
           ) : orders.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                 No orders found
               </TableCell>
             </TableRow>
@@ -138,6 +138,11 @@ const OrdersTable = ({
                     checked={selectedIds.has(order.id)}
                     onCheckedChange={() => onToggleSelect(order.id)}
                   />
+                </TableCell>
+
+                {/* Real product thumbnail with click-to-zoom */}
+                <TableCell>
+                  <OrderRowThumbnail orderId={order.id} />
                 </TableCell>
 
                 {/* Short order reference — first 8 chars of the UUID */}
