@@ -120,7 +120,11 @@ const SeoDebug = () => {
       items.push({ label: "Canonical URLs per route", ok: true, note: "SEOHead injects <link rel=canonical>" });
       items.push({ label: "Product JSON-LD (Product + Offer)", ok: true, note: "buildProductJsonLd" });
       items.push({ label: "Organization / WebSite / ClothingStore JSON-LD", ok: true, note: "index.html static graph" });
-      items.push({ label: "SSR / Prerender", ok: false, note: "Classic Vite SPA — head mutated client-side. See note below." });
+      items.push({ label: "FAQPage JSON-LD (SALE + non-SALE product FAQ)", ok: true, note: "Injected via SEOHead when FAQ present" });
+      items.push({ label: "BreadcrumbList JSON-LD", ok: true, note: "Category/Product breadcrumbs" });
+      items.push({ label: "Article / BlogPosting JSON-LD", ok: true, note: "Injected on /blog/:slug" });
+      items.push({ label: "Bot prerender endpoint reachable", ok: true, note: "supabase/functions/bot-prerender" });
+      items.push({ label: "SSR / Prerender for humans", ok: false, note: "Classic Vite SPA — social crawlers rely on bot-prerender proxy (see workers/bot-prerender-proxy.js)." });
       setChecklist(items);
     })();
   }, []);
