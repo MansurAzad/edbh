@@ -196,6 +196,17 @@ export default function ProductsFilters({
           />
         </div>
 
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onExportFiltered}
+          disabled={filteredCount === 0}
+          title="Download the current filtered/sorted list as CSV"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Export {filteredCount > 0 ? `${filteredCount} ` : ""}CSV
+        </Button>
+
         <ProductImportExport onImportComplete={onImportComplete} />
       </div>
 
