@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Save, Search, Sparkles, Wand2, RotateCcw, Eye, ShieldAlert, History } from "lucide-react";
+import { Save, Search, Sparkles, Wand2, RotateCcw, Eye, ShieldAlert, History, Bot, Loader2 } from "lucide-react";
 
 interface ProductRow {
   id: string;
@@ -93,6 +93,8 @@ const BulkProductEdit = () => {
   const [edits, setEdits] = useState<Record<string, EditPatch>>({});
   const [saving, setSaving] = useState(false);
   const [dryRunOpen, setDryRunOpen] = useState(false);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiFields, setAiFields] = useState<{ title: boolean; description: boolean }>({ title: true, description: true });
 
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkStock, setBulkStock] = useState("");
@@ -300,6 +302,38 @@ const BulkProductEdit = () => {
     toast.info("সব pending পরিবর্তন বাতিল করা হলো");
   };
 
+  const runAiEnrich = async () => {
+    if (selected.size === 0) { toast.error("প্রোডাক্ট সিলেক্ট করুন"); return; }
+    if (!aiFields.title && !aiFields.description) { toast.error("অন্তত title বা description বেছে নিন"); return; }
+    if (selected.size > 50) { toast.error("এক বারে সর্বোচ্চ ৫০টি প্রোডাক্ট"); return; }
+
+    setAiRunning(true);
+    const fields = [aiFields.title && "title", aiFields.description && "description"].filter(Boolean) as string[];
+    try {
+      const { data, error } = await supabase.functions.invoke("enrich-product", {
+        body: { productIds: Array.from(selected), fields, dryRun: true },
+      });
+      if (error) throw error;
+      const results = (data?.results || []) as Array<{ id: string; title?: string; description?: string; error?: string }>;
+      let ok = 0, fail = 0;
+      results.forEach(r => {
+        if (r.error) { fail++; return; }
+        const patch: EditPatch = {};
+        if (aiFields.title && r.title) patch.name = r.title;
+        if (aiFields.description && r.description) patch.description = r.description;
+        if (Object.keys(patch).length) {
+          setEdits(prev => ({ ...prev, [r.id]: { ...prev[r.id], ...patch } }));
+          ok++;
+        }
+      });
+      toast.success(`AI-জেনারেটেড: ${ok}টি সফল, ${fail}টি ব্যর্থ — Dry-run দেখুন তারপর Save`);
+    } catch (e: any) {
+      toast.error(`AI ব্যর্থ: ${e?.message || "unknown"}`);
+    } finally {
+      setAiRunning(false);
+    }
+  };
+
   const editCount = Object.keys(edits).length;
 
   return (
@@ -405,6 +439,41 @@ const BulkProductEdit = () => {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* AI Enrich Card */}
+            <Card className="border-primary/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-primary" /> AI Enrich — Title & Description
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Lovable AI-এর মাধ্যমে সিলেক্টেড প্রোডাক্টের title আপনার SEO format-এ
+                  <code className="mx-1 bg-muted px-1 rounded">[Origin] [Fabric] [Work] [Type] – [Color] – [Set/Part]</code>
+                  এবং description Bangla+English-এ regenerate হবে। প্রথমে dry-run হিসেবে edits map-এ ঢুকবে — Review & Save চাপলেই DB-তে যাবে।
+                </p>
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={aiFields.title} onCheckedChange={v => setAiFields(f => ({ ...f, title: !!v }))} />
+                    Title regenerate
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={aiFields.description} onCheckedChange={v => setAiFields(f => ({ ...f, description: !!v }))} />
+                    Description regenerate
+                  </label>
+                </div>
+                <Button onClick={runAiEnrich} disabled={selected.size === 0 || aiRunning || (!aiFields.title && !aiFields.description)}>
+                  {aiRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
+                  {aiRunning ? "Generating…" : `Generate for ${selected.size} selected`}
+                </Button>
+                {selected.size > 50 && (
+                  <p className="text-xs text-destructive">এক বারে সর্বোচ্চ ৫০টি — কম সিলেক্ট করুন।</p>
+                )}
+              </CardContent>
+            </Card>
+
+
 
             {/* Search + quick bulk price/stock */}
             <div className="flex flex-wrap items-center gap-3">
