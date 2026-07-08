@@ -320,4 +320,177 @@ const SeoDebug = () => {
   );
 };
 
+// ── Prerender Verify tool ─────────────────────────────────────────────
+type VerifyCheck = { label: string; ok: boolean; detail?: string };
+type VerifyResult = {
+  status: number;
+  contentType: string;
+  bytes: number;
+  html: string;
+  visibleText: string;
+  checks: VerifyCheck[];
+} | { error: string };
+
+function runHtmlChecks(html: string, pathname: string): VerifyCheck[] {
+  const kind = pathname.startsWith("/product")
+    ? "product"
+    : pathname.startsWith("/blog")
+    ? "blog"
+    : "category";
+
+  const c: VerifyCheck[] = [
+    { label: "<title> present", ok: /<title>[^<]{5,}<\/title>/i.test(html) },
+    { label: "meta description", ok: /<meta[^>]+name=["']description["'][^>]*content=["'][^"']{10,}/i.test(html) },
+    { label: "canonical link", ok: /<link[^>]+rel=["']canonical["']/i.test(html) },
+    { label: "og:title / og:image", ok: /og:title/i.test(html) && /og:image/i.test(html) },
+    { label: "twitter:card", ok: /twitter:card/i.test(html) },
+    { label: "JSON-LD block", ok: /application\/ld\+json/i.test(html) },
+  ];
+  if (kind === "product") {
+    c.push({ label: "Product schema", ok: /"@type"\s*:\s*"Product"/.test(html) });
+    c.push({ label: "offers.price", ok: /"price"\s*:\s*"?\d+/.test(html) });
+    c.push({ label: "availability (InStock/OutOfStock)", ok: /InStock|OutOfStock|PreOrder/.test(html) });
+    c.push({ label: "visible price (৳ / BDT / Tk)", ok: /৳|BDT|Tk\.?/i.test(html) });
+    c.push({ label: "size mentioned", ok: /size|সাইজ/i.test(html) });
+    c.push({ label: "color mentioned", ok: /colou?r|রঙ/i.test(html) });
+    c.push({ label: "material / fabric mentioned", ok: /material|fabric|কাপড়/i.test(html) });
+    c.push({ label: "description paragraph", ok: /<p[^>]*>[^<]{20,}/i.test(html) });
+  } else if (kind === "blog") {
+    c.push({ label: "Article / BlogPosting schema", ok: /"@type"\s*:\s*"(Article|BlogPosting|Blog)"/.test(html) });
+  } else {
+    c.push({ label: "CollectionPage / ItemList schema", ok: /"@type"\s*:\s*"(CollectionPage|ItemList|WebSite)"/.test(html) });
+    c.push({ label: "product links present", ok: /\/product\//.test(html) });
+  }
+  return c;
+}
+
+const PrerenderVerify = () => {
+  const [input, setInput] = useState("/product/show/abaya-ibis-pink-1132");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<VerifyResult | null>(null);
+
+  const run = async () => {
+    let path = input.trim();
+    try {
+      if (/^https?:\/\//i.test(path)) path = new URL(path).pathname + new URL(path).search;
+    } catch { /* ignore */ }
+    if (!path.startsWith("/")) path = "/" + path;
+
+    setLoading(true);
+    setResult(null);
+    try {
+      const url = `${PRERENDER_ENDPOINT}?path=${encodeURIComponent(path)}&force=1`;
+      const res = await fetch(url, {
+        headers: { "User-Agent": "facebookexternalhit/1.1 (SeoDebug)" },
+      });
+      const html = await res.text();
+      const visibleText = html
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      setResult({
+        status: res.status,
+        contentType: res.headers.get("content-type") || "",
+        bytes: html.length,
+        html,
+        visibleText,
+        checks: runHtmlChecks(html, path),
+      });
+    } catch (e) {
+      setResult({ error: (e as Error).message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const passed = result && "checks" in result ? result.checks.filter(c => c.ok).length : 0;
+  const total = result && "checks" in result ? result.checks.length : 0;
+
+  return (
+    <div className="space-y-4">
+      <Alert>
+        <AlertDescription>
+          যেকোনো product / category / blog path বা full URL দিন — bot-prerender endpoint hit করে
+          HTML, visible text এবং schema fields দৃশ্যমান কিনা যাচাই করবে।
+        </AlertDescription>
+      </Alert>
+      <Card>
+        <CardContent className="pt-4 flex gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="/product/show/... বা /shop?category=Abaya বা /blog/..."
+          />
+          <Button onClick={run} disabled={loading}>
+            <Play className="w-3 h-3 mr-1" /> {loading ? "Checking…" : "Verify"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {result && "error" in result && (
+        <Alert variant="destructive"><AlertDescription>{result.error}</AlertDescription></Alert>
+      )}
+
+      {result && "checks" in result && (
+        <>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                {passed === total
+                  ? <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  : <AlertTriangle className="w-5 h-5 text-yellow-600" />}
+                Result — {passed}/{total} checks passed
+                <div className="ml-auto flex gap-2">
+                  <Badge variant="outline">HTTP {result.status}</Badge>
+                  <Badge variant="outline">{Math.round(result.bytes / 1024)} KB</Badge>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ul className="space-y-1 text-sm">
+                {result.checks.map((c, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    {c.ok
+                      ? <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-600" />
+                      : <XCircle className="w-4 h-4 mt-0.5 text-destructive" />}
+                    <span>{c.label}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => copy(result.html)}>
+                  <Copy className="w-3 h-3 mr-1" /> Copy HTML
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => copy(result.visibleText)}>
+                  <Copy className="w-3 h-3 mr-1" /> Copy visible text
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Visible text (first 2000 chars)</CardTitle></CardHeader>
+            <CardContent>
+              <pre className="text-xs p-3 bg-muted rounded overflow-auto max-h-72 whitespace-pre-wrap">
+                {result.visibleText.slice(0, 2000)}
+              </pre>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Raw HTML (first 4000 chars)</CardTitle></CardHeader>
+            <CardContent>
+              <pre className="text-xs p-3 bg-muted rounded overflow-auto max-h-96">
+                {result.html.slice(0, 4000)}
+              </pre>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+};
+
 export default SeoDebug;
