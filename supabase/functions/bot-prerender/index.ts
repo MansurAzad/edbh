@@ -327,15 +327,21 @@ async function renderBlogIndex(): Promise<Response> {
     author: { "@type": "Person", name: p.author_name || SITE_NAME },
   }));
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Blog",
-    name: `${SITE_NAME} Blog`,
-    url: canonical,
-    description,
-    publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.jpg` } },
-    blogPost: items,
-  };
+  const jsonLd: Array<Record<string, unknown>> = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Blog",
+      name: `${SITE_NAME} Blog`,
+      url: canonical,
+      description,
+      publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.jpg` } },
+      blogPost: items,
+    },
+    breadcrumbSchema([
+      { name: "Home", url: `${SITE_URL}/` },
+      { name: "Blog", url: canonical },
+    ]),
+  ];
 
   const body = `
 <h1>${SITE_NAME} Blog</h1>
