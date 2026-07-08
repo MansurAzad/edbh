@@ -106,7 +106,16 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
       } else {
         toast.error(`Retry failed (${res.variant})`, { description: res.error });
       }
-      await load();
+      const latest = await fetchWhatsAppShareEvents(orderId);
+      setEvents(latest);
+      // Track the newest event so the Resend buttons stay disabled until we
+      // see a terminal delivery_status (delivered/read/failed) or timeout.
+      const newest = latest[0];
+      if (newest && res.channel === "cloud_api" && !TERMINAL_DELIVERY.includes((newest.delivery_status ?? "pending") as WhatsAppDeliveryStatus)) {
+        setAwaitingDeliveryId(newest.id);
+      } else {
+        setAwaitingDeliveryId(null);
+      }
     } catch (e) {
       toast.error("Retry failed", { description: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -114,7 +123,63 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
     }
   };
 
+  // When the awaited event reaches a terminal delivery_status via realtime,
+  // clear the awaiting flag so the Resend buttons re-enable.
+  useEffect(() => {
+    if (!awaitingDeliveryId) return;
+    const ev = events.find((e) => e.id === awaitingDeliveryId);
+    if (ev && TERMINAL_DELIVERY.includes((ev.delivery_status ?? "pending") as WhatsAppDeliveryStatus)) {
+      if (ev.delivery_status === "failed") {
+        toast.error("Delivery failed", { description: ev.error ?? "WhatsApp reported failed" });
+      } else {
+        toast.success(`Delivered (${ev.delivery_status})`);
+      }
+      setAwaitingDeliveryId(null);
+    }
+  }, [events, awaitingDeliveryId]);
+
+  // Safety timeout: give up waiting after 45s so buttons don't stay disabled forever.
+  useEffect(() => {
+    if (!awaitingDeliveryId) return;
+    const t = setTimeout(() => setAwaitingDeliveryId(null), 45_000);
+    return () => clearTimeout(t);
+  }, [awaitingDeliveryId]);
+
+  /**
+   * Filter events by a free-text search against wa_message_id, error, actor,
+   * status, delivery_status, attempt_variant, and any string inside the raw
+   * webhook payload snapshot. Search is case-insensitive.
+   */
+  const visibleEvents = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return events;
+    return events.filter((e) => {
+      const hay = [
+        e.wa_message_id,
+        e.error,
+        e.actor,
+        e.status,
+        e.delivery_status,
+        e.attempt_variant,
+        e.payload_snapshot ? JSON.stringify(e.payload_snapshot) : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [events, search]);
+
+  const failedCount = useMemo(
+    () =>
+      events.filter(
+        (e) => e.status === "failed" || e.status === "blocked" || e.delivery_status === "failed",
+      ).length,
+    [events],
+  );
+
   const latest = events[0];
+  const busy = retryingId !== null || awaitingDeliveryId !== null;
 
   return (
     <section
