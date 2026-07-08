@@ -82,26 +82,45 @@ export default {
       target.searchParams.set("path", url.pathname + url.search);
       target.searchParams.set("force", "1");
 
-      // Cache prerendered HTML at the edge
       const cache = caches.default;
       const cacheKey = new Request(target.toString(), { method: "GET" });
-      let res = await cache.match(cacheKey);
-      if (!res) {
-        res = await fetch(target.toString(), {
-          headers: { "User-Agent": ua, Accept: "text/html" },
-        });
-        // Only cache successful HTML responses
-        if (res.ok && (res.headers.get("content-type") || "").includes("text/html")) {
-          const cloned = new Response(res.body, res);
-          cloned.headers.set("Cache-Control", "public, max-age=300, s-maxage=1800");
-          cloned.headers.set("X-Prerender", "1");
-          await cache.put(cacheKey, cloned.clone());
-          return cloned;
-        }
-      } else {
-        return res;
+      let cached = await cache.match(cacheKey);
+      if (cached) return cached;
+
+      // Request identity encoding: Supabase's gateway rewrites Content-Type
+      // to `text/plain` on gzipped bodies, which trips some crawlers. Asking
+      // for uncompressed responses keeps `text/html; charset=utf-8` intact.
+      const upstream = await fetch(target.toString(), {
+        headers: {
+          "User-Agent": ua,
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Encoding": "identity",
+        },
+      });
+
+      // Sniff HTML by body prefix — some gateway rewrites strip text/html
+      // even when the body is real HTML.
+      const bodyText = await upstream.text();
+      const looksHtml = /^\s*<!doctype html/i.test(bodyText) ||
+        (upstream.headers.get("content-type") || "").includes("text/html");
+
+      if (upstream.ok && looksHtml) {
+        const outHeaders = new Headers(upstream.headers);
+        // Force the correct MIME on the crawler-facing response no matter
+        // what the origin emitted, and drop stale encoding hints.
+        outHeaders.set("Content-Type", "text/html; charset=utf-8");
+        outHeaders.delete("Content-Encoding");
+        outHeaders.delete("Content-Length");
+        outHeaders.set("Cache-Control", "public, max-age=300, s-maxage=1800");
+        outHeaders.set("X-Prerender", "1");
+        const out = new Response(bodyText, { status: upstream.status, headers: outHeaders });
+        await cache.put(cacheKey, out.clone());
+        return out;
       }
-      return res;
+
+      // Prerender failed or returned non-HTML — fall through to origin so
+      // the crawler still gets *something* instead of a broken response.
+      return fetch(new Request(origin + url.pathname + url.search, request));
     }
 
     // Human — pass through to Lovable origin

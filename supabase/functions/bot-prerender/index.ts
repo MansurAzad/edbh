@@ -262,9 +262,100 @@ async function renderBlogPost(slug: string): Promise<Response> {
   );
 }
 
-function renderHome(): Response {
+async function renderBlogIndex(): Promise<Response> {
+  const { data: posts } = await supabase
+    .from("blog_posts")
+    .select("title,slug,excerpt,image_url,author_name,published_at,created_at")
+    .eq("is_published", true)
+    .order("published_at", { ascending: false })
+    .limit(30);
+
+  const canonical = `${SITE_URL}/blog`;
+  const title = `Blog — Abaya, Borka & Hijab Style Guide Bangladesh | ${SITE_NAME}`;
+  const description = "Abaya, Borka ও Hijab styling, care ও Dubai fashion guide — Dubai Borka House-এর blog।";
+
+  const items = (posts || []).map((p) => ({
+    "@type": "BlogPosting",
+    headline: p.title,
+    url: `${SITE_URL}/blog/${p.slug}`,
+    image: absoluteImage(p.image_url),
+    datePublished: p.published_at || p.created_at,
+    author: { "@type": "Person", name: p.author_name || SITE_NAME },
+  }));
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Blog",
+    name: `${SITE_NAME} Blog`,
+    url: canonical,
+    description,
+    publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.jpg` } },
+    blogPost: items,
+  };
+
+  const body = `
+<h1>${SITE_NAME} Blog</h1>
+<p>${escapeHtml(description)}</p>
+<ul>
+${(posts || []).map((p) => `  <li><a href="${SITE_URL}/blog/${p.slug}">${escapeHtml(p.title)}</a>${p.excerpt ? ` — ${escapeHtml(p.excerpt.slice(0, 140))}` : ""}</li>`).join("\n")}
+</ul>`;
+
+  return new Response(
+    shell({ title, description, canonical, ogImage: `${SITE_URL}/og-image.jpg`, body, jsonLd }),
+    { headers: htmlHeaders("public, max-age=600, s-maxage=3600") },
+  );
+}
+
+async function renderHome(): Promise<Response> {
   const title = `${SITE_NAME} – Premium Dubai Imported Borka, Abaya & Hijab in Bangladesh`;
   const description = "Bangladesh-এর সেরা প্রিমিয়াম দুবাই ইম্পোর্টেড বোরকা, আবায়া, হিজাব ও কাফতান শপ। Cash on Delivery, সারা দেশে দ্রুত ডেলিভারি।";
+  const canonical = `${SITE_URL}/`;
+
+  const { data: featured } = await supabase
+    .from("products")
+    .select("id,name,price,sale_price,image_url,slug,stock")
+    .gt("stock", 0)
+    .order("created_at", { ascending: false })
+    .limit(24);
+
+  const productListItems = (featured || []).map((p, i) => ({
+    "@type": "ListItem",
+    position: i + 1,
+    url: `${SITE_URL}/product/${p.slug || p.id}`,
+    name: p.name,
+    image: absoluteImage(p.image_url),
+  }));
+
+  // Emit BOTH schemas as an array — WebSite (with SearchAction) + CollectionPage
+  // wrapping an ItemList of featured products.
+  const jsonLd: Array<Record<string, unknown>> = [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: SITE_NAME,
+      url: canonical,
+      description,
+      potentialAction: {
+        "@type": "SearchAction",
+        target: `${SITE_URL}/shop?search={search_term_string}`,
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: title,
+      url: canonical,
+      description,
+      isPartOf: { "@type": "WebSite", name: SITE_NAME, url: canonical },
+      mainEntity: {
+        "@type": "ItemList",
+        numberOfItems: productListItems.length,
+        itemListElement: productListItems,
+      },
+    },
+  ];
+
   const body = `
 <h1>${SITE_NAME}</h1>
 <p>${escapeHtml(description)}</p>
@@ -276,9 +367,16 @@ function renderHome(): Response {
     <li><a href="${SITE_URL}/shop?category=Kaftan">Kaftan Collection</a></li>
     <li><a href="${SITE_URL}/blog">Blog</a></li>
   </ul>
-</nav>`;
+</nav>
+<section>
+  <h2>Featured Products</h2>
+  <ul>
+${(featured || []).map((p) => `    <li><a href="${SITE_URL}/product/${p.slug || p.id}">${escapeHtml(p.name)}</a> — ৳${p.sale_price ?? p.price}</li>`).join("\n")}
+  </ul>
+</section>`;
+
   return new Response(
-    shell({ title, description, canonical: `${SITE_URL}/`, ogImage: `${SITE_URL}/og-image.jpg`, body }),
+    shell({ title, description, canonical, ogImage: `${SITE_URL}/og-image.jpg`, body, jsonLd }),
     { headers: htmlHeaders("public, max-age=600, s-maxage=1800") },
   );
 }
@@ -322,12 +420,15 @@ Deno.serve(async (req) => {
     const blogMatch = path.match(/^\/blog\/([^/?]+)/);
     if (blogMatch) return reheader(await renderBlogPost(decodeURIComponent(blogMatch[1])));
 
+    // /blog exactly (index) → list all posts with Blog JSON-LD
+    if (/^\/blog\/?$/.test(path)) return reheader(await renderBlogIndex());
+
     if (path.startsWith("/shop") || path.startsWith("/categor")) {
       const cat = new URL(`${SITE_URL}${path}`).searchParams.get("category");
       return reheader(await renderCategoryOrShop(cat));
     }
 
-    return reheader(renderHome());
+    return reheader(await renderHome());
   } catch (err) {
     console.error("bot-prerender error:", err);
     return new Response(`Prerender error: ${err instanceof Error ? err.message : String(err)}`, {
