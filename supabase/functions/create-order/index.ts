@@ -502,7 +502,9 @@ serve(async (req: Request): Promise<Response> => {
 
   // ── Step 9: Final total calculation ─────────────────────────────────────────
   // finalTotal is clamped to ≥0 to prevent negative totals on large discounts.
-  const shippingCost = selectedZone ? Number(selectedZone.shipping_charge) : 0;
+  // Flat ৳150 delivery charge when no specific zone is selected (simplified checkout).
+  const FLAT_SHIPPING_BDT = 150;
+  const shippingCost = selectedZone ? Number(selectedZone.shipping_charge) : FLAT_SHIPPING_BDT;
   const finalTotal = Math.max(0, subtotal - discountAmount + shippingCost);
 
   // ── Step 10: Advance amount sanity guard ─────────────────────────────────────

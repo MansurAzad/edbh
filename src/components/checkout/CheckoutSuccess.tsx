@@ -7,7 +7,7 @@
  */
 
 import { motion } from "framer-motion";
-import { CheckCircle, FileText } from "lucide-react";
+import { CheckCircle, FileText, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -41,6 +41,9 @@ interface Props {
    * handling any loading/error state.
    */
   onDownloadInvoice: () => void;
+
+  /** Optional: re-open WhatsApp with the order receipt message. */
+  onShareWhatsApp?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +72,7 @@ export default function CheckoutSuccess({
   orderId,
   isLoggedIn,
   onDownloadInvoice,
+  onShareWhatsApp,
 }: Props) {
   return (
     /* Full-height page wrapper – shares the global background colour */
@@ -116,14 +120,25 @@ export default function CheckoutSuccess({
             </p>
 
             {/* Invoice download button – delegates to parent callback */}
-            <Button
-              onClick={onDownloadInvoice}
-              variant="outline"
-              className="mb-6 gap-2"
-            >
-              <FileText className="w-4 h-4" />
-              Download Invoice
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
+              <Button
+                onClick={onDownloadInvoice}
+                variant="outline"
+                className="gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Download Invoice
+              </Button>
+              {onShareWhatsApp && (
+                <Button
+                  onClick={onShareWhatsApp}
+                  className="gap-2 bg-green-500 hover:bg-green-600 text-white"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  WhatsApp-এ রিসিট শেয়ার
+                </Button>
+              )}
+            </div>
 
             {/* Post-order navigation – stacks vertically on mobile */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
