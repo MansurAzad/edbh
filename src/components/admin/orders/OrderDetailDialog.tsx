@@ -349,31 +349,15 @@ const OrderDetailDialog = ({
 
                 {waEvents.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-border/40">
-                    <p className="text-xs font-semibold text-muted-foreground mb-1.5">
-                      শেয়ার লগ ({waEvents.length})
-                    </p>
-                    <ul className="space-y-1 text-xs font-mono max-h-40 overflow-y-auto">
-                      {waEvents.map((ev) => (
-                        <li key={ev.id} className="flex justify-between gap-2">
-                          <span className="flex gap-1.5">
-                            <span className={
-                              ev.status === "opened" || ev.status === "retried"
-                                ? "text-green-600"
-                                : ev.status === "blocked"
-                                  ? "text-amber-600"
-                                  : "text-destructive"
-                            }>
-                              {ev.status}
-                            </span>
-                            <span className="text-muted-foreground">[{ev.actor}]</span>
-                          </span>
-                          <span className="text-muted-foreground truncate">
-                            {new Date(ev.created_at).toLocaleString()}
-                            {ev.error ? ` — ${ev.error}` : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    <WhatsAppShareTimeline
+                      title="শেয়ার লগ"
+                      events={waEvents.map((ev) => ({
+                        status: ev.status,
+                        at: ev.created_at,
+                        actor: ev.actor,
+                        error: ev.error,
+                      }))}
+                    />
                   </div>
                 )}
               </div>
