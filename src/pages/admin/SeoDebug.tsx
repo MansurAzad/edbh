@@ -331,6 +331,12 @@ type VerifyResult = {
   checks: VerifyCheck[];
 } | { error: string };
 
+function extractMeta(html: string, kind: "og" | "name", key: string): string | null {
+  const attr = kind === "og" ? "property" : "name";
+  const re = new RegExp(`<meta[^>]+${attr}=["']${key}["'][^>]*content=["']([^"']+)["']`, "i");
+  return html.match(re)?.[1] ?? null;
+}
+
 function runHtmlChecks(html: string, pathname: string): VerifyCheck[] {
   const kind = pathname.startsWith("/product")
     ? "product"
@@ -338,12 +344,29 @@ function runHtmlChecks(html: string, pathname: string): VerifyCheck[] {
     ? "blog"
     : "category";
 
+  const ogTitle = extractMeta(html, "og", "og:title");
+  const ogDesc = extractMeta(html, "og", "og:description");
+  const ogImage = extractMeta(html, "og", "og:image");
+  const ogUrl = extractMeta(html, "og", "og:url");
+  const ogType = extractMeta(html, "og", "og:type");
+  const twCard = extractMeta(html, "name", "twitter:card");
+  const twTitle = extractMeta(html, "name", "twitter:title");
+  const twImage = extractMeta(html, "name", "twitter:image");
+
+  const expectedOgType = kind === "product" ? "product" : kind === "blog" ? "article" : "website";
+
   const c: VerifyCheck[] = [
     { label: "<title> present", ok: /<title>[^<]{5,}<\/title>/i.test(html) },
     { label: "meta description", ok: /<meta[^>]+name=["']description["'][^>]*content=["'][^"']{10,}/i.test(html) },
     { label: "canonical link", ok: /<link[^>]+rel=["']canonical["']/i.test(html) },
-    { label: "og:title / og:image", ok: /og:title/i.test(html) && /og:image/i.test(html) },
-    { label: "twitter:card", ok: /twitter:card/i.test(html) },
+    { label: "og:title", ok: !!ogTitle, detail: ogTitle || undefined },
+    { label: "og:description", ok: !!ogDesc, detail: ogDesc || undefined },
+    { label: "og:image", ok: !!ogImage, detail: ogImage || undefined },
+    { label: "og:url", ok: !!ogUrl, detail: ogUrl || undefined },
+    { label: `og:type = "${expectedOgType}"`, ok: ogType === expectedOgType, detail: `got: ${ogType || "(missing)"}` },
+    { label: "twitter:card", ok: !!twCard, detail: twCard || undefined },
+    { label: "twitter:title", ok: !!twTitle, detail: twTitle || undefined },
+    { label: "twitter:image (falls back to og:image)", ok: !!(twImage || ogImage) },
     { label: "JSON-LD block", ok: /application\/ld\+json/i.test(html) },
   ];
   if (kind === "product") {
