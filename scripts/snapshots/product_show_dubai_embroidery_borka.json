@@ -1,0 +1,29 @@
+{
+  "breadcrumb": [
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "item": "https://dubaiborkahouse.com/",
+          "name": "Home",
+          "position": 1
+        },
+        {
+          "@type": "ListItem",
+          "item": "https://dubaiborkahouse.com/shop?category=Dubai%20borka%20",
+          "name": "Dubai borka ",
+          "position": 2
+        },
+        {
+          "@type": "ListItem",
+          "item": "https://dubaiborkahouse.com/product/dubai-embroidery-borka",
+          "name": "Dubai embroidery borka – Dubai Collection",
+          "position": 3
+        }
+      ]
+    }
+  ],
+  "faq": []
+}
