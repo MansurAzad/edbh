@@ -154,6 +154,35 @@ export default function CheckoutSuccess({
               )}
             </div>
 
+            {events.length > 0 && (
+              <div className="mb-6 rounded-lg border border-border/40 bg-muted/30 p-3 text-left">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                  WhatsApp শেয়ার লগ ({events.length})
+                </p>
+                <ul className="space-y-1 text-xs font-mono">
+                  {events.map((e, i) => (
+                    <li key={i} className="flex justify-between gap-2">
+                      <span className={
+                        e.status === "opened" || e.status === "retried"
+                          ? "text-green-600"
+                          : e.status === "blocked"
+                            ? "text-amber-600"
+                            : "text-destructive"
+                      }>
+                        {e.status}
+                      </span>
+                      <span className="text-muted-foreground truncate">
+                        {new Date(e.timestamp).toLocaleTimeString()}
+                        {e.error ? ` — ${e.error}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               {isLoggedIn && (
                 <Link to="/profile" className="btn-outline-gold">
