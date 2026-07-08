@@ -609,6 +609,8 @@ Deno.serve(async (req) => {
     if (/^\/blog\/?$/.test(path)) return reheader(await renderBlogIndex());
 
     if (/^\/faq\/?$/.test(path)) return reheader(renderFaq());
+    if (/^\/about\/?$/.test(path)) return reheader(renderAbout());
+    if (/^\/contact\/?$/.test(path)) return reheader(renderContact());
 
     if (path.startsWith("/shop") || path.startsWith("/categor")) {
       const cat = new URL(`${SITE_URL}${path}`).searchParams.get("category");
