@@ -8,7 +8,8 @@
  */
 
 import { motion } from "framer-motion";
-import { Truck, Wallet, ShieldCheck, AlertCircle } from "lucide-react";
+import { Truck, Wallet, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
+
 import type {
   CheckoutShippingInfo,
   DeliveryZone,
@@ -127,52 +128,10 @@ export default function SimpleCheckoutForm({
             <FieldError msg={errors.address} />
           </div>
 
-          {/* Optional city → drives conditional zone selector */}
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              শহর <span className="text-muted-foreground text-xs">(ঐচ্ছিক)</span>
-            </label>
-            <input
-              type="text"
-              className="input-luxury w-full"
-              placeholder="যেমন: Dhaka, Chittagong"
-              value={shippingInfo.city}
-              onChange={(e) => setShippingInfo({ ...shippingInfo, city: e.target.value })}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              বিশেষ শহরের জন্য আলাদা ডেলিভারি জোন থাকলে নিচে দেখাবে।
-            </p>
-          </div>
+          {/* City + delivery zone selector intentionally hidden from customer:
+              flat ৳150 shipping applies everywhere; keeping the props keeps
+              backward compatibility with tests and the parent state. */}
 
-          {/* Conditional delivery zone selector — only appears when we have
-              at least one matching zone for the typed city. */}
-          {showZoneSelector && deliveryZones.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              className="overflow-hidden"
-            >
-              <label className="block text-sm font-medium mb-2">
-                ডেলিভারি জোন <span className="text-muted-foreground text-xs">(ঐচ্ছিক)</span>
-              </label>
-              <select
-                className="input-luxury w-full"
-                value={selectedZone?.id || ""}
-                onChange={(e) => {
-                  const zone = deliveryZones.find((z) => z.id === e.target.value) || null;
-                  onSelectZone(zone);
-                }}
-              >
-                <option value="">— ফ্ল্যাট ৳১৫০ ব্যবহার করুন —</option>
-                {deliveryZones.map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.zone_name} — ৳{z.shipping_charge}
-                    {z.estimated_days ? ` (${z.estimated_days} দিন)` : ""}
-                  </option>
-                ))}
-              </select>
-            </motion.div>
-          )}
 
           <div>
             <label className="block text-sm font-medium mb-2">ডেলিভারি নোট (ঐচ্ছিক)</label>
