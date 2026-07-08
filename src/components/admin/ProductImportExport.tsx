@@ -327,73 +327,10 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
     }
   };
 
-  // ============ HELPERS ============
-  const esc = (field: string): string => {
-    if (!field) return '""';
-    if (field.includes(",") || field.includes('"') || field.includes("\n")) {
-      return `"${field.replace(/"/g, '""')}"`;
-    }
-    return `"${field}"`;
-  };
+  // CSV helpers (esc / parseCsvField / parseCSVLine / parseProductRow /
+  // validateProductRow) live in @/lib/admin/productCsv so we can unit-test
+  // the round-trip without pulling in the whole component.
 
-  const parseCsvField = (field: string): string => {
-    if (!field) return "";
-    field = field.trim();
-    if (field.startsWith('"') && field.endsWith('"')) field = field.slice(1, -1).replace(/""/g, '"');
-    return field;
-  };
-
-  const parseCSVLine = (line: string): string[] => {
-    const result: string[] = [];
-    let current = "";
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (inQuotes) {
-        if (char === '"' && line[i + 1] === '"') { current += '"'; i++; }
-        else if (char === '"') { inQuotes = false; }
-        else { current += char; }
-      } else {
-        if (char === '"') { inQuotes = true; }
-        else if (char === ",") { result.push(current); current = ""; }
-        else { current += char; }
-      }
-    }
-    result.push(current);
-    return result;
-  };
-
-  const parseProductRow = (headers: string[], values: string[]): Record<string, any> => {
-    const product: Record<string, any> = {};
-    headers.forEach((header, index) => {
-      const value = parseCsvField(values[index] || "");
-      switch (header) {
-        case "name": case "category": case "description": case "image_url": case "material":
-        case "sku": case "subcategory": case "fabric": case "work_type": case "part":
-        case "image_alt_text": case "meta_title": case "meta_description":
-          if (value) product[header] = value; break;
-        case "price": case "sale_price":
-          const num = parseFloat(value);
-          if (!isNaN(num) && num > 0) product[header] = num;
-          else if (header === "price") throw new Error("অবৈধ মূল্য");
-          break;
-        case "stock": product.stock = parseInt(value) || 0; break;
-        case "purchase_cost":
-          const pc = parseFloat(value);
-          if (!isNaN(pc)) product.purchase_cost = pc;
-          break;
-        case "featured": product.featured = value.toLowerCase() === "true"; break;
-        case "hijab_included": product.hijab_included = value.toLowerCase() === "true"; break;
-        case "inner_included": product.inner_included = value.toLowerCase() === "true"; break;
-        case "sizes": product.sizes = value ? value.split(";").map((s) => s.trim()).filter(Boolean) : []; break;
-        case "colors": product.colors = value ? value.split(";").map((c) => c.trim()).filter(Boolean) : []; break;
-      }
-    });
-    // Back-compat: mirror fabric ↔ material if only one is provided.
-    if (product.fabric && !product.material) product.material = product.fabric;
-    if (product.material && !product.fabric) product.fabric = product.material;
-    return product;
-  };
 
   const parseVariantFromRow = (headers: string[], values: string[]): Record<string, any> | null => {
     const row: Record<string, string> = {};
