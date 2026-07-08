@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import OrderStatusBadge from "./OrderStatusBadge";
+import OrderRowThumbnail from "./OrderRowThumbnail";
 import type { AdminOrder } from "@/lib/admin/orderHelpers";
 
 // ---------------------------------------------------------------------------
