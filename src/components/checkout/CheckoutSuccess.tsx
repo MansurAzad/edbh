@@ -7,7 +7,7 @@
  */
 
 import { motion } from "framer-motion";
-import { CheckCircle, FileText } from "lucide-react";
+import { CheckCircle, FileText, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
