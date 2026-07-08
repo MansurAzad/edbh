@@ -99,6 +99,7 @@ const OrdersTable = ({
             <TableHead className="w-10">
               <Checkbox checked={allSelected} onCheckedChange={onToggleSelectAll} />
             </TableHead>
+            <TableHead className="w-14">Item</TableHead>
             <TableHead>Order ID</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Customer</TableHead>
