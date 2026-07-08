@@ -122,6 +122,10 @@ interface Props {
   onSubmit: (e: React.FormEvent) => void;
   /** Disables submit while a Supabase mutation is pending. বাংলা: মিউটেশন চলাকালীন সাবমিট বন্ধ। */
   submitting?: boolean;
+  /** Category autocomplete suggestions sourced from existing products. */
+  categorySuggestions?: string[];
+  /** Subcategory autocomplete suggestions, filtered by selected category upstream. */
+  subcategorySuggestions?: string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
