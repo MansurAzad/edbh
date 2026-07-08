@@ -118,11 +118,14 @@ const OrderDetailDialog = ({
   // WhatsApp share attempt log (append-only from whatsapp_share_events).
   const [waEvents, setWaEvents] = useState<WhatsAppShareEvent[]>([]);
   const [waRetrying, setWaRetrying] = useState(false);
+  /** Event id we're awaiting a terminal delivery_status for. */
+  const [waAwaitingId, setWaAwaitingId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const loadWaEvents = async (orderId: string) => {
     const rows = await fetchWhatsAppShareEvents(orderId);
     setWaEvents(rows);
+    return rows;
   };
 
   useEffect(() => {
