@@ -101,6 +101,22 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  /** Snapshot of the original stock/purchase_cost values for every product
+   *  in the dialog. Used for optimistic rollback: if a per-row Supabase
+   *  update fails, we restore that row's draft to this snapshot so the UI
+   *  matches the DB state and the admin can retry. */
+  const originalById = useMemo(() => {
+    const m: Record<string, { stock: string; purchase_cost: string }> = {};
+    for (const p of products) {
+      m[p.id] = {
+        stock: String(p.stock ?? 0),
+        purchase_cost: p.purchase_cost != null ? String(p.purchase_cost) : "",
+      };
+    }
+    return m;
+  }, [products]);
 
   useEffect(() => {
     if (open) {
