@@ -18,7 +18,10 @@ import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
-import type { WhatsAppShareStatus } from "@/lib/checkout/whatsappShare";
+import type {
+  WhatsAppShareStatus,
+  ShareResult,
+} from "@/lib/checkout/whatsappShare";
 
 interface Props {
   orderId: string | null;
@@ -30,6 +33,8 @@ interface Props {
   whatsappStatus?: WhatsAppShareStatus | null;
   /** Human-readable reason when whatsappStatus is "blocked" or "failed". */
   whatsappError?: string | null;
+  /** Timestamped log of every share attempt in this session (newest first). */
+  whatsappEvents?: ShareResult[];
 }
 
 function WhatsAppStatusCard({
@@ -94,12 +99,15 @@ export default function CheckoutSuccess({
   onShareWhatsApp,
   whatsappStatus,
   whatsappError,
+  whatsappEvents,
 }: Props) {
+  const events = whatsappEvents ?? [];
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="pt-24 pb-20">
         <div className="container mx-auto px-4">
+
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -145,6 +153,35 @@ export default function CheckoutSuccess({
                 </Button>
               )}
             </div>
+
+            {events.length > 0 && (
+              <div className="mb-6 rounded-lg border border-border/40 bg-muted/30 p-3 text-left">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                  WhatsApp শেয়ার লগ ({events.length})
+                </p>
+                <ul className="space-y-1 text-xs font-mono">
+                  {events.map((e, i) => (
+                    <li key={i} className="flex justify-between gap-2">
+                      <span className={
+                        e.status === "opened" || e.status === "retried"
+                          ? "text-green-600"
+                          : e.status === "blocked"
+                            ? "text-amber-600"
+                            : "text-destructive"
+                      }>
+                        {e.status}
+                      </span>
+                      <span className="text-muted-foreground truncate">
+                        {new Date(e.timestamp).toLocaleTimeString()}
+                        {e.error ? ` — ${e.error}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               {isLoggedIn && (

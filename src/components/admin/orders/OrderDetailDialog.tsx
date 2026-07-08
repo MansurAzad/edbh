@@ -13,11 +13,13 @@
 // =============================================================================
 
 import { useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import TrackingForm from "./TrackingForm";
 import {
   type AdminOrder,
@@ -25,6 +27,11 @@ import {
   getStatusColor,
   getPaymentStatusColor,
 } from "@/lib/admin/orderHelpers";
+import {
+  fetchWhatsAppShareEvents,
+  type WhatsAppShareEvent,
+} from "@/lib/checkout/whatsappShare";
+import { retryWhatsAppShareForOrder } from "@/lib/admin/adminWhatsAppRetry";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -101,28 +108,65 @@ const OrderDetailDialog = ({
   // Fetch order items whenever the selected order changes.
   // Resets to an empty array when the dialog closes (order === null).
   // -------------------------------------------------------------------------
+  // WhatsApp share attempt log (append-only from whatsapp_share_events).
+  const [waEvents, setWaEvents] = useState<WhatsAppShareEvent[]>([]);
+  const [waRetrying, setWaRetrying] = useState(false);
+  const { toast } = useToast();
+
+  const loadWaEvents = async (orderId: string) => {
+    const rows = await fetchWhatsAppShareEvents(orderId);
+    setWaEvents(rows);
+  };
+
   useEffect(() => {
     if (!order) {
       setItems([]);
+      setWaEvents([]);
       return;
     }
-    // Direct Supabase query — items are small and don't need a React Query cache.
     supabase
       .from("order_items")
       .select("*")
       .eq("order_id", order.id)
       .then(({ data }) => setItems((data as AdminOrderItem[]) || []));
+    loadWaEvents(order.id);
   }, [order]);
 
+  const handleAdminRetryWa = async () => {
+    if (!order) return;
+    setWaRetrying(true);
+    try {
+      const res = await retryWhatsAppShareForOrder(order.id);
+      toast({
+        title:
+          res.status === "opened" || res.status === "retried"
+            ? "WhatsApp আবার খোলা হয়েছে"
+            : "WhatsApp শেয়ার হয়নি",
+        description: res.error || `স্ট্যাটাস: ${res.status}`,
+        variant:
+          res.status === "opened" || res.status === "retried"
+            ? "default"
+            : "destructive",
+      });
+      await loadWaEvents(order.id);
+    } catch (e) {
+      toast({
+        title: "রি-শেয়ার ব্যর্থ",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setWaRetrying(false);
+    }
+  };
+
   return (
-    // Dialog open state is derived from whether an order is selected.
-    // onOpenChange triggers onClose when the user presses Escape or the overlay.
     <Dialog open={!!order} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          {/* Show the first 8 chars of the UUID as a short order reference */}
           <DialogTitle>Order Details #{order?.id.slice(0, 8)}</DialogTitle>
         </DialogHeader>
+
 
         {/* Only render body content once an order is available */}
         {order && (
@@ -255,37 +299,85 @@ const OrderDetailDialog = ({
             {/* ----------------------------------------------------------------
                 Section 2b — WhatsApp receipt share status
             ---------------------------------------------------------------- */}
-            {order.whatsapp_share_status && (
+            {(order.whatsapp_share_status || waEvents.length > 0) && (
               <div className={`p-4 border rounded-lg text-sm ${
                 order.whatsapp_share_status === "opened" || order.whatsapp_share_status === "retried"
                   ? "border-green-500/40 bg-green-500/5"
                   : order.whatsapp_share_status === "blocked"
                   ? "border-amber-500/40 bg-amber-500/5"
-                  : "border-destructive/40 bg-destructive/5"
+                  : order.whatsapp_share_status
+                  ? "border-destructive/40 bg-destructive/5"
+                  : "border-border bg-muted/30"
               }`}>
-                <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                  📱 WhatsApp রিসিট শেয়ার
-                </h4>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="font-medium">
-                    স্ট্যাটাস:{" "}
-                    <span className="uppercase font-mono text-xs">
-                      {order.whatsapp_share_status}
-                    </span>
-                  </span>
-                  {order.whatsapp_shared_at && (
-                    <span className="text-xs text-muted-foreground">
-                      সময়: {new Date(order.whatsapp_shared_at).toLocaleString()}
-                    </span>
-                  )}
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">
+                    📱 WhatsApp রিসিট শেয়ার
+                  </h4>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleAdminRetryWa}
+                    disabled={waRetrying}
+                    className="gap-1.5 h-7 text-xs"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${waRetrying ? "animate-spin" : ""}`} />
+                    {waRetrying ? "চেষ্টা করা হচ্ছে..." : "আবার শেয়ার করুন"}
+                  </Button>
                 </div>
+
+                {order.whatsapp_share_status && (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="font-medium">
+                      স্ট্যাটাস:{" "}
+                      <span className="uppercase font-mono text-xs">
+                        {order.whatsapp_share_status}
+                      </span>
+                    </span>
+                    {order.whatsapp_shared_at && (
+                      <span className="text-xs text-muted-foreground">
+                        সময়: {new Date(order.whatsapp_shared_at).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {order.whatsapp_share_error && (
                   <p className="mt-1 text-xs text-destructive">
                     কারণ: {order.whatsapp_share_error}
                   </p>
                 )}
+
+                {waEvents.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border/40">
+                    <p className="text-xs font-semibold text-muted-foreground mb-1.5">
+                      শেয়ার লগ ({waEvents.length})
+                    </p>
+                    <ul className="space-y-1 text-xs font-mono max-h-40 overflow-y-auto">
+                      {waEvents.map((ev) => (
+                        <li key={ev.id} className="flex justify-between gap-2">
+                          <span className="flex gap-1.5">
+                            <span className={
+                              ev.status === "opened" || ev.status === "retried"
+                                ? "text-green-600"
+                                : ev.status === "blocked"
+                                  ? "text-amber-600"
+                                  : "text-destructive"
+                            }>
+                              {ev.status}
+                            </span>
+                            <span className="text-muted-foreground">[{ev.actor}]</span>
+                          </span>
+                          <span className="text-muted-foreground truncate">
+                            {new Date(ev.created_at).toLocaleString()}
+                            {ev.error ? ` — ${ev.error}` : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
+
 
             {/* ----------------------------------------------------------------
                 Section 3 — Tracking information

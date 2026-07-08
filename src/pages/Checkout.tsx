@@ -20,15 +20,19 @@ import {
 } from "@/lib/checkout/types";
 import CheckoutAuthChoice from "@/components/checkout/CheckoutAuthChoice";
 import CheckoutSuccess from "@/components/checkout/CheckoutSuccess";
-import SimpleCheckoutForm, {
-  type FieldErrors,
-} from "@/components/checkout/SimpleCheckoutForm";
+import SimpleCheckoutForm from "@/components/checkout/SimpleCheckoutForm";
 import CheckoutOrderSummary from "@/components/checkout/CheckoutOrderSummary";
 import {
   shareOrderToWhatsApp,
   type OrderReceipt,
   type WhatsAppShareStatus,
+  type ShareResult,
 } from "@/lib/checkout/whatsappShare";
+import {
+  validateCheckoutFields,
+  type CheckoutFieldErrors,
+} from "@/lib/checkout/validation";
+import { createSubmitGuard } from "@/lib/checkout/submitGuard";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -53,10 +57,11 @@ const Checkout = () => {
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [shippingInfo, setShippingInfo] = useState(emptyShippingInfo);
 
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [fieldErrors, setFieldErrors] = useState<CheckoutFieldErrors>({});
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [waStatus, setWaStatus] = useState<WhatsAppShareStatus | null>(null);
   const [waError, setWaError] = useState<string | null>(null);
+  const [waEvents, setWaEvents] = useState<ShareResult[]>([]);
 
   const { user, loading: authLoading } = useAuth();
   const { items, total, clearCart } = useCart();
@@ -64,8 +69,9 @@ const Checkout = () => {
   const navigate = useNavigate();
 
   // Double-submit guard — synchronously blocks concurrent order attempts even
-  // before React re-renders with `processing = true`.
-  const submitLockRef = useRef(false);
+  // before React re-renders with `processing = true`. Backed by createSubmitGuard
+  // so the mechanism is covered by src/lib/checkout/__tests__/submitGuard.test.ts.
+  const submitGuardRef = useRef(createSubmitGuard());
 
   // Snapshot for the "Retry WhatsApp share" button on the success page.
   const lastReceiptRef = useRef<OrderReceipt | null>(null);
@@ -95,28 +101,7 @@ const Checkout = () => {
   const finalTotal = Math.max(0, total - discountAmount) + shippingCost;
 
   const validate = (): boolean => {
-    const errs: FieldErrors = {};
-    if (!shippingInfo.fullName.trim()) {
-      errs.fullName = "নাম দিন — এটি বাধ্যতামূলক";
-    } else if (shippingInfo.fullName.trim().length < 3) {
-      errs.fullName = "নাম কমপক্ষে ৩ অক্ষরের হতে হবে";
-    }
-
-    const digits = shippingInfo.phone.replace(/\D/g, "");
-    if (!shippingInfo.phone.trim()) {
-      errs.phone = "মোবাইল নম্বর দিন — এটি বাধ্যতামূলক";
-    } else if (digits.length < 11 || digits.length > 14) {
-      errs.phone = "সঠিক মোবাইল নম্বর দিন (১১ সংখ্যা, যেমন 01XXXXXXXXX)";
-    } else if (!/^01[3-9]\d{8}$/.test(digits.slice(-11))) {
-      errs.phone = "বাংলাদেশি মোবাইল ফরম্যাট নয় (01 দিয়ে শুরু, ১১ সংখ্যা)";
-    }
-
-    if (!shippingInfo.address.trim()) {
-      errs.address = "পুরো ঠিকানা দিন — এটি বাধ্যতামূলক";
-    } else if (shippingInfo.address.trim().length < 10) {
-      errs.address = "ঠিকানাটি সম্পূর্ণ লিখুন (কমপক্ষে ১০ অক্ষর)";
-    }
-
+    const errs = validateCheckoutFields(shippingInfo);
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
       toast({
@@ -144,6 +129,7 @@ const Checkout = () => {
     const res = await shareOrderToWhatsApp(lastReceiptRef.current, { isRetry: true });
     setWaStatus(res.status);
     setWaError(res.error ?? null);
+    setWaEvents((prev) => [res, ...prev]);
     if (res.status === "blocked") {
       toast({
         title: "WhatsApp popup ব্লক হয়েছে",
@@ -155,7 +141,7 @@ const Checkout = () => {
   };
 
   const handleConfirmClick = () => {
-    if (submitLockRef.current || processing) return;
+    if (submitGuardRef.current.isLocked() || processing) return;
     if (!validate()) return;
     if (items.length === 0) {
       toast({ title: "Cart is empty", description: "Add items to your cart before checkout", variant: "destructive" });
@@ -168,17 +154,16 @@ const Checkout = () => {
   const handlePlaceOrder = async () => {
     // Synchronous re-entrancy guard — blocks double clicks even before
     // React re-renders with processing=true.
-    if (submitLockRef.current) return;
-    submitLockRef.current = true;
+    if (!submitGuardRef.current.tryAcquire()) return;
     setShowConfirmDialog(false);
 
     if (authLoading) {
-      submitLockRef.current = false;
+      submitGuardRef.current.release();
       toast({ title: "একটু অপেক্ষা করুন", description: "সেশন যাচাই হচ্ছে, আবার চেষ্টা করুন", variant: "destructive" });
       return;
     }
     if (!user && !isGuest) {
-      submitLockRef.current = false;
+      submitGuardRef.current.release();
       toast({ title: "Please sign in or continue as guest", description: "Choose an option to proceed", variant: "destructive" });
       return;
     }
@@ -225,6 +210,7 @@ const Checkout = () => {
       const shareRes = await shareOrderToWhatsApp(receipt);
       setWaStatus(shareRes.status);
       setWaError(shareRes.error ?? null);
+      setWaEvents([shareRes]);
 
       trackPurchase(
         generatedOrderId,
@@ -250,7 +236,7 @@ const Checkout = () => {
       });
     } finally {
       setProcessing(false);
-      submitLockRef.current = false;
+      submitGuardRef.current.release();
     }
   };
 
@@ -263,6 +249,7 @@ const Checkout = () => {
         onShareWhatsApp={handleShareWhatsApp}
         whatsappStatus={waStatus}
         whatsappError={waError}
+        whatsappEvents={waEvents}
       />
     );
   }

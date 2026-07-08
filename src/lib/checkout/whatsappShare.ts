@@ -1,19 +1,28 @@
 /**
  * @file whatsappShare.ts
- * @description Builds a Bengali order-receipt message and opens WhatsApp with
- * the message pre-filled to the business number. Also persists the share
- * attempt result to `orders.whatsapp_share_status` so admins can see whether
- * the customer's receipt was successfully forwarded.
+ * @description Builds a Bengali order-receipt message, opens WhatsApp with
+ * the message pre-filled to the business number, and persists BOTH:
+ *  1. The latest status on `orders` (whatsapp_share_status, ..._at, ..._error)
+ *  2. A per-attempt row in `whatsapp_share_events` (audit trail for admin).
  */
 
 import type { CartItem } from "@/contexts/CartContext";
 import type { CheckoutShippingInfo, PaymentMethodId } from "@/lib/checkout/types";
 import { supabase } from "@/integrations/supabase/client";
 
-/** Business WhatsApp number (same as WhatsAppOrderButton). */
 export const BUSINESS_WHATSAPP = "8801845853634";
 
 export type WhatsAppShareStatus = "opened" | "blocked" | "failed" | "retried";
+export type WhatsAppShareActor = "customer" | "admin" | "system";
+
+export interface WhatsAppShareEvent {
+  id: string;
+  order_id: string;
+  status: WhatsAppShareStatus;
+  error: string | null;
+  actor: WhatsAppShareActor;
+  created_at: string;
+}
 
 export interface OrderReceipt {
   orderId: string;
@@ -34,6 +43,9 @@ export interface ShareResult {
   status: WhatsAppShareStatus;
   error?: string;
   url: string;
+  /** Timestamp of the attempt (client clock). */
+  timestamp: string;
+  actor: WhatsAppShareActor;
 }
 
 const paymentLabel: Record<PaymentMethodId, string> = {
@@ -91,15 +103,18 @@ export function buildOrderReceiptText(p: OrderReceipt): string {
 }
 
 /**
- * Attempts to open WhatsApp with the pre-filled receipt and persists the
- * result to the order row. Returns a status the UI can display.
+ * Opens WhatsApp with the pre-filled receipt and persists the attempt to:
+ *  - `orders` (latest status)
+ *  - `whatsapp_share_events` (append-only log)
  */
 export async function shareOrderToWhatsApp(
   params: OrderReceipt,
-  opts: { isRetry?: boolean } = {},
+  opts: { isRetry?: boolean; actor?: WhatsAppShareActor } = {},
 ): Promise<ShareResult> {
   const text = buildOrderReceiptText(params);
   const url = `https://wa.me/${BUSINESS_WHATSAPP}?text=${encodeURIComponent(text)}`;
+  const actor: WhatsAppShareActor = opts.actor ?? "customer";
+  const timestamp = new Date().toISOString();
 
   let status: WhatsAppShareStatus = "opened";
   let error: string | undefined;
@@ -122,19 +137,47 @@ export async function shareOrderToWhatsApp(
     error = e instanceof Error ? e.message : String(e);
   }
 
-  // Persist to DB (best-effort — never blocks the UI).
+  // 1. Latest status on the order row
   try {
     await supabase
       .from("orders")
       .update({
         whatsapp_share_status: status,
-        whatsapp_shared_at: new Date().toISOString(),
+        whatsapp_shared_at: timestamp,
         whatsapp_share_error: error ?? null,
       })
       .eq("id", params.orderId);
-  } catch (persistErr) {
-    console.warn("Failed to persist WhatsApp share status:", persistErr);
+  } catch (e) {
+    console.warn("Failed to persist WhatsApp share status:", e);
   }
 
-  return { status, error, url };
+  // 2. Append to the event log
+  try {
+    await supabase.from("whatsapp_share_events").insert({
+      order_id: params.orderId,
+      status,
+      error: error ?? null,
+      actor,
+    });
+  } catch (e) {
+    console.warn("Failed to log WhatsApp share event:", e);
+  }
+
+  return { status, error, url, timestamp, actor };
+}
+
+/** Fetches the full audit trail of share attempts for a single order. */
+export async function fetchWhatsAppShareEvents(
+  orderId: string,
+): Promise<WhatsAppShareEvent[]> {
+  const { data, error } = await supabase
+    .from("whatsapp_share_events")
+    .select("*")
+    .eq("order_id", orderId)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.warn("Failed to fetch share events:", error);
+    return [];
+  }
+  return (data ?? []) as WhatsAppShareEvent[];
 }

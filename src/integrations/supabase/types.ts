@@ -1898,6 +1898,41 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_share_events: {
+        Row: {
+          actor: string
+          created_at: string
+          error: string | null
+          id: string
+          order_id: string
+          status: string
+        }
+        Insert: {
+          actor?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          order_id: string
+          status: string
+        }
+        Update: {
+          actor?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          order_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_share_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wishlist: {
         Row: {
           created_at: string
