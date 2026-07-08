@@ -182,11 +182,23 @@ export interface ProductJsonLdInput extends ProductSeoInput {
   stock?: number | null;
   reviewCount?: number;
   averageRating?: number;
+  sizes?: string[] | null;
+  colors?: string[] | null;
+  material?: string | null;
+  sku?: string | null;
+  gtin?: string | null;
 }
 
 export function buildProductJsonLd(p: ProductJsonLdInput): Record<string, unknown> {
   const effectivePrice = p.salePrice ?? p.price ?? 0;
   const inStock = typeof p.stock === "number" ? p.stock > 0 : true;
+
+  // Additional properties → Google shows these as key/value in rich results.
+  const additionalProperty: Array<Record<string, string>> = [];
+  if (p.sizes?.length) additionalProperty.push({ "@type": "PropertyValue", name: "Size", value: p.sizes.join(", ") });
+  if (p.colors?.length) additionalProperty.push({ "@type": "PropertyValue", name: "Color", value: p.colors.join(", ") });
+  if (p.material) additionalProperty.push({ "@type": "PropertyValue", name: "Material", value: p.material });
+
   const schema: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -195,7 +207,12 @@ export function buildProductJsonLd(p: ProductJsonLdInput): Record<string, unknow
     image: absoluteUrl(p.image),
     category: p.category || undefined,
     url: productUrl(p),
+    sku: p.sku || p.id,
+    ...(p.gtin ? { gtin: p.gtin } : {}),
     brand: { "@type": "Brand", name: SITE_NAME },
+    ...(additionalProperty.length ? { additionalProperty } : {}),
+    ...(p.material ? { material: p.material } : {}),
+    ...(p.colors?.length ? { color: p.colors.join(", ") } : {}),
     offers: {
       "@type": "Offer",
       priceCurrency: "BDT",
@@ -204,15 +221,34 @@ export function buildProductJsonLd(p: ProductJsonLdInput): Record<string, unknow
       availability: inStock
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
+      itemCondition: "https://schema.org/NewCondition",
       seller: { "@type": "Organization", name: SITE_NAME },
-      // Sale prices are only valid for ~30 days per Google guidelines.
       ...(p.salePrice
         ? { priceValidUntil: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0] }
         : {}),
+      // Shipping — Google rich result eligibility (BD nationwide COD).
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        shippingRate: { "@type": "MonetaryAmount", value: "80", currency: "BDT" },
+        shippingDestination: { "@type": "DefinedRegion", addressCountry: "BD" },
+        deliveryTime: {
+          "@type": "ShippingDeliveryTime",
+          handlingTime:  { "@type": "QuantitativeValue", minValue: 0, maxValue: 1, unitCode: "DAY" },
+          transitTime:   { "@type": "QuantitativeValue", minValue: 1, maxValue: 3, unitCode: "DAY" },
+        },
+      },
+      // Return policy — enables "free returns / X days" annotations.
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        applicableCountry: "BD",
+        returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+        merchantReturnDays: 3,
+        returnMethod: "https://schema.org/ReturnByMail",
+        returnFees: "https://schema.org/FreeReturn",
+      },
     },
   };
 
-  // AggregateRating drives the star snippet — only emit when we have real data.
   if (p.reviewCount && p.reviewCount > 0 && p.averageRating) {
     schema.aggregateRating = {
       "@type": "AggregateRating",
