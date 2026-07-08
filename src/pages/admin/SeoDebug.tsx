@@ -388,9 +388,34 @@ function runHtmlChecks(html: string, pathname: string): VerifyCheck[] {
 }
 
 const PrerenderVerify = () => {
-  const [input, setInput] = useState("/product/show/abaya-ibis-pink-1132");
+  const [input, setInput] = useState("/product/show/dubai-embroidery-borka");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<VerifyResult | null>(null);
+  const [reports, setReports] = useState<SavedReport[]>(() => loadReports());
+
+  const persistReports = (next: SavedReport[]) => {
+    setReports(next);
+    try { localStorage.setItem(REPORTS_KEY, JSON.stringify(next)); } catch { /* quota */ }
+  };
+  const saveReport = () => {
+    if (!result || !("checks" in result)) return;
+    const path = input.trim().startsWith("/") ? input.trim() : "/" + input.trim();
+    const sameCount = reports.filter((r) => r.path === path).length;
+    const entry: SavedReport = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      version: sameCount + 1,
+      path,
+      savedAt: new Date().toISOString(),
+      status: result.status,
+      passed: result.checks.filter((c) => c.ok).length,
+      total: result.checks.length,
+      checks: result.checks,
+      htmlHead: result.html.slice(0, 4000),
+    };
+    persistReports([entry, ...reports].slice(0, 50));
+  };
+  const deleteReport = (id: string) => persistReports(reports.filter((r) => r.id !== id));
+  const clearReports = () => persistReports([]);
 
   const run = async () => {
     let path = input.trim();
