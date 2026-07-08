@@ -1390,54 +1390,90 @@ export type Database = {
           colors: string[] | null
           created_at: string
           description: string | null
+          fabric: string | null
           featured: boolean | null
+          hijab_included: boolean
           id: string
+          image_alt_text: string | null
           image_url: string | null
+          inner_included: boolean
+          margin: number | null
           material: string | null
+          meta_description: string | null
+          meta_title: string | null
           name: string
+          part: string | null
           price: number
+          purchase_cost: number | null
           sale_price: number | null
           sizes: string[] | null
+          sku: string | null
           slug: string | null
           stock: number | null
+          subcategory: string | null
           updated_at: string
           video_url: string | null
+          work_type: string | null
         }
         Insert: {
           category: string
           colors?: string[] | null
           created_at?: string
           description?: string | null
+          fabric?: string | null
           featured?: boolean | null
+          hijab_included?: boolean
           id?: string
+          image_alt_text?: string | null
           image_url?: string | null
+          inner_included?: boolean
+          margin?: number | null
           material?: string | null
+          meta_description?: string | null
+          meta_title?: string | null
           name: string
+          part?: string | null
           price: number
+          purchase_cost?: number | null
           sale_price?: number | null
           sizes?: string[] | null
+          sku?: string | null
           slug?: string | null
           stock?: number | null
+          subcategory?: string | null
           updated_at?: string
           video_url?: string | null
+          work_type?: string | null
         }
         Update: {
           category?: string
           colors?: string[] | null
           created_at?: string
           description?: string | null
+          fabric?: string | null
           featured?: boolean | null
+          hijab_included?: boolean
           id?: string
+          image_alt_text?: string | null
           image_url?: string | null
+          inner_included?: boolean
+          margin?: number | null
           material?: string | null
+          meta_description?: string | null
+          meta_title?: string | null
           name?: string
+          part?: string | null
           price?: number
+          purchase_cost?: number | null
           sale_price?: number | null
           sizes?: string[] | null
+          sku?: string | null
           slug?: string | null
           stock?: number | null
+          subcategory?: string | null
           updated_at?: string
           video_url?: string | null
+          work_type?: string | null
         }
         Relationships: []
       }
