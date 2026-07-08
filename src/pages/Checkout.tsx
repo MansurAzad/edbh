@@ -56,10 +56,11 @@ const Checkout = () => {
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [shippingInfo, setShippingInfo] = useState(emptyShippingInfo);
 
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [fieldErrors, setFieldErrors] = useState<CheckoutFieldErrors>({});
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [waStatus, setWaStatus] = useState<WhatsAppShareStatus | null>(null);
   const [waError, setWaError] = useState<string | null>(null);
+  const [waEvents, setWaEvents] = useState<ShareResult[]>([]);
 
   const { user, loading: authLoading } = useAuth();
   const { items, total, clearCart } = useCart();
