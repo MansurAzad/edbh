@@ -440,12 +440,17 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      <div className="max-h-32 overflow-y-auto text-sm">
-                        {importResult.errors.slice(0, 5).map((error, i) => (
-                          <div key={i}>{error}</div>
+                      <div className="text-sm font-semibold mb-1">
+                        {importResult.failed}টি রো-তে সমস্যা — নিচের ফিল্ডগুলো ঠিক করে আবার আপলোড করুন:
+                      </div>
+                      <div className="max-h-40 overflow-y-auto text-xs space-y-0.5">
+                        {importResult.errors.slice(0, 20).map((error, i) => (
+                          <div key={i} className="font-mono">• {error}</div>
                         ))}
-                        {importResult.errors.length > 5 && (
-                          <div className="mt-1 text-muted-foreground">...আরো {importResult.errors.length - 5}টি এরর</div>
+                        {importResult.errors.length > 20 && (
+                          <div className="mt-1 text-muted-foreground">
+                            ...আরো {importResult.errors.length - 20}টি এরর
+                          </div>
                         )}
                       </div>
                     </AlertDescription>
