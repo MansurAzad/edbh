@@ -286,7 +286,7 @@ export default function OrderWhatsAppHistory({ orderId }: Props) {
       )}
 
       <ol className="space-y-1.5">
-        {events.map((ev) => (
+        {visibleEvents.map((ev) => (
           <li
             key={ev.id}
             className="rounded border border-border/40 bg-background/60 px-2 py-1.5 text-[11px]"
