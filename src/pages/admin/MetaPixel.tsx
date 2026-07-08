@@ -508,6 +508,10 @@ const MetaPixel = () => {
                     </CardContent>
                   </Card>
 
+                  <CatalogFeedHealth />
+
+
+
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-lg">Meta Catalog Connect — ধাপে ধাপে</CardTitle>
