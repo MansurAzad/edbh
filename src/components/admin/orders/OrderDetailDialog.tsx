@@ -32,6 +32,7 @@ import {
   type WhatsAppShareEvent,
 } from "@/lib/checkout/whatsappShare";
 import { retryWhatsAppShareForOrder } from "@/lib/admin/adminWhatsAppRetry";
+import WhatsAppShareTimeline from "@/components/checkout/WhatsAppShareTimeline";
 
 // ---------------------------------------------------------------------------
 // Props
