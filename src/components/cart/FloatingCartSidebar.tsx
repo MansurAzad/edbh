@@ -209,7 +209,11 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
       setShareStatus("sharing");
       setShareError(null);
       const shareRes = await shareOrderToWhatsApp(receipt);
-      setShareStatus(shareRes.status === "opened" || shareRes.status === "retried" ? "opened" : shareRes.status);
+      setShareStatus(
+        shareRes.status === "opened" || shareRes.status === "retried" || shareRes.status === "queued"
+          ? "opened"
+          : shareRes.status,
+      );
       setShareError(shareRes.error ?? null);
       if (shareRes.status === "blocked") {
         toast({
@@ -261,13 +265,14 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
     setShareError(null);
     try {
       const res = await shareOrderToWhatsApp(lastReceipt, { isRetry: true });
-      setShareStatus(res.status === "opened" || res.status === "retried" ? "opened" : res.status);
+      const ok = res.status === "opened" || res.status === "retried" || res.status === "queued";
+      setShareStatus(ok ? "opened" : res.status);
       setShareError(res.error ?? null);
       toast({
         title: res.status === "blocked" ? "আবার popup ব্লক হয়েছে" :
                res.status === "failed"  ? "শেয়ার ব্যর্থ" : "WhatsApp খোলা হয়েছে ✅",
         description: res.error ?? undefined,
-        variant: res.status === "opened" || res.status === "retried" ? "default" : "destructive",
+        variant: ok ? "default" : "destructive",
       });
     } finally {
       setReshareLoading(false);
