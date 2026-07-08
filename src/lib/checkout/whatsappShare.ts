@@ -124,12 +124,35 @@ export async function shareOrderToWhatsApp(
       status = "failed";
       error = "SSR context — window unavailable";
     } else {
-      const win = window.open(url, "_blank", "noopener,noreferrer");
-      if (!win || win.closed || typeof win.closed === "undefined") {
-        status = "blocked";
-        error = "ব্রাউজার popup ব্লক করেছে";
-      } else if (opts.isRetry) {
-        status = "retried";
+      // Mobile vs desktop split:
+      //   • Mobile (Android/iOS): async popup.open() is unreliable AND desktop-
+      //     style popup blockers kill it; wa.me is a system intent, so an
+      //     anchor click launches the WhatsApp app directly with no popup
+      //     prompt. This is the reliable path the user requested for phones.
+      //   • Desktop: try window.open first. Popup blockers usually reject it
+      //     because we're outside a direct user gesture (order insert is
+      //     async), so we detect the block and surface a manual retry button
+      //     — that reshare click IS a user gesture and always succeeds.
+      const ua = navigator.userAgent || "";
+      const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobile/i.test(ua);
+
+      if (isMobile) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener,noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        status = opts.isRetry ? "retried" : "opened";
+      } else {
+        const win = window.open(url, "_blank", "noopener,noreferrer");
+        if (!win || win.closed || typeof win.closed === "undefined") {
+          status = "blocked";
+          error = "ব্রাউজার popup ব্লক করেছে — নিচের বাটনে ক্লিক করে ম্যানুয়ালি খুলুন";
+        } else if (opts.isRetry) {
+          status = "retried";
+        }
       }
     }
   } catch (e: unknown) {
