@@ -108,28 +108,65 @@ const OrderDetailDialog = ({
   // Fetch order items whenever the selected order changes.
   // Resets to an empty array when the dialog closes (order === null).
   // -------------------------------------------------------------------------
+  // WhatsApp share attempt log (append-only from whatsapp_share_events).
+  const [waEvents, setWaEvents] = useState<WhatsAppShareEvent[]>([]);
+  const [waRetrying, setWaRetrying] = useState(false);
+  const { toast } = useToast();
+
+  const loadWaEvents = async (orderId: string) => {
+    const rows = await fetchWhatsAppShareEvents(orderId);
+    setWaEvents(rows);
+  };
+
   useEffect(() => {
     if (!order) {
       setItems([]);
+      setWaEvents([]);
       return;
     }
-    // Direct Supabase query — items are small and don't need a React Query cache.
     supabase
       .from("order_items")
       .select("*")
       .eq("order_id", order.id)
       .then(({ data }) => setItems((data as AdminOrderItem[]) || []));
+    loadWaEvents(order.id);
   }, [order]);
 
+  const handleAdminRetryWa = async () => {
+    if (!order) return;
+    setWaRetrying(true);
+    try {
+      const res = await retryWhatsAppShareForOrder(order.id);
+      toast({
+        title:
+          res.status === "opened" || res.status === "retried"
+            ? "WhatsApp আবার খোলা হয়েছে"
+            : "WhatsApp শেয়ার হয়নি",
+        description: res.error || `স্ট্যাটাস: ${res.status}`,
+        variant:
+          res.status === "opened" || res.status === "retried"
+            ? "default"
+            : "destructive",
+      });
+      await loadWaEvents(order.id);
+    } catch (e) {
+      toast({
+        title: "রি-শেয়ার ব্যর্থ",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setWaRetrying(false);
+    }
+  };
+
   return (
-    // Dialog open state is derived from whether an order is selected.
-    // onOpenChange triggers onClose when the user presses Escape or the overlay.
     <Dialog open={!!order} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          {/* Show the first 8 chars of the UUID as a short order reference */}
           <DialogTitle>Order Details #{order?.id.slice(0, 8)}</DialogTitle>
         </DialogHeader>
+
 
         {/* Only render body content once an order is available */}
         {order && (
