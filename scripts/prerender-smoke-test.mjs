@@ -46,7 +46,9 @@ const PATHS = args.path
       "/categories/abaya",
       "/product/show/dubai-embroidery-borka",
       "/blog",
+      "/faq",
     ];
+
 
 // -- helpers --------------------------------------------------------------
 
