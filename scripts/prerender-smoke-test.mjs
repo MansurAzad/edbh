@@ -43,7 +43,8 @@ const PATHS = args.path
   : [
       "/",
       "/shop?category=Abaya",
-      "/product/show/abaya-ibis-pink-1132",
+      "/categories/abaya",
+      "/product/show/dubai-embroidery-borka",
       "/blog",
     ];
 
