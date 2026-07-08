@@ -175,31 +175,29 @@ export function fanout(input: TrackInput) {
     ...(ecommerce  ? { ecommerce }  : {}),
     ...(dl         || {}),
   });
+  emitDebug({ ts: Date.now(), source: "dataLayer", event, event_id, params: { ecommerce, ...(dl || {}) } });
 
   // ── 2. GA4 direct (gtag) ──────────────────────────────────────────────────
-  // Only meaningful when a standalone gtag snippet is present alongside (or
-  // instead of) GTM.  In a pure GTM setup this is a harmless no-op because
-  // `window.gtag` is typically undefined.
   const w = window as any;
-  if (w.gtag) w.gtag("event", event, ga ?? ecommerce ?? {});
+  if (w.gtag) {
+    w.gtag("event", event, ga ?? ecommerce ?? {});
+    emitDebug({ ts: Date.now(), source: "gtag", event, event_id, params: ga ?? (ecommerce as any) });
+  }
 
   // ── 3. Meta Pixel (fbq) ───────────────────────────────────────────────────
-  // `fb: null` means the caller explicitly opted out of the Pixel for this
-  // event (e.g. server-only events, internal admin actions).
-  if (fb && w.fbq) w.fbq("track", fb.name, fb.params || {}, { eventID: event_id });
+  if (fb && w.fbq) {
+    w.fbq("track", fb.name, fb.params || {}, { eventID: event_id });
+    emitDebug({ ts: Date.now(), source: "pixel", event: fb.name, event_id, params: fb.params });
+  }
 
   // ── 4. Server-side CAPI + native analytics_events DB ─────────────────────
-  // `capi: null` means skip entirely.  `capi` being undefined means use the
-  // event name and ecommerce object as defaults.
   if (capi !== null) {
-    // Fall back to the top-level `event` name if capi.name is not specified.
     const capiName = capi?.name || event;
+    emitDebug({ ts: Date.now(), source: "capi", event: capiName, event_id, params: capi?.params ?? (ecommerce as any) });
     void serverTrack({
       event_name: capiName,
       event_id,
-      // Prefer capi.user_data for PII; fall back to top-level user_data.
       user_data: capi?.user_data ?? user_data,
-      // Prefer capi.params; fall back to the ecommerce object.
       params: capi?.params ?? (ecommerce as AnyObj) ?? {},
     });
   }
