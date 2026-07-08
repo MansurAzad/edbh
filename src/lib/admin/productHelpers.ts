@@ -180,48 +180,36 @@ export interface AdminProduct {
    * বাংলা: পণ্যের ভিডিও URL (ঐচ্ছিক)।
    */
   video_url: string | null;
+
+  // ── Standardized catalogue fields (see product-field standard) ────────────
+  /** Merchant SKU, unique when set. Example: `DBH-ABY-1001`. */
+  sku: string | null;
+  /** Subcategory under `category`, e.g. Farasha / Open Abaya / Borka. */
+  subcategory: string | null;
+  /** Fabric / cloth type, e.g. Nida / Barbie / Chiffon / Crepe. */
+  fabric: string | null;
+  /** Ornamentation, e.g. Embroidery / Karchupi / Stone / Beaded. */
+  work_type: string | null;
+  /** Piece count, e.g. `1 Part` / `2 Part` / `3 Part`. */
+  part: string | null;
+  /** Whether a matching hijab ships with the product. */
+  hijab_included: boolean;
+  /** Whether an inner garment ships with the product. */
+  inner_included: boolean;
+  /** Internal-only cost price. Never shown to customers. */
+  purchase_cost: number | null;
+  /** Auto-computed by the database. Read-only in the client. */
+  margin: number | null;
+  /** SEO/accessibility alt text for the primary product image. */
+  image_alt_text: string | null;
+  /** SEO `<title>` for the product detail page. */
+  meta_title: string | null;
+  /** SEO meta description. */
+  meta_description: string | null;
 }
 
-/**
- * `AdminProductInput` – write payload for INSERT and UPDATE operations.
- *
- * Identical to {@link AdminProduct} with the server-assigned `id` field
- * stripped out.  Used as:
- *  - The type of `formData` state in the products admin page.
- *  - The `data` argument passed to `saveMutation` in {@link useAdminProducts}.
- *
- * ```ts
- * // Insert
- * supabase.from("products").insert(productData)
- * // Update
- * supabase.from("products").update(productData).eq("id", existingId)
- * ```
- *
- * বাংলা: নতুন প্রোডাক্ট তৈরি বা বিদ্যমান প্রোডাক্ট আপডেটের জন্য পেলোড টাইপ।
- */
-export type AdminProductInput = Omit<AdminProduct, "id">;
+export type AdminProductInput = Omit<AdminProduct, "id" | "margin">;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Form seed value
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * `emptyProduct` – blank {@link AdminProductInput} used to reset / initialise
- * the {@link ProductFormDialog} state when opening the "Add New Product" flow.
- *
- * All required numeric fields default to `0`; all optional nullable fields
- * default to their appropriate falsy value (`null` or `""`) so that controlled
- * inputs are always in "controlled" mode from the first render.
- *
- * Usage in the admin products page:
- * ```ts
- * const [formData, setFormData] = useState<AdminProductInput>(emptyProduct);
- * // Reset on dialog close:
- * setFormData(emptyProduct);
- * ```
- *
- * বাংলা: নতুন প্রোডাক্ট ফর্ম খোলার সময় এই অবজেক্টটি দিয়ে ফর্ম রিসেট করা হয়।
- */
 export const emptyProduct: AdminProductInput = {
   name: "",
   category: "",
@@ -235,4 +223,16 @@ export const emptyProduct: AdminProductInput = {
   colors: [],
   material: "",
   video_url: "",
+  sku: "",
+  subcategory: "",
+  fabric: "",
+  work_type: "",
+  part: "",
+  hijab_included: false,
+  inner_included: false,
+  purchase_cost: null,
+  image_alt_text: "",
+  meta_title: "",
+  meta_description: "",
 };
+

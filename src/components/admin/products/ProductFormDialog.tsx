@@ -360,32 +360,26 @@ export default function ProductFormDialog({
             </div>
           </div>
 
-          {/* ── Section 7: Material + Video (2-col) ─────────────────── */}
+          {/* ── Section 7: Fabric + Video (2-col) ─────────────────── */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              {/* Fabric / material description. বাংলা: কাপড়ের ধরন। */}
-              <Label htmlFor="material">Material / Fabric</Label>
+              <Label htmlFor="fabric">Fabric</Label>
               <Input
-                id="material"
-                value={formData.material || ""}
-                onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-                placeholder="Nida, Zoom, Jorjet..."
+                id="fabric"
+                value={formData.fabric || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, fabric: e.target.value, material: e.target.value })
+                }
+                placeholder="Nida, Barbie, Chiffon, Crepe..."
               />
             </div>
             <div className="space-y-2">
-              {/*
-               * Bengali label: "প্রোডাক্ট ভিডিও" — Product Video
-               * VideoUpload handles upload to Supabase Storage.
-               * The raw URL input is an alternative for external video links.
-               * বাংলা: ভিডিও আপলোড বা URL পেস্ট করুন।
-               */}
-              <Label>প্রোডাক্ট ভিডিও</Label> {/* Product Video */}
+              <Label>প্রোডাক্ট ভিডিও</Label>
               <VideoUpload
                 value={formData.video_url || ""}
                 onChange={(url) => setFormData({ ...formData, video_url: url })}
               />
-              {/* Fallback URL input for external video links. বাংলা: বাইরের ভিডিও লিংকের জন্য। */}
-              <p className="text-xs text-muted-foreground">অথবা ভিডিও URL পেস্ট করুন:</p> {/* Or paste video URL: */}
+              <p className="text-xs text-muted-foreground">অথবা ভিডিও URL পেস্ট করুন:</p>
               <Input
                 id="video_url"
                 placeholder="https://example.com/video.mp4"
@@ -395,12 +389,134 @@ export default function ProductFormDialog({
             </div>
           </div>
 
+          {/* ── Section 7b: Product Field Standard ───────────────────
+               SKU, Subcategory, Work Type, Part, Hijab/Inner included,
+               Purchase Cost (internal), and computed Margin preview. */}
+          <div className="rounded-lg border border-border/60 p-4 space-y-4 bg-muted/20">
+            <p className="text-sm font-semibold">Product Field Standard</p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="sku">SKU</Label>
+                <Input
+                  id="sku"
+                  value={formData.sku || ""}
+                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                  placeholder="DBH-ABY-1001"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subcategory">Subcategory</Label>
+                <Input
+                  id="subcategory"
+                  value={formData.subcategory || ""}
+                  onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
+                  placeholder="Farasha / Open Abaya / Borka"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="work_type">Work Type</Label>
+                <Input
+                  id="work_type"
+                  value={formData.work_type || ""}
+                  onChange={(e) => setFormData({ ...formData, work_type: e.target.value })}
+                  placeholder="Embroidery / Karchupi / Stone / Beaded"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="part">Part</Label>
+                <Input
+                  id="part"
+                  value={formData.part || ""}
+                  onChange={(e) => setFormData({ ...formData, part: e.target.value })}
+                  placeholder="1 Part / 2 Part / 3 Part"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="hijab_included"
+                  checked={formData.hijab_included}
+                  onCheckedChange={(v) => setFormData({ ...formData, hijab_included: v })}
+                />
+                <Label htmlFor="hijab_included">Hijab Included</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="inner_included"
+                  checked={formData.inner_included}
+                  onCheckedChange={(v) => setFormData({ ...formData, inner_included: v })}
+                />
+                <Label htmlFor="inner_included">Inner Included</Label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="purchase_cost">Purchase Cost (৳) — internal only</Label>
+                <Input
+                  id="purchase_cost"
+                  type="number"
+                  value={formData.purchase_cost ?? ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      purchase_cost: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Margin (auto)</Label>
+                <div className="input-luxury flex items-center px-3 py-2 rounded-md border bg-background text-sm text-muted-foreground">
+                  ৳{(
+                    ((formData.sale_price ?? formData.price) || 0) -
+                    (formData.purchase_cost ?? 0)
+                  ).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Section 7c: SEO fields ─────────────────────────────── */}
+          <div className="rounded-lg border border-border/60 p-4 space-y-4 bg-muted/20">
+            <p className="text-sm font-semibold">SEO & Accessibility</p>
+            <div className="space-y-2">
+              <Label htmlFor="image_alt_text">Image Alt Text</Label>
+              <Input
+                id="image_alt_text"
+                value={formData.image_alt_text || ""}
+                onChange={(e) => setFormData({ ...formData, image_alt_text: e.target.value })}
+                placeholder="Dubai Imported Black Karchupi Abaya"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="meta_title">Meta Title</Label>
+              <Input
+                id="meta_title"
+                value={formData.meta_title || ""}
+                onChange={(e) => setFormData({ ...formData, meta_title: e.target.value })}
+                maxLength={70}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="meta_description">Meta Description</Label>
+              <Textarea
+                id="meta_description"
+                rows={2}
+                value={formData.meta_description || ""}
+                onChange={(e) => setFormData({ ...formData, meta_description: e.target.value })}
+                maxLength={170}
+              />
+            </div>
+          </div>
+
           {/* ── Section 8: Featured toggle ───────────────────────────── */}
-          {/*
-           * Featured products appear in dedicated homepage sections.
-           * The Switch toggles `formData.featured` (boolean).
-           * বাংলা: "ফিচার্ড" পণ্য হোমপেজে বিশেষভাবে দেখানো হয়।
-           */}
           <div className="flex items-center gap-2">
             <Switch
               id="featured"
@@ -409,6 +525,7 @@ export default function ProductFormDialog({
             />
             <Label htmlFor="featured">Featured Product</Label>
           </div>
+
 
           {/* ── Section 9: Form action buttons ──────────────────────── */}
           <div className="flex justify-end gap-2">
