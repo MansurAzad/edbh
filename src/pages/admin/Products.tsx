@@ -200,6 +200,8 @@ const Products = () => {
         setGalleryUrls={setGalleryUrls}
         onSubmit={handleSubmit}
         submitting={saveMutation.isPending}
+        categorySuggestions={categories}
+        subcategorySuggestions={subcategorySuggestions}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
