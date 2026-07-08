@@ -359,7 +359,7 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
             Cancel
           </Button>
           <Button
-            onClick={handleSave}
+            onClick={openConfirm}
             disabled={saving || selectedCount === 0 || hasInvalidSelected}
             data-testid="bulk-inventory-save"
           >
@@ -371,6 +371,57 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
             Save {selectedCount > 0 ? `${selectedCount} ` : ""}changes
           </Button>
         </DialogFooter>
+
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent className="max-w-lg">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm bulk inventory changes</AlertDialogTitle>
+              <AlertDialogDescription>
+                আপনি {pendingChanges.length}টি প্রোডাক্টের stock/purchase_cost আপডেট করতে যাচ্ছেন।
+                ব্যর্থ রোগুলো স্বয়ংক্রিয়ভাবে রোলব্যাক হবে; সফল রোগুলো ফিরিয়ে আনতে ম্যানুয়াল edit লাগবে।
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="max-h-64 overflow-y-auto rounded-md border text-xs">
+              <table className="w-full">
+                <thead className="bg-muted/50 sticky top-0">
+                  <tr className="text-left">
+                    <th className="p-2">Product</th>
+                    <th className="p-2 w-28">Stock</th>
+                    <th className="p-2 w-32">Purchase ৳</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingChanges.map((c) => {
+                    const stockChanged = String(c.nextStock) !== String(c.prevStock);
+                    const pcChanged =
+                      String(c.nextPurchase ?? "") !== String(c.prevPurchase ?? "");
+                    return (
+                      <tr key={c.id} className="border-t">
+                        <td className="p-2 truncate max-w-[220px]">{c.name}</td>
+                        <td className={`p-2 ${stockChanged ? "font-medium" : "text-muted-foreground"}`}>
+                          {c.prevStock} → {c.nextStock}
+                        </td>
+                        <td className={`p-2 ${pcChanged ? "font-medium" : "text-muted-foreground"}`}>
+                          {c.prevPurchase || "—"} → {c.nextPurchase ?? "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => { e.preventDefault(); void commit(); }}
+                disabled={saving}
+                data-testid="bulk-inventory-confirm"
+              >
+                {saving ? "সেভ হচ্ছে..." : `Yes, update ${pendingChanges.length}`}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );
