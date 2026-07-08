@@ -41,10 +41,10 @@ const Categories = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead 
-        title="ক্যাটাগরি — আবায়া, বোরকা, হিজাব, কাফতান" 
-        description="দুবাই বোরকা হাউসের সকল ক্যাটাগরি — আবায়া, বোরকা, হিজাব, কাফতান, স্কার্ফ ও প্রিমিয়াম ফেব্রিক। ক্যাটাগরি অনুযায়ী শপ করুন।" 
+        title="All Categories – Abaya, Borka, Hijab & Kaftan Collection Bangladesh" 
+        description="Dubai Borka House-এর সকল ক্যাটাগরি ব্রাউজ করুন — আবায়া, বোরকা, হিজাব, কাফতান, স্কার্ফ ও প্রিমিয়াম ফেব্রিক।" 
         canonical="/categories" 
-        keywords="আবায়া ক্যাটাগরি, বোরকা ধরন, হিজাব প্রকার, কাফতান স্টাইল, abaya categories, borka types, hijab styles bd"
+        keywords="abaya categories bd, borka types, hijab styles bangladesh, kaftan collection, islamic fashion categories"
       />
       <StructuredData data={itemListSchema} />
       <Header />
