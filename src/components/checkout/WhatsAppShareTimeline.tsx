@@ -74,7 +74,7 @@ export default function WhatsAppShareTimeline({ events, title = "WhatsApp শে
       <div
         data-testid="wa-latest-attempt"
         className={`mb-3 rounded-md border p-2 text-xs ${
-          latest.status === "opened" || latest.status === "retried"
+          latest.status === "opened" || latest.status === "retried" || latest.status === "queued"
             ? "border-green-500/40 bg-green-500/5"
             : latest.status === "blocked"
               ? "border-amber-500/40 bg-amber-500/5"
