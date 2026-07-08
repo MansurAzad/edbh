@@ -465,7 +465,7 @@ const HotSaleAdmin = () => {
                     এখনও কোনো data নেই — visitor Hot Sale section দেখলে ইভেন্ট রেকর্ড হবে।
                   </p>
                 )}
-                {report && report.A.impressions > 30 && report.B.impressions > 30 && (
+                {report && report.A.impressions >= 30 && report.B.impressions >= 30 && (
                   <Alert className="mt-4">
                     <AlertDescription>
                       🏆 Winner (by checkout rate):{" "}
