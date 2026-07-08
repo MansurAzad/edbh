@@ -420,12 +420,15 @@ Deno.serve(async (req) => {
     const blogMatch = path.match(/^\/blog\/([^/?]+)/);
     if (blogMatch) return reheader(await renderBlogPost(decodeURIComponent(blogMatch[1])));
 
+    // /blog exactly (index) → list all posts with Blog JSON-LD
+    if (/^\/blog\/?$/.test(path)) return reheader(await renderBlogIndex());
+
     if (path.startsWith("/shop") || path.startsWith("/categor")) {
       const cat = new URL(`${SITE_URL}${path}`).searchParams.get("category");
       return reheader(await renderCategoryOrShop(cat));
     }
 
-    return reheader(renderHome());
+    return reheader(await renderHome());
   } catch (err) {
     console.error("bot-prerender error:", err);
     return new Response(`Prerender error: ${err instanceof Error ? err.message : String(err)}`, {
