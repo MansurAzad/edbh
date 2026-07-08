@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { productsToCsv } from "@/lib/admin/productCsv";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
