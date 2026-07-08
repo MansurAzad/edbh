@@ -5,11 +5,17 @@
  * currently visible / low-stock subset) and admins can search within the list,
  * edit values inline, then save all changes in one Supabase update batch.
  *
+ * Validation:
+ *  • `stock` must be a non-negative integer (0, 1, 2, …).
+ *  • `purchase_cost` must be a non-negative number or blank (blank → null).
+ *  • Rows with invalid values show an inline error and block saving.
+ *
  * বাংলা: একসাথে অনেক প্রোডাক্টের stock এবং purchase_cost আপডেট করার টুল।
+ * নেগেটিভ স্টক বা ভুল purchase_cost দিলে সেভ বন্ধ থাকে।
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -38,7 +44,36 @@ interface Draft {
   selected: boolean;
 }
 
-/** Build the initial draft map from an incoming product list. */
+interface RowErrors {
+  stock?: string;
+  purchase_cost?: string;
+}
+
+/**
+ * Validate a single row's draft values.
+ * Returns per-field error strings; empty object means the row is valid.
+ */
+export function validateRow(draft: Draft): RowErrors {
+  const errs: RowErrors = {};
+  const stockStr = draft.stock.trim();
+  if (stockStr === "") {
+    errs.stock = "Required";
+  } else {
+    const n = Number(stockStr);
+    if (!Number.isFinite(n)) errs.stock = "Must be a number";
+    else if (n < 0) errs.stock = "Cannot be negative";
+    else if (!Number.isInteger(n)) errs.stock = "Whole number only";
+  }
+
+  const pcStr = draft.purchase_cost.trim();
+  if (pcStr !== "") {
+    const n = Number(pcStr);
+    if (!Number.isFinite(n)) errs.purchase_cost = "Must be a number";
+    else if (n < 0) errs.purchase_cost = "Cannot be negative";
+  }
+  return errs;
+}
+
 function buildDrafts(products: AdminProduct[]): Record<string, Draft> {
   const out: Record<string, Draft> = {};
   for (const p of products) {
@@ -75,8 +110,6 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
     );
   }, [products, search]);
 
-  const selectedCount = Object.values(drafts).filter((d) => d.selected).length;
-
   const setDraft = (id: string, patch: Partial<Draft>) =>
     setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
 
@@ -90,14 +123,29 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
     });
   };
 
+  // Selected + invalid tracking derived from current drafts.
+  const selectedEntries = Object.entries(drafts).filter(([, d]) => d.selected);
+  const selectedCount = selectedEntries.length;
+  const invalidSelectedIds = selectedEntries
+    .filter(([, d]) => Object.keys(validateRow(d)).length > 0)
+    .map(([id]) => id);
+  const hasInvalidSelected = invalidSelectedIds.length > 0;
+
   const handleSave = async () => {
-    const changes = Object.entries(drafts)
-      .filter(([, d]) => d.selected)
-      .map(([id, d]) => ({
-        id,
-        stock: Number(d.stock) || 0,
-        purchase_cost: d.purchase_cost === "" ? null : Number(d.purchase_cost),
-      }));
+    if (hasInvalidSelected) {
+      toast({
+        title: "ভুল মান আছে",
+        description: `${invalidSelectedIds.length}টি রোতে নেগেটিভ বা ভুল মান — ঠিক করুন`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const changes = selectedEntries.map(([id, d]) => ({
+      id,
+      stock: Number(d.stock),
+      purchase_cost: d.purchase_cost.trim() === "" ? null : Number(d.purchase_cost),
+    }));
 
     if (changes.length === 0) {
       toast({ title: "কোনো পরিবর্তন নির্বাচন করা হয়নি", variant: "destructive" });
@@ -139,7 +187,7 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
           <DialogTitle>Bulk inventory update</DialogTitle>
           <DialogDescription>
             Update stock and purchase cost for multiple products at once. Only checked rows are
-            saved.
+            saved. Negative or non-numeric values block saving.
           </DialogDescription>
         </DialogHeader>
 
@@ -151,6 +199,11 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
           />
           <div className="text-sm text-muted-foreground whitespace-nowrap">
             {selectedCount} selected
+            {hasInvalidSelected && (
+              <span className="ml-2 text-destructive font-medium">
+                · {invalidSelectedIds.length} invalid
+              </span>
+            )}
           </div>
         </div>
 
@@ -166,46 +219,72 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
                   />
                 </th>
                 <th className="p-2">Product</th>
-                <th className="p-2 w-28">Stock</th>
-                <th className="p-2 w-32">Purchase ৳</th>
+                <th className="p-2 w-32">Stock</th>
+                <th className="p-2 w-36">Purchase ৳</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((p) => {
                 const d = drafts[p.id];
                 if (!d) return null;
+                const errs = validateRow(d);
+                const hasErr = d.selected && Object.keys(errs).length > 0;
                 return (
-                  <tr key={p.id} className="border-t">
-                    <td className="p-2">
+                  <tr
+                    key={p.id}
+                    className={`border-t ${hasErr ? "bg-destructive/5" : ""}`}
+                    data-testid="bulk-inventory-row"
+                  >
+                    <td className="p-2 align-top">
                       <Checkbox
                         checked={d.selected}
                         onCheckedChange={(v) => setDraft(p.id, { selected: Boolean(v) })}
                         aria-label={`Select ${p.name}`}
                       />
                     </td>
-                    <td className="p-2">
+                    <td className="p-2 align-top">
                       <div className="font-medium">{p.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {p.sku || "—"} · {p.category}
                       </div>
                     </td>
-                    <td className="p-2">
+                    <td className="p-2 align-top">
                       <Input
                         type="number"
                         min={0}
+                        step={1}
                         value={d.stock}
                         onChange={(e) => setDraft(p.id, { stock: e.target.value })}
                         aria-label={`Stock for ${p.name}`}
+                        aria-invalid={Boolean(errs.stock)}
+                        className={errs.stock ? "border-destructive focus-visible:ring-destructive" : ""}
                       />
+                      {errs.stock && (
+                        <p className="mt-1 text-[11px] text-destructive flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {errs.stock}
+                        </p>
+                      )}
                     </td>
-                    <td className="p-2">
+                    <td className="p-2 align-top">
                       <Input
                         type="number"
                         min={0}
+                        step="0.01"
                         value={d.purchase_cost}
                         onChange={(e) => setDraft(p.id, { purchase_cost: e.target.value })}
                         aria-label={`Purchase cost for ${p.name}`}
+                        aria-invalid={Boolean(errs.purchase_cost)}
+                        className={
+                          errs.purchase_cost
+                            ? "border-destructive focus-visible:ring-destructive"
+                            : ""
+                        }
                       />
+                      {errs.purchase_cost && (
+                        <p className="mt-1 text-[11px] text-destructive flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {errs.purchase_cost}
+                        </p>
+                      )}
                     </td>
                   </tr>
                 );
@@ -225,7 +304,11 @@ export default function BulkInventoryDialog({ open, onOpenChange, products, onSa
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || selectedCount === 0}>
+          <Button
+            onClick={handleSave}
+            disabled={saving || selectedCount === 0 || hasInvalidSelected}
+            data-testid="bulk-inventory-save"
+          >
             {saving ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
