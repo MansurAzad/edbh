@@ -24,7 +24,7 @@ const PAGE_SIZE = 25;
 
 function toCsv(rows: Record<string, any>[]): string {
   if (!rows.length) return "";
-  const cols = Array.from(rows.reduce((s, r) => { Object.keys(r).forEach(k => s.add(k)); return s; }, new Set<string>()));
+  const cols = Array.from(rows.reduce((s: Set<string>, r) => { Object.keys(r).forEach(k => s.add(k)); return s; }, new Set<string>()));
   const esc = (v: any) => {
     if (v == null) return "";
     const s = typeof v === "string" ? v : JSON.stringify(v);
