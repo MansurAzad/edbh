@@ -41,9 +41,23 @@ const Products = () => {
   const [zoomImage, setZoomImage] = useState<{ url: string; name: string } | null>(null);
 
   const categories = useMemo(() => {
-    const cats = new Set(products.map((p) => p.category));
+    const cats = new Set(products.map((p) => p.category).filter(Boolean));
     return Array.from(cats).sort();
   }, [products]);
+
+  // Distinct subcategories from existing products, filtered by the category
+  // currently selected in the form. Falls back to all subcategories when no
+  // category is picked so admins can still discover the full list.
+  const subcategorySuggestions = useMemo(() => {
+    const chosen = formData.category?.trim().toLowerCase();
+    const pool = chosen
+      ? products.filter((p) => (p.category || "").trim().toLowerCase() === chosen)
+      : products;
+    const set = new Set(
+      pool.map((p) => (p.subcategory || "").trim()).filter((s): s is string => Boolean(s)),
+    );
+    return Array.from(set).sort();
+  }, [products, formData.category]);
 
   const filteredProducts = useMemo(() => {
     let filtered = products;
