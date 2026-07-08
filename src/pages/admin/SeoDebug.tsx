@@ -273,6 +273,11 @@ const SeoDebug = () => {
             })}
           </TabsContent>
 
+          {/* ── Prerender Verify ──────────────────────────────────── */}
+          <TabsContent value="verify" className="space-y-4">
+            <PrerenderVerify />
+          </TabsContent>
+
           {/* ── Crawl checklist ─────────────────────────────────────── */}
           <TabsContent value="checklist" className="space-y-4">
             <Card>
