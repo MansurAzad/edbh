@@ -431,6 +431,47 @@ ${(featured || []).map((p) => `    <li><a href="${SITE_URL}/product/${p.slug || 
   );
 }
 
+// FAQ content mirrors src/pages/FAQ.tsx — kept short & stable so the schema
+// snapshot in scripts/snapshots/ only changes intentionally.
+const FAQ_ITEMS: Array<{ q: string; a: string }> = [
+  { q: "How long does delivery take after placing an order?", a: "Within Dhaka, delivery takes 1-2 business days. Outside Dhaka, it takes 3-5 business days." },
+  { q: "Is Cash on Delivery (COD) available?", a: "Yes, Cash on Delivery is available. Partial advance payment may be required." },
+  { q: "What are the delivery charges?", a: "৳60 within Dhaka and ৳120 outside Dhaka. Free delivery on orders above ৳3,000." },
+  { q: "Can I return a product?", a: "Yes, you can submit a return request within 3 days of receiving the product." },
+  { q: "How do I choose the right size?", a: "Please refer to our size guide. Sizes range from 52\" to 60\"." },
+  { q: "What payment methods are accepted?", a: "bKash, Nagad, Rocket, bank transfer, and Cash on Delivery." },
+];
+
+function renderFaq(): Response {
+  const canonical = `${SITE_URL}/faq`;
+  const title = `FAQ — Delivery, Returns, Sizing | ${SITE_NAME}`;
+  const description = "Frequently asked questions about delivery, payments, sizing, and returns at Dubai Borka House.";
+  const body = `
+<h1>Frequently Asked Questions</h1>
+<dl>
+${FAQ_ITEMS.map((f) => `  <dt>${escapeHtml(f.q)}</dt><dd>${escapeHtml(f.a)}</dd>`).join("\n")}
+</dl>`;
+  const jsonLd: Array<Record<string, unknown>> = [
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: FAQ_ITEMS.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    },
+    breadcrumbSchema([
+      { name: "Home", url: `${SITE_URL}/` },
+      { name: "FAQ", url: canonical },
+    ]),
+  ];
+  return new Response(
+    shell({ title, description, canonical, ogImage: `${SITE_URL}/og-image.jpg`, body, jsonLd }),
+    { headers: htmlHeaders("public, max-age=3600, s-maxage=86400") },
+  );
+}
+
 // ── entrypoint ─────────────────────────────────────────────────────────────
 // Wrap every response with a fresh Response that reuses the body + status but
 // hard-sets Content-Type. The Supabase edge gateway appears to keep whatever
