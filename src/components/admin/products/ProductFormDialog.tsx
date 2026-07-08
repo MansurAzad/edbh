@@ -217,10 +217,16 @@ export default function ProductFormDialog({
               <Label htmlFor="category">Category</Label>
               <Input
                 id="category"
+                list="product-category-suggestions"
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 required
               />
+              <datalist id="product-category-suggestions">
+                {categorySuggestions.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </div>
           </div>
 
