@@ -116,6 +116,47 @@ export default function WhatsAppSettingsCard() {
     }
   }
 
+  /**
+   * Verify the webhook handshake by calling the callback URL with the exact
+   * query parameters Meta uses (`hub.mode=subscribe`, our verify token, and a
+   * random challenge). A correctly configured webhook must echo the challenge
+   * back verbatim with HTTP 200. Anything else is surfaced as an error so
+   * admins can fix mismatched tokens before going live in Meta Dashboard.
+   */
+  async function testAndVerify() {
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const url = webhookUrl.trim();
+      const token = verifyToken.trim();
+      if (!/^https?:\/\//i.test(url)) throw new Error("Invalid Callback URL — must start with https://");
+      if (!token) throw new Error("Verify Token খালি রাখা যাবে না");
+      const challenge = `lov-${Math.random().toString(36).slice(2, 12)}`;
+      const target = new URL(url);
+      target.searchParams.set("hub.mode", "subscribe");
+      target.searchParams.set("hub.verify_token", token);
+      target.searchParams.set("hub.challenge", challenge);
+      const started = performance.now();
+      const res = await fetch(target.toString(), { method: "GET" });
+      const body = (await res.text()).trim();
+      const latencyMs = Math.round(performance.now() - started);
+      if (!res.ok) throw new Error(`Webhook returned HTTP ${res.status}`);
+      if (body !== challenge) {
+        throw new Error(
+          "Verify token mismatch — webhook did not echo the challenge (check META_WHATSAPP_VERIFY_TOKEN)",
+        );
+      }
+      setVerifyResult({ ok: true, latencyMs });
+      toast({ title: "Webhook verified", description: `Handshake OK in ${latencyMs}ms` });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setVerifyResult({ ok: false, error: msg });
+      toast({ title: "Verification failed", description: msg, variant: "destructive" });
+    } finally {
+      setVerifying(false);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
