@@ -996,9 +996,46 @@ function ScheduleEditor({ draft, setDraft, onSave, saving }: any) {
           </Select>
         </div>
 
+        <div>
+          <Label>Timezone</Label>
+          <Select value={schedule.timezone ?? "UTC"} onValueChange={(v) => setSchedule({ timezone: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent className="max-h-64">
+              {["UTC","Asia/Dhaka","Asia/Kolkata","Asia/Dubai","Asia/Singapore","Asia/Tokyo","Europe/London","Europe/Berlin","America/New_York","America/Los_Angeles","Australia/Sydney"].map(z => (
+                <SelectItem key={z} value={z}>{z}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground mt-1">Weekdays and start time are interpreted in this zone.</p>
+        </div>
+
+        <div>
+          <Label>Weekdays</Label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d, i) => {
+              const wds: number[] = Array.isArray(schedule.weekdays) ? schedule.weekdays : [0,1,2,3,4,5,6];
+              const on = wds.includes(i);
+              return (
+                <button key={d} type="button"
+                  onClick={() => setSchedule({ weekdays: on ? wds.filter(x => x !== i) : [...wds, i].sort() })}
+                  className={`px-3 py-1 rounded border text-xs ${on ? "bg-primary text-primary-foreground" : "bg-background"}`}>
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <Label>Start time of day</Label>
+          <Input type="time" value={schedule.start_time_of_day ?? "03:00"}
+            onChange={(e) => setSchedule({ start_time_of_day: e.target.value })} className="w-40" />
+          <p className="text-[11px] text-muted-foreground mt-1">Scans won't start before this local time on eligible weekdays.</p>
+        </div>
+
         <div className="rounded border p-3 text-xs text-muted-foreground">
           Last scheduled run: <b>{schedule.last_run_at ? new Date(schedule.last_run_at).toLocaleString() : "—"}</b><br />
-          Scheduler polls hourly at :00 UTC.
+          Scheduler polls hourly at :00 UTC and evaluates timezone/weekday/start-time gates.
         </div>
 
         <div className="flex justify-end">
