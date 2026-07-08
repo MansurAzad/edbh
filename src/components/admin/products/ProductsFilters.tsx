@@ -33,8 +33,12 @@
  * @module ProductsFilters
  */
 
-import { Search } from "lucide-react";
+import { Search, AlertTriangle, ArrowDownWideNarrow } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
