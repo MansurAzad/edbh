@@ -19,6 +19,7 @@ import {
   esc,
   type CsvRowError,
 } from "@/lib/admin/productCsv";
+import { groupErrorsByRow } from "@/lib/admin/productImportErrors";
 
 interface ProductImportExportProps {
   onImportComplete: () => void;
