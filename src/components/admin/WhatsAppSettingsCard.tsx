@@ -307,10 +307,33 @@ export default function WhatsAppSettingsCard() {
             )}
             {verifying ? "Verifying…" : "Test & Verify"}
           </Button>
-          <Button onClick={save} disabled={saving || verifying} className="gap-2">
+          <Button onClick={handleSaveClick} disabled={saving || verifying} className="gap-2">
             <Save className="w-4 h-4" /> {saving ? "সেভ হচ্ছে..." : "সেভ করুন"}
           </Button>
         </div>
+
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm verify token change</AlertDialogTitle>
+              <AlertDialogDescription>
+                Verify token পরিবর্তন করলে Meta Dashboard-এর webhook subscription তাৎক্ষণিকভাবে ভেঙে যেতে পারে
+                যতক্ষণ না নতুন token সেখানেও আপডেট করা হয়। নিশ্চিত হয়ে সেভ করুন — বিশেষভাবে backend secret{" "}
+                <code className="font-mono">META_WHATSAPP_VERIFY_TOKEN</code>-এর সাথে হুবহু মিলতে হবে।
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="rounded-md border p-2 text-xs font-mono break-all bg-muted/40">
+              <div className="text-muted-foreground">New token:</div>
+              <div>{verifyToken.trim() || <span className="italic">(empty)</span>}</div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={(e) => { e.preventDefault(); void save(); }} disabled={saving}>
+                {saving ? "সেভ হচ্ছে..." : "Yes, save token"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );
