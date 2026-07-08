@@ -15,5 +15,9 @@ verify_jwt = false
 [functions.security-scan]
 verify_jwt = false
 
+[functions.security-cleanup]
+verify_jwt = false
+
+
 
 
