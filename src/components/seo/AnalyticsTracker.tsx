@@ -17,6 +17,7 @@ export {
   trackSearch,
   trackAddToWishlist,
   trackLead,
+  trackContact,
 } from "@/lib/tracking";
 
 const AnalyticsTracker = () => {
