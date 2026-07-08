@@ -29,6 +29,7 @@ const Contact = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    trackLead("contact_form");
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 3000);
   };
