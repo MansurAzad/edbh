@@ -472,6 +472,100 @@ ${FAQ_ITEMS.map((f) => `  <dt>${escapeHtml(f.q)}</dt><dd>${escapeHtml(f.a)}</dd>
   );
 }
 
+// ── Organization + Brand identity (shared across About/Contact) ───────────
+function organizationSchema(): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": ["Organization", "OnlineStore"],
+    "@id": `${SITE_URL}/#organization`,
+    name: SITE_NAME,
+    legalName: "Dubai Borka House Bangladesh",
+    alternateName: "Dubai Borka House BD",
+    url: SITE_URL,
+    logo: `${SITE_URL}/og-image.jpg`,
+    image: `${SITE_URL}/og-image.jpg`,
+    foundingDate: "2009",
+    areaServed: "BD",
+    email: "info@dubaiborkehouse.com",
+    telephone: "+880-1845-853634",
+    contactPoint: [{
+      "@type": "ContactPoint",
+      telephone: "+880-1845-853634",
+      contactType: "customer service",
+      areaServed: "BD",
+      availableLanguage: ["bn", "en"],
+    }],
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "কোহিনুর সিটি, ৩য় তলা, ৩৪২ নং শপ",
+      addressLocality: "Chattogram",
+      addressCountry: "BD",
+    },
+    sameAs: [
+      "https://www.facebook.com/dborkahouse",
+      "https://www.instagram.com/dubaiborkahousebd",
+      "https://www.youtube.com/@dubaiborkahousebd",
+    ],
+    brand: {
+      "@type": "Brand",
+      "@id": `${SITE_URL}/#brand`,
+      name: SITE_NAME,
+      logo: `${SITE_URL}/og-image.jpg`,
+      url: SITE_URL,
+      slogan: "Premium Quality fabric & fashion brand — the finest Dubai-imported fashion delivered to your doorstep.",
+    },
+  };
+}
+
+function renderAbout(): Response {
+  const canonical = `${SITE_URL}/about`;
+  const title = `About ${SITE_NAME} — Official Website of Dubai Borka House Bangladesh`;
+  const description = "Dubai Borka House — founded 2009, 8 branches across Bangladesh. Premium Dubai-imported abaya, borka, hijab & kaftan. Official identity, legal name & contact.";
+  const body = `
+<h1>About ${SITE_NAME}</h1>
+<p><strong>Official Website of Dubai Borka House Bangladesh</strong> — <a href="${SITE_URL}">${SITE_URL}</a></p>
+<p>Legal name: Dubai Borka House Bangladesh. Founded 2009. Business type: retail fashion (abaya, borka, hijab, kaftan, fabric). 8 branches across Bangladesh with main showroom at Kohinoor City, Chattogram.</p>
+<p>Hotline: +880-1845-853634 · Email: info@dubaiborkehouse.com · Facebook: <a href="https://www.facebook.com/dborkahouse">facebook.com/dborkahouse</a></p>`;
+  const jsonLd: Array<Record<string, unknown>> = [
+    organizationSchema(),
+    breadcrumbSchema([
+      { name: "Home", url: `${SITE_URL}/` },
+      { name: "About", url: canonical },
+    ]),
+  ];
+  return new Response(
+    shell({ title, description, canonical, ogImage: `${SITE_URL}/og-image.jpg`, body, jsonLd }),
+    { headers: htmlHeaders("public, max-age=3600, s-maxage=86400") },
+  );
+}
+
+function renderContact(): Response {
+  const canonical = `${SITE_URL}/contact`;
+  const title = `Contact ${SITE_NAME} — Hotline, Branches & Support`;
+  const description = "Contact Dubai Borka House — hotline +880-1845-853634, 8 branches across Bangladesh, email info@dubaiborkehouse.com. Official Website of Dubai Borka House Bangladesh.";
+  const body = `
+<h1>Contact ${SITE_NAME}</h1>
+<p><strong>Official Website of Dubai Borka House Bangladesh</strong> — <a href="${SITE_URL}">${SITE_URL}</a></p>
+<ul>
+  <li>Hotline: +880-1845-853634</li>
+  <li>Email: info@dubaiborkehouse.com</li>
+  <li>Facebook: <a href="https://www.facebook.com/dborkahouse">facebook.com/dborkahouse</a></li>
+  <li>Main showroom: কোহিনুর সিটি, ৩য় তলা, ৩৪২ নং শপ, চট্টগ্রাম</li>
+  <li>সারা বাংলাদেশে ৮টি শাখা</li>
+</ul>`;
+  const jsonLd: Array<Record<string, unknown>> = [
+    organizationSchema(),
+    breadcrumbSchema([
+      { name: "Home", url: `${SITE_URL}/` },
+      { name: "Contact", url: canonical },
+    ]),
+  ];
+  return new Response(
+    shell({ title, description, canonical, ogImage: `${SITE_URL}/og-image.jpg`, body, jsonLd }),
+    { headers: htmlHeaders("public, max-age=3600, s-maxage=86400") },
+  );
+}
+
 // ── entrypoint ─────────────────────────────────────────────────────────────
 // Wrap every response with a fresh Response that reuses the body + status but
 // hard-sets Content-Type. The Supabase edge gateway appears to keep whatever
@@ -515,6 +609,8 @@ Deno.serve(async (req) => {
     if (/^\/blog\/?$/.test(path)) return reheader(await renderBlogIndex());
 
     if (/^\/faq\/?$/.test(path)) return reheader(renderFaq());
+    if (/^\/about\/?$/.test(path)) return reheader(renderAbout());
+    if (/^\/contact\/?$/.test(path)) return reheader(renderContact());
 
     if (path.startsWith("/shop") || path.startsWith("/categor")) {
       const cat = new URL(`${SITE_URL}${path}`).searchParams.get("category");
