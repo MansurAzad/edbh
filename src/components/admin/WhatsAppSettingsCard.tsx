@@ -81,10 +81,23 @@ export default function WhatsAppSettingsCard() {
       const v = raw && typeof raw === "object" ? (raw as Partial<WhatsappWebhookSettings>) : null;
       if (v) {
         if (v.webhook_url) setWebhookUrl(v.webhook_url);
-        if (v.verify_token) setVerifyToken(v.verify_token);
+        if (v.verify_token) {
+          setVerifyToken(v.verify_token);
+          setInitialVerifyToken(v.verify_token);
+        }
       }
     })();
   }, []);
+
+  /** Save trigger — routes through a confirmation modal when the verify token
+   *  is being changed from its stored value (highest-risk edit). */
+  function handleSaveClick() {
+    if (verifyToken.trim() !== initialVerifyToken.trim()) {
+      setConfirmOpen(true);
+      return;
+    }
+    void save();
+  }
 
   async function copy(name: string, value: string) {
     try {
