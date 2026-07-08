@@ -95,6 +95,16 @@ const BulkProductEdit = () => {
   const [dryRunOpen, setDryRunOpen] = useState(false);
   const [aiRunning, setAiRunning] = useState(false);
   const [aiFields, setAiFields] = useState<{ title: boolean; description: boolean }>({ title: true, description: true });
+  const [aiProgress, setAiProgress] = useState<{ done: number; total: number; ok: number; fail: number }>({ done: 0, total: 0, ok: 0, fail: 0 });
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiResults, setAiResults] = useState<Array<{
+    id: string; productName: string;
+    beforeName: string; afterName?: string;
+    beforeDesc: string; afterDesc?: string;
+    titleValid: boolean; titleWarnings: string[];
+    error?: string;
+  }>>([]);
+  const [aiRateLimited, setAiRateLimited] = useState(false);
 
   const [bulkPrice, setBulkPrice] = useState("");
   const [bulkStock, setBulkStock] = useState("");
