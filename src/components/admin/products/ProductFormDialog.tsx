@@ -421,10 +421,21 @@ export default function ProductFormDialog({
                 <Label htmlFor="subcategory">Subcategory</Label>
                 <Input
                   id="subcategory"
+                  list="product-subcategory-suggestions"
                   value={formData.subcategory || ""}
                   onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
                   placeholder="Farasha / Open Abaya / Borka"
                 />
+                <datalist id="product-subcategory-suggestions">
+                  {subcategorySuggestions.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+                {formData.category && subcategorySuggestions.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    "{formData.category}"-এর জন্য পূর্বে ব্যবহৃত সাব-ক্যাটাগরি থেকে বেছে নিন বা নতুন লিখুন।
+                  </p>
+                )}
               </div>
             </div>
 
