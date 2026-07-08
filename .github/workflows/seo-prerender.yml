@@ -24,6 +24,9 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Validate sitemap.xml and robots.txt
+        run: node scripts/validate-sitemap-robots.mjs
+
       - name: Run prerender smoke test
         id: smoke
         run: node scripts/prerender-smoke-test.mjs | tee prerender-report.txt
