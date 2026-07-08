@@ -20,15 +20,18 @@ import {
 } from "@/lib/checkout/types";
 import CheckoutAuthChoice from "@/components/checkout/CheckoutAuthChoice";
 import CheckoutSuccess from "@/components/checkout/CheckoutSuccess";
-import SimpleCheckoutForm, {
-  type FieldErrors,
-} from "@/components/checkout/SimpleCheckoutForm";
+import SimpleCheckoutForm from "@/components/checkout/SimpleCheckoutForm";
 import CheckoutOrderSummary from "@/components/checkout/CheckoutOrderSummary";
 import {
   shareOrderToWhatsApp,
   type OrderReceipt,
   type WhatsAppShareStatus,
+  type ShareResult,
 } from "@/lib/checkout/whatsappShare";
+import {
+  validateCheckoutFields,
+  type CheckoutFieldErrors,
+} from "@/lib/checkout/validation";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
