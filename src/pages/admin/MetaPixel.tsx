@@ -335,9 +335,10 @@ const MetaPixel = () => {
         </div>
 
         <Tabs defaultValue="setup" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 h-auto">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 h-auto">
             <TabsTrigger value="setup" className="text-xs">সেটআপ</TabsTrigger>
             <TabsTrigger value="events" className="text-xs">ইভেন্টস</TabsTrigger>
+            <TabsTrigger value="catalog" className="text-xs">Catalog</TabsTrigger>
             <TabsTrigger value="reports" className="text-xs">রিপোর্ট</TabsTrigger>
             <TabsTrigger value="funnel" className="text-xs">ফানেল</TabsTrigger>
             <TabsTrigger value="config" className="text-xs">কনফিগ</TabsTrigger>
@@ -452,6 +453,126 @@ const MetaPixel = () => {
                 </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* CATALOG TAB — Meta Commerce Manager product feed */}
+          <TabsContent value="catalog" className="space-y-4">
+            {(() => {
+              const projectRef = "izeabmhtxtrelfqgkuua";
+              const xmlUrl = `https://${projectRef}.functions.supabase.co/meta-catalog-feed?format=xml`;
+              const csvUrl = `https://${projectRef}.functions.supabase.co/meta-catalog-feed?format=csv`;
+              const copyUrl = (u: string) => {
+                navigator.clipboard.writeText(u);
+                toast({ title: "Copied", description: u });
+              };
+              return (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <FileText className="w-5 h-5" />
+                        Meta Product Catalog Feed
+                      </CardTitle>
+                      <CardDescription>
+                        Meta Commerce Manager-এ product catalog সিঙ্ক করতে নিচের feed URL ব্যবহার করুন।
+                        Feed hourly re-generate হয় (Cache-Control 1h) — প্রতি product/price/stock update
+                        automatically পরের fetch-এ চলে যাবে।
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-semibold">Feed URL — XML (recommended)</Label>
+                        <div className="flex gap-2 mt-1">
+                          <Input value={xmlUrl} readOnly className="font-mono text-xs" />
+                          <Button size="sm" variant="outline" onClick={() => copyUrl(xmlUrl)}>
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="outline" asChild>
+                            <a href={xmlUrl} target="_blank" rel="noopener noreferrer">Open</a>
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">Feed URL — CSV (alternative)</Label>
+                        <div className="flex gap-2 mt-1">
+                          <Input value={csvUrl} readOnly className="font-mono text-xs" />
+                          <Button size="sm" variant="outline" onClick={() => copyUrl(csvUrl)}>
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="outline" asChild>
+                            <a href={csvUrl} target="_blank" rel="noopener noreferrer">Open</a>
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Meta Catalog Connect — ধাপে ধাপে</CardTitle>
+                      <CardDescription>এই ধাপগুলো একবার সেট করলে catalog আজীবন auto-sync হবে।</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ol className="space-y-3 text-sm list-decimal list-inside">
+                        <li>
+                          <a className="text-primary underline" href="https://business.facebook.com/commerce" target="_blank" rel="noopener noreferrer">
+                            Commerce Manager
+                          </a>{" "}
+                          → <strong>Catalogs</strong> → <strong>Add Catalog</strong> → Type: <em>E-commerce</em>.
+                        </li>
+                        <li>
+                          Catalog-এ যান → <strong>Data Sources</strong> → <strong>Add Items</strong> →{" "}
+                          <strong>Use Data Feeds</strong>.
+                        </li>
+                        <li>
+                          <strong>Set up a scheduled feed</strong> সিলেক্ট করুন → উপরের <em>XML feed URL</em>{" "}
+                          পেস্ট করুন → Schedule: <em>Daily</em> বা <em>Hourly</em>।
+                        </li>
+                        <li>
+                          Feed configuration:
+                          <ul className="list-disc list-inside pl-6 mt-1 space-y-1">
+                            <li>Currency: <strong>BDT</strong></li>
+                            <li>Country of sale: <strong>Bangladesh</strong></li>
+                            <li>Default availability: <strong>in stock</strong></li>
+                          </ul>
+                        </li>
+                        <li>
+                          <strong>Events</strong> tab → Pixel সাথে Catalog connect করুন → Pixel ID টি এখানে সেটআপ ট্যাবে
+                          আছে সেটাই সিলেক্ট করবেন। এতে <em>ViewContent / AddToCart / Purchase</em> events-এর
+                          <code className="mx-1 text-xs">content_ids</code> catalog product-এর সাথে match হবে।
+                        </li>
+                        <li>
+                          Catalog processed হলে <strong>Advantage+ Catalog Ads</strong> চালু করা যাবে (dynamic retargeting)।
+                        </li>
+                      </ol>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Feed Field Mapping</CardTitle>
+                      <CardDescription>Meta যেসব required + recommended field পাচ্ছে</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                        {[
+                          "id", "title", "description", "link", "image_link",
+                          "additional_image_link", "availability", "condition",
+                          "price", "sale_price", "brand", "item_group_id",
+                          "google_product_category", "fb_product_category",
+                          "product_type", "color", "size", "material", "shipping",
+                        ].map((f) => (
+                          <div key={f} className="flex items-center gap-2 p-2 rounded bg-muted">
+                            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                            <code>{f}</code>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              );
+            })()}
           </TabsContent>
 
           {/* REPORTS TAB */}
