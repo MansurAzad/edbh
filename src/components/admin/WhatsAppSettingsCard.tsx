@@ -132,6 +132,8 @@ export default function WhatsAppSettingsCard() {
           .insert([{ key: SETTING_KEY, value: payload as unknown as Record<string, string> }]);
       }
       toast({ title: "WhatsApp সেটিংস সেভ হয়েছে" });
+      setInitialVerifyToken(verifyToken.trim());
+      setConfirmOpen(false);
     } catch (e) {
       toast({
         title: "সেভ ব্যর্থ",
