@@ -65,20 +65,20 @@ const Footer = () => {
               <img src={logoImage} alt="Dubai Borka House Logo" className="h-14 w-auto object-contain" loading="lazy" />
             </Link>
             <p className="text-muted-foreground leading-relaxed text-sm">
-              Premium Bangladeshi fabric & fashion brand — the finest Dubai-imported fashion delivered to your doorstep.
+              Premium Quality fabric & fashion brand — the finest Dubai-imported fashion delivered to your doorstep.
             </p>
-            <p className="text-xs text-primary font-semibold">
+            <p className="text-xs text-primary font-semibold" aria-label="Official website tagline">
               Official Website of Dubai Borka House Bangladesh
             </p>
             <p className="text-xs text-muted-foreground">
-              <a href="https://dubaiborkahouse.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary">
+              <a href="https://dubaiborkahouse.com" target="_blank" rel="noopener noreferrer" aria-label="Visit official website dubaiborkahouse.com (opens in new tab)" className="hover:text-primary">
                 https://dubaiborkahouse.com
               </a>
             </p>
-            <div className="flex gap-3">
-              <a href="https://www.facebook.com/dborkahouse" target="_blank" rel="noopener noreferrer" aria-label="Facebook — Dubai Borka House official page" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all"><Facebook className="w-4 h-4" /></a>
-              <a href="https://www.instagram.com/dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all"><Instagram className="w-4 h-4" /></a>
-              <a href="https://www.youtube.com/@dubaiborkahousebd" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all"><Youtube className="w-4 h-4" /></a>
+            <div className="flex gap-3" role="list" aria-label="Social media links">
+              <a href="https://www.facebook.com/dborkahouse" target="_blank" rel="noopener noreferrer" aria-label="Facebook — Dubai Borka House official page (opens in new tab)" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all"><Facebook className="w-4 h-4" aria-hidden="true" /></a>
+              <a href="https://www.instagram.com/dubaiborkahousebd" target="_blank" rel="noopener noreferrer" aria-label="Instagram — Dubai Borka House official page (opens in new tab)" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all"><Instagram className="w-4 h-4" aria-hidden="true" /></a>
+              <a href="https://www.youtube.com/@dubaiborkahousebd" target="_blank" rel="noopener noreferrer" aria-label="YouTube — Dubai Borka House official channel (opens in new tab)" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all"><Youtube className="w-4 h-4" aria-hidden="true" /></a>
             </div>
           </div>
 
