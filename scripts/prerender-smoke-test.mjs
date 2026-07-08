@@ -195,7 +195,12 @@ for (const path of PATHS) {
 
       const fieldChecks = [
         ["status 200", res.status === 200],
-        ["content-type html", (res.headers.get("content-type") || "").includes("text/html")],
+        // Supabase's edge gateway sometimes rewrites content-type to text/plain
+        // on gzip-compressed GET responses; accept if the body starts with an
+        // HTML doctype instead.
+        ["content-type html (or HTML body)",
+          (res.headers.get("content-type") || "").includes("text/html") ||
+          /^\s*<!doctype html/i.test(html)],
         ["body length > 500", html.length > 500],
         ...checkCommonHead(html),
         ...(kind === "product" ? checkProduct(html) : []),
