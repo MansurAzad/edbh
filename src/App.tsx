@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
 import AnalyticsTracker from "@/components/seo/AnalyticsTracker";
+import TrackingDebugOverlay from "@/components/seo/TrackingDebugOverlay";
 import ScrollToTop from "@/components/seo/ScrollToTop";
 import FloatingCartSidebar from "@/components/cart/FloatingCartSidebar";
 import { useCart } from "@/contexts/CartContext";
