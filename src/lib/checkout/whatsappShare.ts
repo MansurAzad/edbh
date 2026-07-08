@@ -42,7 +42,7 @@ export function buildOrderReceiptText(p: BuildOrderReceiptParams): string {
   const trackUrl = `${origin}/order-tracking?id=${p.orderId}`;
   const shortId = p.orderId.slice(0, 8).toUpperCase();
 
-  const firstImage = p.items[0]?.product?.image_url || p.items[0]?.product?.images?.[0];
+  const firstImage = p.items[0]?.product?.image_url;
 
   const lines: string[] = [];
   lines.push(`🛍️ *নতুন অর্ডার* — #${shortId}`);
