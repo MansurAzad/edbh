@@ -10,17 +10,19 @@
  * the whatsapp-webhook flow appear without a manual refresh.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Send, Zap, MessageCircle, Star } from "lucide-react";
+import { Loader2, RefreshCw, Send, Zap, MessageCircle, Star, Search, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   fetchWhatsAppShareEvents,
   type WhatsAppShareEvent,
   type WhatsAppDeliveryStatus,
 } from "@/lib/checkout/whatsappShare";
 import { retryWhatsAppShareForOrder, retryWithEscalation } from "@/lib/admin/adminWhatsAppRetry";
+import { exportWhatsAppHistoryCSV } from "@/lib/admin/whatsappHistoryCsv";
 
 interface Props {
   orderId: string;
