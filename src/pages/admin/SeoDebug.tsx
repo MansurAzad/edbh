@@ -15,6 +15,7 @@ import AdminLayout from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,9 +24,12 @@ import {
   buildProductJsonLd, buildProductSeo, buildBlogListSeo, SITE_URL,
 } from "@/lib/seo/config";
 import {
-  CheckCircle2, XCircle, AlertTriangle, ExternalLink, Copy, Search,
+  CheckCircle2, XCircle, AlertTriangle, ExternalLink, Copy, Search, Download, Play,
 } from "lucide-react";
 import { toast } from "sonner";
+
+const PRERENDER_ENDPOINT =
+  "https://izeabmhtxtrelfqgkuua.supabase.co/functions/v1/bot-prerender";
 
 // ── static route metadata (matches SEOHead calls across the app) ───────────
 const STATIC_ROUTES = [
