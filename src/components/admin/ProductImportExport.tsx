@@ -137,22 +137,29 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
   };
 
   const importProductsOnly = async (headers: string[], dataRows: string[], results: ImportResult) => {
-    // Batch insert for speed
     const allProducts: Record<string, any>[] = [];
+    const fieldErrors: CsvRowError[] = (results.fieldErrors ??= []);
 
     for (let i = 0; i < dataRows.length; i++) {
+      const rowNumber = i + 2;
       try {
         const values = parseCSVLine(dataRows[i]);
         const product = parseProductRow(headers, values);
-        if (!product.name || !product.category || !product.price) throw new Error("প্রয়োজনীয় ফিল্ড নেই");
+        const rowErrs = validateProductRow(product, rowNumber);
+        if (rowErrs.length) {
+          results.failed++;
+          fieldErrors.push(...rowErrs);
+          rowErrs.forEach((e) => results.errors.push(`রো ${e.row} · ${e.field ?? "row"}: ${e.message}`));
+          continue;
+        }
         allProducts.push(product);
       } catch (err: any) {
         results.failed++;
-        results.errors.push(`রো ${i + 2}: ${err.message}`);
+        results.errors.push(`রো ${rowNumber}: ${err.message}`);
+        fieldErrors.push({ row: rowNumber, message: err.message });
       }
     }
 
-    // Insert in batches
     for (let i = 0; i < allProducts.length; i += BATCH_SIZE) {
       const batch = allProducts.slice(i, i + BATCH_SIZE);
       setImportProgress(Math.round(((i + batch.length) / allProducts.length) * 100));
@@ -167,27 +174,31 @@ const ProductImportExport = ({ onImportComplete }: ProductImportExportProps) => 
   };
 
   const importWithInlineVariants = async (headers: string[], dataRows: string[], results: ImportResult) => {
-    // Group rows by product name - each row can have variant_size, variant_color, variant_stock, variant_sku, variant_price_adjustment, variant_image_url
     const productMap = new Map<string, { product: Record<string, any>; variants: Record<string, any>[] }>();
+    const fieldErrors: CsvRowError[] = (results.fieldErrors ??= []);
 
     for (let i = 0; i < dataRows.length; i++) {
+      const rowNumber = i + 2;
       try {
         const values = parseCSVLine(dataRows[i]);
         const product = parseProductRow(headers, values);
         const variant = parseVariantFromRow(headers, values);
-
-        if (!product.name || !product.category || !product.price) throw new Error("প্রয়োজনীয় ফিল্ড নেই");
-
-        const key = product.name;
-        if (!productMap.has(key)) {
-          productMap.set(key, { product, variants: [] });
+        const rowErrs = validateProductRow(product, rowNumber);
+        if (rowErrs.length) {
+          results.failed++;
+          fieldErrors.push(...rowErrs);
+          rowErrs.forEach((e) => results.errors.push(`রো ${e.row} · ${e.field ?? "row"}: ${e.message}`));
+          continue;
         }
+        const key = product.name;
+        if (!productMap.has(key)) productMap.set(key, { product, variants: [] });
         if (variant && (variant.size || variant.color)) {
           productMap.get(key)!.variants.push(variant);
         }
       } catch (err: any) {
         results.failed++;
-        results.errors.push(`রো ${i + 2}: ${err.message}`);
+        results.errors.push(`রো ${rowNumber}: ${err.message}`);
+        fieldErrors.push({ row: rowNumber, message: err.message });
       }
     }
 
