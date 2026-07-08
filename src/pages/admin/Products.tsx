@@ -186,6 +186,21 @@ const Products = () => {
           setMaxPrice={onFilterChange(setMaxPrice)}
           categories={categories}
           onImportComplete={invalidateProducts}
+          lowStockOnly={lowStockOnly}
+          setLowStockOnly={onFilterChange(setLowStockOnly)}
+          lowStockThreshold={lowStockThreshold}
+          setLowStockThreshold={onFilterChange(setLowStockThreshold)}
+          sortMode={sortMode}
+          setSortMode={onFilterChange(setSortMode)}
+          lowStockCount={lowStockCount}
+          onOpenBulkInventory={() => setBulkInventoryOpen(true)}
+        />
+
+        <BulkInventoryDialog
+          open={bulkInventoryOpen}
+          onOpenChange={setBulkInventoryOpen}
+          products={filteredProducts}
+          onSaved={invalidateProducts}
         />
 
         <ProductsTable
