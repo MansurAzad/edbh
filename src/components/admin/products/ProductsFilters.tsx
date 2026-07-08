@@ -33,7 +33,7 @@
  * @module ProductsFilters
  */
 
-import { Search, AlertTriangle, ArrowDownWideNarrow } from "lucide-react";
+import { Search, AlertTriangle, ArrowDownWideNarrow, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
