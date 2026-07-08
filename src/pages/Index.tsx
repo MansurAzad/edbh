@@ -27,6 +27,7 @@ const DealOfTheDay = lazy(() => import("@/components/home/DealOfTheDay"));
 const TrustBadges = lazy(() => import("@/components/home/TrustBadges"));
 const VideoShowcase = lazy(() => import("@/components/home/VideoShowcase"));
 const PopularCategoriesCarousel = lazy(() => import("@/components/home/PopularCategoriesCarousel"));
+const HotSale = lazy(() => import("@/components/home/HotSale"));
 const TrustGuaranteeBanner = lazy(() => import("@/components/marketing/TrustGuaranteeBanner"));
 const FloatingContactButtons = lazy(() => import("@/components/layout/FloatingContactButtons"));
 
@@ -40,6 +41,7 @@ const SectionLoader = () => (
 // Map section_key to component
 const sectionComponents: Record<string, React.ComponentType<any>> = {
   flash_sale: FlashSaleTimer,
+  hot_sale: HotSale,
   featured_categories: FeaturedCategories,
   featured_products: FeaturedProducts,
   special_offer: SpecialOffer,
@@ -61,7 +63,7 @@ const sectionComponents: Record<string, React.ComponentType<any>> = {
 
 // Sections that accept sectionData prop
 const dynamicSections = new Set([
-  "featured_products", "special_offer", "bundle_deals", "about_section",
+  "featured_products", "special_offer", "bundle_deals", "about_section", "hot_sale",
 ]);
 
 const Index = () => {
