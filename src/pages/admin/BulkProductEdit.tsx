@@ -440,6 +440,41 @@ const BulkProductEdit = () => {
               </CardContent>
             </Card>
 
+            {/* AI Enrich Card */}
+            <Card className="border-primary/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-primary" /> AI Enrich — Title & Description
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Lovable AI-এর মাধ্যমে সিলেক্টেড প্রোডাক্টের title আপনার SEO format-এ
+                  <code className="mx-1 bg-muted px-1 rounded">[Origin] [Fabric] [Work] [Type] – [Color] – [Set/Part]</code>
+                  এবং description Bangla+English-এ regenerate হবে। প্রথমে dry-run হিসেবে edits map-এ ঢুকবে — Review & Save চাপলেই DB-তে যাবে।
+                </p>
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={aiFields.title} onCheckedChange={v => setAiFields(f => ({ ...f, title: !!v }))} />
+                    Title regenerate
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={aiFields.description} onCheckedChange={v => setAiFields(f => ({ ...f, description: !!v }))} />
+                    Description regenerate
+                  </label>
+                </div>
+                <Button onClick={runAiEnrich} disabled={selected.size === 0 || aiRunning || (!aiFields.title && !aiFields.description)}>
+                  {aiRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
+                  {aiRunning ? "Generating…" : `Generate for ${selected.size} selected`}
+                </Button>
+                {selected.size > 50 && (
+                  <p className="text-xs text-destructive">এক বারে সর্বোচ্চ ৫০টি — কম সিলেক্ট করুন।</p>
+                )}
+              </CardContent>
+            </Card>
+
+
+
             {/* Search + quick bulk price/stock */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[200px] max-w-sm">
