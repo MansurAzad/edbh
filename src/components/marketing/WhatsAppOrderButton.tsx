@@ -1,4 +1,5 @@
 import { MessageCircle } from "lucide-react";
+import { trackContact } from "@/lib/tracking";
 
 interface WhatsAppOrderButtonProps {
   productName: string;
