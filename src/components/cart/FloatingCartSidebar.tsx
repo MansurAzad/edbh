@@ -68,6 +68,11 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
   const [processing, setProcessing] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [shareStatus, setShareStatus] = useState<
+    "idle" | "sharing" | "opened" | "blocked" | "failed"
+  >("idle");
+  const [lastReceipt, setLastReceipt] = useState<OrderReceipt | null>(null);
+  const [reshareLoading, setReshareLoading] = useState(false);
 
   // Simplified checkout state
   const [shippingInfo, setShippingInfo] = useState(emptyShippingInfo);
@@ -195,15 +200,26 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
 
       await clearCart();
       setOrderId(generatedOrderId);
+      setLastReceipt(receipt);
       setOrderPlaced(true);
 
-      // Auto-share to WhatsApp
+      // Auto-share to WhatsApp — track visible status for the success screen
+      setShareStatus("sharing");
       const shareRes = await shareOrderToWhatsApp(receipt);
+      setShareStatus(shareRes.status === "opened" || shareRes.status === "retried" ? "opened" : shareRes.status);
       if (shareRes.status === "blocked") {
         toast({
           title: "WhatsApp popup ব্লক হয়েছে",
-          description: "রিসিট শেয়ার করতে সাফল্য পেজের লিংকে ক্লিক করুন।",
+          description: 'নিচে "আবার শেয়ার করুন" বাটনে ক্লিক করুন।',
         });
+      } else if (shareRes.status === "failed") {
+        toast({
+          title: "WhatsApp শেয়ার ব্যর্থ",
+          description: shareRes.error ?? "আবার চেষ্টা করুন।",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "WhatsApp রিসিট শেয়ার হয়েছে ✅" });
       }
 
       trackPurchase(
@@ -233,12 +249,32 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
     }
   };
 
+  const handleReshare = async () => {
+    if (!lastReceipt || reshareLoading) return;
+    setReshareLoading(true);
+    setShareStatus("sharing");
+    try {
+      const res = await shareOrderToWhatsApp(lastReceipt, { isRetry: true });
+      setShareStatus(res.status === "opened" || res.status === "retried" ? "opened" : res.status);
+      toast({
+        title: res.status === "blocked" ? "আবার popup ব্লক হয়েছে" :
+               res.status === "failed"  ? "শেয়ার ব্যর্থ" : "WhatsApp খোলা হয়েছে ✅",
+        variant: res.status === "opened" || res.status === "retried" ? "default" : "destructive",
+      });
+    } finally {
+      setReshareLoading(false);
+    }
+  };
+
   const resetCheckout = () => {
     setMode("cart");
     setOrderPlaced(false);
     setOrderId(null);
+    setShareStatus("idle");
+    setLastReceipt(null);
     onClose();
   };
+
 
   const headerTitle = orderPlaced
     ? "অর্ডার সম্পন্ন ✅"
@@ -281,7 +317,43 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
 
             <div className="flex-1 overflow-y-auto p-4">
               {orderPlaced ? (
-                <OrderSuccess orderId={orderId} onAfterAction={resetCheckout} />
+                <div className="space-y-4">
+                  <OrderSuccess orderId={orderId} onAfterAction={resetCheckout} />
+                  <div
+                    data-testid="wa-share-status"
+                    data-status={shareStatus}
+                    className={`rounded-xl border p-3 text-sm ${
+                      shareStatus === "opened"
+                        ? "border-green-500/40 bg-green-500/5 text-green-700 dark:text-green-400"
+                        : shareStatus === "sharing"
+                        ? "border-border bg-muted/50 text-muted-foreground"
+                        : shareStatus === "blocked" || shareStatus === "failed"
+                        ? "border-destructive/40 bg-destructive/5 text-destructive"
+                        : "hidden"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-medium">
+                      <MessageCircle className="w-4 h-4" />
+                      {shareStatus === "sharing" && "WhatsApp রিসিট শেয়ার হচ্ছে..."}
+                      {shareStatus === "opened" && "WhatsApp রিসিট শেয়ার হয়েছে ✅"}
+                      {shareStatus === "blocked" && "WhatsApp popup ব্লক হয়েছে"}
+                      {shareStatus === "failed" && "WhatsApp শেয়ার ব্যর্থ হয়েছে"}
+                    </div>
+                    {(shareStatus === "blocked" || shareStatus === "failed") && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="mt-2 w-full"
+                        onClick={handleReshare}
+                        disabled={reshareLoading}
+                        data-testid="wa-reshare"
+                      >
+                        {reshareLoading ? "চেষ্টা করা হচ্ছে..." : "আবার WhatsApp-এ শেয়ার করুন"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
               ) : mode === "cart" ? (
                 items.length === 0 ? (
                   <EmptyCart onClose={onClose} />
