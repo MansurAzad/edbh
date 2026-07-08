@@ -41,6 +41,9 @@ interface Props {
    * handling any loading/error state.
    */
   onDownloadInvoice: () => void;
+
+  /** Optional: re-open WhatsApp with the order receipt message. */
+  onShareWhatsApp?: () => void;
 }
 
 // ---------------------------------------------------------------------------
