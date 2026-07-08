@@ -140,7 +140,7 @@ const Checkout = () => {
   };
 
   const handleConfirmClick = () => {
-    if (submitLockRef.current || processing) return;
+    if (submitGuardRef.current.isLocked() || processing) return;
     if (!validate()) return;
     if (items.length === 0) {
       toast({ title: "Cart is empty", description: "Add items to your cart before checkout", variant: "destructive" });
@@ -153,17 +153,16 @@ const Checkout = () => {
   const handlePlaceOrder = async () => {
     // Synchronous re-entrancy guard — blocks double clicks even before
     // React re-renders with processing=true.
-    if (submitLockRef.current) return;
-    submitLockRef.current = true;
+    if (!submitGuardRef.current.tryAcquire()) return;
     setShowConfirmDialog(false);
 
     if (authLoading) {
-      submitLockRef.current = false;
+      submitGuardRef.current.release();
       toast({ title: "একটু অপেক্ষা করুন", description: "সেশন যাচাই হচ্ছে, আবার চেষ্টা করুন", variant: "destructive" });
       return;
     }
     if (!user && !isGuest) {
-      submitLockRef.current = false;
+      submitGuardRef.current.release();
       toast({ title: "Please sign in or continue as guest", description: "Choose an option to proceed", variant: "destructive" });
       return;
     }
@@ -236,7 +235,7 @@ const Checkout = () => {
       });
     } finally {
       setProcessing(false);
-      submitLockRef.current = false;
+      submitGuardRef.current.release();
     }
   };
 
