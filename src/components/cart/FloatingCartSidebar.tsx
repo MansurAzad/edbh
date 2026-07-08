@@ -214,30 +214,14 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
       setLastReceipt(receipt);
       setOrderPlaced(true);
 
-      // Auto-share to WhatsApp — track visible status for the success screen
+      // Open the preview modal — user reviews receipt + images before sending.
+      // Actual dispatch happens on preview confirm.
       setShareStatus("sharing");
       setShareError(null);
-      const shareRes = await shareOrderToWhatsApp(receipt);
-      setShareStatus(
-        shareRes.status === "opened" || shareRes.status === "retried" || shareRes.status === "queued"
-          ? "opened"
-          : shareRes.status,
-      );
-      setShareError(shareRes.error ?? null);
-      if (shareRes.status === "blocked") {
-        toast({
-          title: "WhatsApp popup ব্লক হয়েছে",
-          description: shareRes.error ?? 'নিচে "আবার শেয়ার করুন" বাটনে ক্লিক করুন।',
-        });
-      } else if (shareRes.status === "failed") {
-        toast({
-          title: "WhatsApp শেয়ার ব্যর্থ",
-          description: shareRes.error ?? "আবার চেষ্টা করুন।",
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "WhatsApp রিসিট শেয়ার হয়েছে ✅" });
-      }
+      pendingReceiptRef.current = receipt;
+      pendingIsRetryRef.current = false;
+      setPreviewPayload(buildWhatsAppPayload(receipt));
+      setPreviewOpen(true);
 
 
       trackPurchase(
