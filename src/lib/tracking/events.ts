@@ -185,7 +185,7 @@ export function trackPurchase(
 
   fanout({
     event: "purchase",
-    event_id: `purchase-${orderId}`,
+    event_id: eventId,
     user_data: userData,
     ecommerce: { transaction_id: orderId, currency: "BDT", value: total, items: gaItems },
     fb: { name: "Purchase", params: {
