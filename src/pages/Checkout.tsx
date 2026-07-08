@@ -209,6 +209,7 @@ const Checkout = () => {
       const shareRes = await shareOrderToWhatsApp(receipt);
       setWaStatus(shareRes.status);
       setWaError(shareRes.error ?? null);
+      setWaEvents([shareRes]);
 
       trackPurchase(
         generatedOrderId,
