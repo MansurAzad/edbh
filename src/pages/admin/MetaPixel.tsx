@@ -335,9 +335,10 @@ const MetaPixel = () => {
         </div>
 
         <Tabs defaultValue="setup" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 h-auto">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 h-auto">
             <TabsTrigger value="setup" className="text-xs">সেটআপ</TabsTrigger>
             <TabsTrigger value="events" className="text-xs">ইভেন্টস</TabsTrigger>
+            <TabsTrigger value="catalog" className="text-xs">Catalog</TabsTrigger>
             <TabsTrigger value="reports" className="text-xs">রিপোর্ট</TabsTrigger>
             <TabsTrigger value="funnel" className="text-xs">ফানেল</TabsTrigger>
             <TabsTrigger value="config" className="text-xs">কনফিগ</TabsTrigger>
