@@ -514,6 +514,8 @@ Deno.serve(async (req) => {
     // /blog exactly (index) → list all posts with Blog JSON-LD
     if (/^\/blog\/?$/.test(path)) return reheader(await renderBlogIndex());
 
+    if (/^\/faq\/?$/.test(path)) return reheader(renderFaq());
+
     if (path.startsWith("/shop") || path.startsWith("/categor")) {
       const cat = new URL(`${SITE_URL}${path}`).searchParams.get("category");
       return reheader(await renderCategoryOrShop(cat));
