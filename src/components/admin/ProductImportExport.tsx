@@ -9,6 +9,15 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  PRODUCT_CSV_HEADERS,
+  serializeProduct,
+  parseCSVLine,
+  parseProductRow,
+  parseCsvField,
+  validateProductRow,
+  type CsvRowError,
+} from "@/lib/admin/productCsv";
 
 interface ProductImportExportProps {
   onImportComplete: () => void;
@@ -19,6 +28,7 @@ interface ImportResult {
   failed: number;
   variantsAdded: number;
   errors: string[];
+  fieldErrors?: CsvRowError[];
 }
 
 const BATCH_SIZE = 50;
