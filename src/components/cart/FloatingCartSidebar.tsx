@@ -545,6 +545,7 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
         </>
       )}
     </AnimatePresence>
+    </>
   );
 };
 
