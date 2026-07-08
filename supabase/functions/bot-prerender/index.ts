@@ -73,9 +73,23 @@ function textHeaders(): HeadersInit {
 }
 
 // ── page renderers ─────────────────────────────────────────────────────────
-function shell({ title, description, canonical, ogImage, body, jsonLd }: {
+function breadcrumbSchema(crumbs: Array<{ name: string; url: string }>): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((c, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: c.name,
+      item: c.url,
+    })),
+  };
+}
+
+function shell({ title, description, canonical, ogImage, body, jsonLd, ogType = "website" }: {
   title: string; description: string; canonical: string; ogImage: string;
   body: string; jsonLd?: Record<string, unknown> | Array<Record<string, unknown>>;
+  ogType?: string;
 }): string {
   const ld = jsonLd
     ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, "\\u003c")}</script>`
@@ -88,16 +102,22 @@ function shell({ title, description, canonical, ogImage, body, jsonLd }: {
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
 <link rel="canonical" href="${escapeHtml(canonical)}">
+<link rel="alternate" hreflang="bn-BD" href="${escapeHtml(canonical)}">
+<link rel="alternate" hreflang="bn" href="${escapeHtml(canonical)}">
+<link rel="alternate" hreflang="x-default" href="${escapeHtml(canonical)}">
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
 <meta property="og:url" content="${escapeHtml(canonical)}">
 <meta property="og:image" content="${escapeHtml(ogImage)}">
-<meta property="og:type" content="website">
+<meta property="og:image:alt" content="${escapeHtml(title)}">
+<meta property="og:type" content="${escapeHtml(ogType)}">
 <meta property="og:site_name" content="${SITE_NAME}">
+<meta property="og:locale" content="bn_BD">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
 <meta name="twitter:image" content="${escapeHtml(ogImage)}">
+<meta name="twitter:url" content="${escapeHtml(canonical)}">
 <meta name="robots" content="index,follow,max-image-preview:large">
 ${ld}
 </head>
@@ -147,7 +167,7 @@ async function renderProduct(idOrSlug: string): Promise<Response> {
   <p><a href="${canonical}">View full product page →</a></p>
 </article>`;
 
-  const jsonLd: Record<string, unknown> = {
+  const productSchema: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: p.name,
@@ -188,8 +208,16 @@ async function renderProduct(idOrSlug: string): Promise<Response> {
     },
   };
 
+  const crumbs = [
+    { name: "Home", url: `${SITE_URL}/` },
+    ...(p.category ? [{ name: p.category, url: `${SITE_URL}/shop?category=${encodeURIComponent(p.category)}` }] : []),
+    { name: p.name, url: canonical },
+  ];
+
+  const jsonLd: Array<Record<string, unknown>> = [productSchema, breadcrumbSchema(crumbs)];
+
   return new Response(
-    shell({ title, description, canonical, ogImage: absoluteImage(p.image_url), body, jsonLd }),
+    shell({ title, description, canonical, ogImage: absoluteImage(p.image_url), body, jsonLd, ogType: "product" }),
     { headers: htmlHeaders("public, max-age=300, s-maxage=600") },
   );
 }
@@ -214,14 +242,23 @@ async function renderCategoryOrShop(category: string | null): Promise<Response> 
 ${(rows || []).map(r => `  <li><a href="${SITE_URL}/product/${r.slug || r.id}">${escapeHtml(r.name)}</a> — ৳${r.sale_price ?? r.price}${(r.stock ?? 0) > 0 ? "" : " (Out of Stock)"}</li>`).join("\n")}
 </ul>`;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    name: title,
-    url: canonical,
-    description,
-    numberOfItems: rows?.length || 0,
-  };
+  const crumbs = [
+    { name: "Home", url: `${SITE_URL}/` },
+    { name: "Shop", url: `${SITE_URL}/shop` },
+    ...(category ? [{ name: category, url: canonical }] : []),
+  ];
+
+  const jsonLd: Array<Record<string, unknown>> = [
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: title,
+      url: canonical,
+      description,
+      numberOfItems: rows?.length || 0,
+    },
+    breadcrumbSchema(crumbs),
+  ];
 
   return new Response(
     shell({ title, description, canonical, ogImage: `${SITE_URL}/og-image.jpg`, body, jsonLd }),
@@ -243,21 +280,28 @@ async function renderBlogPost(slug: string): Promise<Response> {
   <div>${(post.content || "").toString()}</div>
 </article>`;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    headline: post.title,
-    description,
-    image: absoluteImage(post.featured_image),
-    url: canonical,
-    datePublished: post.created_at,
-    dateModified: post.updated_at,
-    publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.jpg` } },
-    mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
-  };
+  const jsonLd: Array<Record<string, unknown>> = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: post.title,
+      description,
+      image: absoluteImage(post.featured_image),
+      url: canonical,
+      datePublished: post.created_at,
+      dateModified: post.updated_at,
+      publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.jpg` } },
+      mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
+    },
+    breadcrumbSchema([
+      { name: "Home", url: `${SITE_URL}/` },
+      { name: "Blog", url: `${SITE_URL}/blog` },
+      { name: post.title, url: canonical },
+    ]),
+  ];
 
   return new Response(
-    shell({ title, description, canonical, ogImage: absoluteImage(post.featured_image), body, jsonLd }),
+    shell({ title, description, canonical, ogImage: absoluteImage(post.featured_image), body, jsonLd, ogType: "article" }),
     { headers: htmlHeaders("public, max-age=600, s-maxage=3600") },
   );
 }
@@ -283,15 +327,21 @@ async function renderBlogIndex(): Promise<Response> {
     author: { "@type": "Person", name: p.author_name || SITE_NAME },
   }));
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Blog",
-    name: `${SITE_NAME} Blog`,
-    url: canonical,
-    description,
-    publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.jpg` } },
-    blogPost: items,
-  };
+  const jsonLd: Array<Record<string, unknown>> = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Blog",
+      name: `${SITE_NAME} Blog`,
+      url: canonical,
+      description,
+      publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/favicon.jpg` } },
+      blogPost: items,
+    },
+    breadcrumbSchema([
+      { name: "Home", url: `${SITE_URL}/` },
+      { name: "Blog", url: canonical },
+    ]),
+  ];
 
   const body = `
 <h1>${SITE_NAME} Blog</h1>
@@ -381,6 +431,47 @@ ${(featured || []).map((p) => `    <li><a href="${SITE_URL}/product/${p.slug || 
   );
 }
 
+// FAQ content mirrors src/pages/FAQ.tsx — kept short & stable so the schema
+// snapshot in scripts/snapshots/ only changes intentionally.
+const FAQ_ITEMS: Array<{ q: string; a: string }> = [
+  { q: "How long does delivery take after placing an order?", a: "Within Dhaka, delivery takes 1-2 business days. Outside Dhaka, it takes 3-5 business days." },
+  { q: "Is Cash on Delivery (COD) available?", a: "Yes, Cash on Delivery is available. Partial advance payment may be required." },
+  { q: "What are the delivery charges?", a: "৳60 within Dhaka and ৳120 outside Dhaka. Free delivery on orders above ৳3,000." },
+  { q: "Can I return a product?", a: "Yes, you can submit a return request within 3 days of receiving the product." },
+  { q: "How do I choose the right size?", a: "Please refer to our size guide. Sizes range from 52\" to 60\"." },
+  { q: "What payment methods are accepted?", a: "bKash, Nagad, Rocket, bank transfer, and Cash on Delivery." },
+];
+
+function renderFaq(): Response {
+  const canonical = `${SITE_URL}/faq`;
+  const title = `FAQ — Delivery, Returns, Sizing | ${SITE_NAME}`;
+  const description = "Frequently asked questions about delivery, payments, sizing, and returns at Dubai Borka House.";
+  const body = `
+<h1>Frequently Asked Questions</h1>
+<dl>
+${FAQ_ITEMS.map((f) => `  <dt>${escapeHtml(f.q)}</dt><dd>${escapeHtml(f.a)}</dd>`).join("\n")}
+</dl>`;
+  const jsonLd: Array<Record<string, unknown>> = [
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: FAQ_ITEMS.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    },
+    breadcrumbSchema([
+      { name: "Home", url: `${SITE_URL}/` },
+      { name: "FAQ", url: canonical },
+    ]),
+  ];
+  return new Response(
+    shell({ title, description, canonical, ogImage: `${SITE_URL}/og-image.jpg`, body, jsonLd }),
+    { headers: htmlHeaders("public, max-age=3600, s-maxage=86400") },
+  );
+}
+
 // ── entrypoint ─────────────────────────────────────────────────────────────
 // Wrap every response with a fresh Response that reuses the body + status but
 // hard-sets Content-Type. The Supabase edge gateway appears to keep whatever
@@ -422,6 +513,8 @@ Deno.serve(async (req) => {
 
     // /blog exactly (index) → list all posts with Blog JSON-LD
     if (/^\/blog\/?$/.test(path)) return reheader(await renderBlogIndex());
+
+    if (/^\/faq\/?$/.test(path)) return reheader(renderFaq());
 
     if (path.startsWith("/shop") || path.startsWith("/categor")) {
       const cat = new URL(`${SITE_URL}${path}`).searchParams.get("category");

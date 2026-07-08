@@ -1,0 +1,23 @@
+{
+  "breadcrumb": [
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "item": "https://dubaiborkahouse.com/",
+          "name": "Home",
+          "position": 1
+        },
+        {
+          "@type": "ListItem",
+          "item": "https://dubaiborkahouse.com/shop",
+          "name": "Shop",
+          "position": 2
+        }
+      ]
+    }
+  ],
+  "faq": []
+}

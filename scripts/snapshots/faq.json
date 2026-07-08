@@ -1,0 +1,78 @@
+{
+  "breadcrumb": [
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "item": "https://dubaiborkahouse.com/",
+          "name": "Home",
+          "position": 1
+        },
+        {
+          "@type": "ListItem",
+          "item": "https://dubaiborkahouse.com/faq",
+          "name": "FAQ",
+          "position": 2
+        }
+      ]
+    }
+  ],
+  "faq": [
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Within Dhaka, delivery takes 1-2 business days. Outside Dhaka, it takes 3-5 business days."
+          },
+          "name": "How long does delivery take after placing an order?"
+        },
+        {
+          "@type": "Question",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, Cash on Delivery is available. Partial advance payment may be required."
+          },
+          "name": "Is Cash on Delivery (COD) available?"
+        },
+        {
+          "@type": "Question",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "৳60 within Dhaka and ৳120 outside Dhaka. Free delivery on orders above ৳3,000."
+          },
+          "name": "What are the delivery charges?"
+        },
+        {
+          "@type": "Question",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, you can submit a return request within 3 days of receiving the product."
+          },
+          "name": "Can I return a product?"
+        },
+        {
+          "@type": "Question",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Please refer to our size guide. Sizes range from 52\" to 60\"."
+          },
+          "name": "How do I choose the right size?"
+        },
+        {
+          "@type": "Question",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "bKash, Nagad, Rocket, bank transfer, and Cash on Delivery."
+          },
+          "name": "What payment methods are accepted?"
+        }
+      ]
+    }
+  ]
+}
