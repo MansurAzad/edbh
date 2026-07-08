@@ -27,6 +27,7 @@ const WhatsAppOrderButton = ({ productName, price, size, color }: WhatsAppOrderB
       href={url}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() => trackContact("whatsapp")}
       className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-green-500 hover:bg-green-600 text-white font-medium transition-colors"
     >
       <MessageCircle className="w-5 h-5" />
