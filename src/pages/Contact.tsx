@@ -8,6 +8,7 @@ import Breadcrumbs from "@/components/seo/Breadcrumbs";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { trackContact, trackLead } from "@/lib/tracking";
 
 const branches = [
   { name: "কোহিনুর সিটি (মেইন শোরুম)", address: "৩য় তলা, ৩৪২ নং শপ, পুলিশ লেন, ওয়াসা, চট্টগ্রাম", main: true },
