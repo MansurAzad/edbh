@@ -82,6 +82,12 @@ export interface AdminOrder {
   courier_name: string | null;
   /** Human-readable estimated delivery date string (nullable). */
   estimated_delivery: string | null;
+  /** Result of the WhatsApp receipt auto-share ("opened" | "blocked" | "failed" | "retried" | null). */
+  whatsapp_share_status?: string | null;
+  /** ISO-8601 timestamp of the last WhatsApp share attempt (nullable). */
+  whatsapp_shared_at?: string | null;
+  /** Short error/reason when WhatsApp share was blocked or failed (nullable). */
+  whatsapp_share_error?: string | null;
 }
 
 /**
