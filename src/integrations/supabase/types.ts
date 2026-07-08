@@ -1625,39 +1625,84 @@ export type Database = {
         }
         Relationships: []
       }
+      security_admin_audit_log: {
+        Row: {
+          action: string
+          actor: string | null
+          after: Json | null
+          before: Json | null
+          category: string
+          created_at: string
+          environment: string | null
+          id: string
+          metadata: Json
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          after?: Json | null
+          before?: Json | null
+          category: string
+          created_at?: string
+          environment?: string | null
+          id?: string
+          metadata?: Json
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          after?: Json | null
+          before?: Json | null
+          category?: string
+          created_at?: string
+          environment?: string | null
+          id?: string
+          metadata?: Json
+        }
+        Relationships: []
+      }
       security_scan_reports: {
         Row: {
           created_at: string
           critical_count: number
           duration_ms: number | null
+          error: string | null
           findings: Json
           id: string
+          progress: number
           status: string
           total_findings: number
           triggered_by: string
           triggered_user: string | null
+          updated_at: string
         }
         Insert: {
           created_at?: string
           critical_count?: number
           duration_ms?: number | null
+          error?: string | null
           findings?: Json
           id?: string
+          progress?: number
           status?: string
           total_findings?: number
           triggered_by?: string
           triggered_user?: string | null
+          updated_at?: string
         }
         Update: {
           created_at?: string
           critical_count?: number
           duration_ms?: number | null
+          error?: string | null
           findings?: Json
           id?: string
+          progress?: number
           status?: string
           total_findings?: number
           triggered_by?: string
           triggered_user?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1669,6 +1714,7 @@ export type Database = {
           id: string
           rules: Json
           scan_retention_days: number
+          schedule: Json
           updated_at: string
           updated_by: string | null
         }
@@ -1679,6 +1725,7 @@ export type Database = {
           id?: string
           rules?: Json
           scan_retention_days?: number
+          schedule?: Json
           updated_at?: string
           updated_by?: string | null
         }
@@ -1689,6 +1736,7 @@ export type Database = {
           id?: string
           rules?: Json
           scan_retention_days?: number
+          schedule?: Json
           updated_at?: string
           updated_by?: string | null
         }
@@ -1943,6 +1991,7 @@ export type Database = {
         }[]
       }
       sanitize_html_content: { Args: { input: string }; Returns: string }
+      security_scan_is_due: { Args: { _settings_id: string }; Returns: boolean }
       track_order_by_id: {
         Args: { order_id: string }
         Returns: {
