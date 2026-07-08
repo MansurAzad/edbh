@@ -200,15 +200,26 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
 
       await clearCart();
       setOrderId(generatedOrderId);
+      setLastReceipt(receipt);
       setOrderPlaced(true);
 
-      // Auto-share to WhatsApp
+      // Auto-share to WhatsApp — track visible status for the success screen
+      setShareStatus("sharing");
       const shareRes = await shareOrderToWhatsApp(receipt);
+      setShareStatus(shareRes.status === "opened" ? "opened" : shareRes.status);
       if (shareRes.status === "blocked") {
         toast({
           title: "WhatsApp popup ব্লক হয়েছে",
-          description: "রিসিট শেয়ার করতে সাফল্য পেজের লিংকে ক্লিক করুন।",
+          description: 'নিচে "আবার শেয়ার করুন" বাটনে ক্লিক করুন।',
         });
+      } else if (shareRes.status === "failed") {
+        toast({
+          title: "WhatsApp শেয়ার ব্যর্থ",
+          description: shareRes.error ?? "আবার চেষ্টা করুন।",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "WhatsApp রিসিট শেয়ার হয়েছে ✅" });
       }
 
       trackPurchase(
@@ -238,12 +249,32 @@ const FloatingCartSidebar = ({ open, onClose }: FloatingCartSidebarProps) => {
     }
   };
 
+  const handleReshare = async () => {
+    if (!lastReceipt || reshareLoading) return;
+    setReshareLoading(true);
+    setShareStatus("sharing");
+    try {
+      const res = await shareOrderToWhatsApp(lastReceipt, { isRetry: true });
+      setShareStatus(res.status === "opened" || res.status === "retried" ? "opened" : res.status);
+      toast({
+        title: res.status === "blocked" ? "আবার popup ব্লক হয়েছে" :
+               res.status === "failed"  ? "শেয়ার ব্যর্থ" : "WhatsApp খোলা হয়েছে ✅",
+        variant: res.status === "opened" || res.status === "retried" ? "default" : "destructive",
+      });
+    } finally {
+      setReshareLoading(false);
+    }
+  };
+
   const resetCheckout = () => {
     setMode("cart");
     setOrderPlaced(false);
     setOrderId(null);
+    setShareStatus("idle");
+    setLastReceipt(null);
     onClose();
   };
+
 
   const headerTitle = orderPlaced
     ? "অর্ডার সম্পন্ন ✅"
