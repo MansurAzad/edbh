@@ -22,6 +22,7 @@ import type {
   WhatsAppShareStatus,
   ShareResult,
 } from "@/lib/checkout/whatsappShare";
+import WhatsAppShareTimeline from "./WhatsAppShareTimeline";
 
 interface Props {
   orderId: string | null;
