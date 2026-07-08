@@ -176,7 +176,21 @@ const OrderDetailDialog = ({
             ? "default"
             : "destructive",
       });
-      await loadWaEvents(order.id);
+      const rows = await loadWaEvents(order.id);
+      // If we sent via Cloud API and the newest event doesn't yet have a
+      // terminal delivery_status, hold the button in "Awaiting delivery…"
+      // until the webhook lands (see realtime effect below) or the timeout
+      // expires so admins get a live progress read-out instead of a stale
+      // "Resend" affordance.
+      const newest = rows[0];
+      const terminal = new Set(["delivered", "read", "failed"]);
+      if (
+        newest &&
+        res.channel === "cloud_api" &&
+        !terminal.has((newest.delivery_status ?? "pending") as string)
+      ) {
+        setWaAwaitingId(newest.id);
+      }
     } catch (e) {
       toast({
         title: "রি-শেয়ার ব্যর্থ",
@@ -187,6 +201,51 @@ const OrderDetailDialog = ({
       setWaRetrying(false);
     }
   };
+
+  // Subscribe to delivery_status changes for the current order while a resend
+  // is in-flight so the button re-enables the moment Meta reports a terminal
+  // state via our whatsapp-webhook function.
+  useEffect(() => {
+    if (!order || !waAwaitingId) return;
+    const channel = supabase
+      .channel(`wa-await-${order.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "whatsapp_share_events",
+          filter: `id=eq.${waAwaitingId}`,
+        },
+        (payload) => {
+          const next = payload.new as { delivery_status?: string | null; error?: string | null };
+          const ds = next.delivery_status ?? "pending";
+          if (ds === "delivered" || ds === "read" || ds === "failed") {
+            setWaAwaitingId(null);
+            void loadWaEvents(order.id);
+            if (ds === "failed") {
+              toast({
+                title: "Delivery failed",
+                description: next.error ?? "WhatsApp reported the send as failed",
+                variant: "destructive",
+              });
+            } else {
+              toast({ title: `Delivered (${ds})` });
+            }
+          }
+        },
+      )
+      .subscribe();
+    // Safety net: stop awaiting after 45s so the button can't stay stuck.
+    const timeout = setTimeout(() => setWaAwaitingId(null), 45_000);
+    return () => {
+      supabase.removeChannel(channel);
+      clearTimeout(timeout);
+    };
+  }, [order, waAwaitingId, toast]);
+
+  const waBusy = waRetrying || waAwaitingId !== null;
+  const latestDelivery = waEvents[0]?.delivery_status ?? null;
 
   return (
     <Dialog open={!!order} onOpenChange={(o) => !o && onClose()}>
