@@ -342,6 +342,10 @@ import WhatsAppSettingsCard from "@/components/admin/WhatsAppSettingsCard";
 
          {/* Cloudinary Migration */}
          <CloudinaryMigrationCard />
+
+         {/* WhatsApp Cloud API webhook configuration */}
+         <WhatsAppSettingsCard />
+ 
  
          <Button onClick={handleSave} className="w-full">
            <Save className="w-4 h-4 mr-2" />
