@@ -114,6 +114,7 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <AnalyticsTracker />
+              <TrackingDebugOverlay />
               <ScrollToTop />
               <Suspense fallback={<PageLoader />}>
                 <ErrorBoundary>
