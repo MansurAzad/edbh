@@ -1,17 +1,21 @@
 /**
  * @file whatsappShare.ts
  * @description Builds a Bengali order-receipt message and opens WhatsApp with
- * the message pre-filled to the business number. Called immediately after a
- * successful order placement on the checkout page.
+ * the message pre-filled to the business number. Also persists the share
+ * attempt result to `orders.whatsapp_share_status` so admins can see whether
+ * the customer's receipt was successfully forwarded.
  */
 
 import type { CartItem } from "@/contexts/CartContext";
 import type { CheckoutShippingInfo, PaymentMethodId } from "@/lib/checkout/types";
+import { supabase } from "@/integrations/supabase/client";
 
 /** Business WhatsApp number (same as WhatsAppOrderButton). */
 export const BUSINESS_WHATSAPP = "8801845853634";
 
-interface BuildOrderReceiptParams {
+export type WhatsAppShareStatus = "opened" | "blocked" | "failed" | "retried";
+
+export interface OrderReceipt {
   orderId: string;
   items: CartItem[];
   shippingInfo: CheckoutShippingInfo;
@@ -26,6 +30,12 @@ interface BuildOrderReceiptParams {
   deliveryNotes?: string;
 }
 
+export interface ShareResult {
+  status: WhatsAppShareStatus;
+  error?: string;
+  url: string;
+}
+
 const paymentLabel: Record<PaymentMethodId, string> = {
   cod: "সম্পূর্ণ ক্যাশ অন ডেলিভারি",
   advance_cod: "অ্যাডভান্স + COD",
@@ -33,15 +43,10 @@ const paymentLabel: Record<PaymentMethodId, string> = {
   nagad: "Nagad",
 };
 
-/**
- * Build a plaintext Bengali receipt suitable for a WhatsApp message.
- * First product image URL is placed on its own line so WhatsApp auto-previews it.
- */
-export function buildOrderReceiptText(p: BuildOrderReceiptParams): string {
+export function buildOrderReceiptText(p: OrderReceipt): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const trackUrl = `${origin}/order-tracking?id=${p.orderId}`;
   const shortId = p.orderId.slice(0, 8).toUpperCase();
-
   const firstImage = p.items[0]?.product?.image_url;
 
   const lines: string[] = [];
@@ -50,6 +55,7 @@ export function buildOrderReceiptText(p: BuildOrderReceiptParams): string {
   lines.push(`👤 নাম: ${p.shippingInfo.fullName}`);
   lines.push(`📞 মোবাইল: ${p.shippingInfo.phone}`);
   lines.push(`📍 ঠিকানা: ${p.shippingInfo.address}`);
+  if (p.shippingInfo.city) lines.push(`🏙️ শহর: ${p.shippingInfo.city}`);
   if (p.deliveryNotes) lines.push(`📝 নোট: ${p.deliveryNotes}`);
   lines.push("");
   lines.push("*প্রোডাক্ট বিবরণ:*");
@@ -84,11 +90,51 @@ export function buildOrderReceiptText(p: BuildOrderReceiptParams): string {
   return lines.join("\n");
 }
 
-/** Open WhatsApp with the receipt message to the business number. */
-export function shareOrderToWhatsApp(params: BuildOrderReceiptParams): void {
+/**
+ * Attempts to open WhatsApp with the pre-filled receipt and persists the
+ * result to the order row. Returns a status the UI can display.
+ */
+export async function shareOrderToWhatsApp(
+  params: OrderReceipt,
+  opts: { isRetry?: boolean } = {},
+): Promise<ShareResult> {
   const text = buildOrderReceiptText(params);
   const url = `https://wa.me/${BUSINESS_WHATSAPP}?text=${encodeURIComponent(text)}`;
-  if (typeof window !== "undefined") {
-    window.open(url, "_blank", "noopener,noreferrer");
+
+  let status: WhatsAppShareStatus = "opened";
+  let error: string | undefined;
+
+  try {
+    if (typeof window === "undefined") {
+      status = "failed";
+      error = "SSR context — window unavailable";
+    } else {
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if (!win || win.closed || typeof win.closed === "undefined") {
+        status = "blocked";
+        error = "ব্রাউজার popup ব্লক করেছে";
+      } else if (opts.isRetry) {
+        status = "retried";
+      }
+    }
+  } catch (e: unknown) {
+    status = "failed";
+    error = e instanceof Error ? e.message : String(e);
   }
+
+  // Persist to DB (best-effort — never blocks the UI).
+  try {
+    await supabase
+      .from("orders")
+      .update({
+        whatsapp_share_status: status,
+        whatsapp_shared_at: new Date().toISOString(),
+        whatsapp_share_error: error ?? null,
+      })
+      .eq("id", params.orderId);
+  } catch (persistErr) {
+    console.warn("Failed to persist WhatsApp share status:", persistErr);
+  }
+
+  return { status, error, url };
 }
