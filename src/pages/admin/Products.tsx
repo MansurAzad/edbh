@@ -37,6 +37,8 @@ const Products = () => {
   const [sortMode, setSortMode] = useState<"newest" | "stock_asc" | "stock_desc" | "margin_asc" | "margin_desc">("newest");
   const [bulkInventoryOpen, setBulkInventoryOpen] = useState(false);
   const [auditFilter, setAuditFilter] = useState<string>(""); // slow|dead|oos|low_stock|duplicates
+  const [verifyFilter, setVerifyFilter] = useState<"" | DescriptionVerifyStatus>("");
+  const [compareFocus, setCompareFocus] = useState<AdminProduct | null>(null);
 
   // Deep-link support from Business Audit: /admin/products?filter=oos&sort=margin_desc
   const [searchParams, setSearchParams] = useSearchParams();
