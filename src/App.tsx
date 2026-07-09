@@ -46,6 +46,7 @@ const DeveloperDocs = lazy(() => import("./pages/DeveloperDocs"));
 // Admin pages - lazy loaded
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const AdminProducts = lazy(() => import("./pages/admin/Products"));
+const AdminProductDescriptions = lazy(() => import("./pages/admin/ProductDescriptions"));
 const AdminOrders = lazy(() => import("./pages/admin/Orders"));
 const AdminCustomers = lazy(() => import("./pages/admin/Customers"));
 const AdminReviews = lazy(() => import("./pages/admin/Reviews"));
