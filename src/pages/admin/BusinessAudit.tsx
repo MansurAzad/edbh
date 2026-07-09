@@ -401,12 +401,21 @@ export default function BusinessAudit() {
 
         {/* 7.4 Order workflow */}
         <SectionHeading n="৭.৪" title="Order Workflow Health" desc="Canonical status coverage" />
+        {workflowTooFlat && (
+          <Alert variant="destructive">
+            <AlertTriangle className="w-4 h-4" />
+            <AlertTitle>Sales operation risk: workflow শুধু Pending/Complete</AlertTitle>
+            <AlertDescription>
+              বর্তমানে অর্ডারগুলো <b>{activeStatuses.join(" / ")}</b> — এই flat workflow-এ processing, packed, shipped, returned, exchange, refunded track হচ্ছে না।
+              অপারেশন সঠিকভাবে audit করতে হলে Orders পেজ থেকে পূর্ণ status ladder ব্যবহার শুরু করুন।
+            </AlertDescription>
+          </Alert>
+        )}
         {m.missingStatuses.length > 0 && (
           <Alert variant="default" className="border-amber-500/40">
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             <AlertTitle>Order workflow অসম্পূর্ণ</AlertTitle>
             <AlertDescription>
-              যদি শুধু Pending/Complete থাকে, তাহলে sales operation ঠিকভাবে track হবে না।
               এই status গুলো এখনো ব্যবহৃত হয়নি: <b>{m.missingStatuses.join(", ")}</b>
             </AlertDescription>
           </Alert>
