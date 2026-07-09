@@ -45,19 +45,31 @@ const Products = () => {
   useEffect(() => {
     const f = searchParams.get("filter") || "";
     const s = searchParams.get("sort");
+    const v = searchParams.get("verify");
     if (f) setAuditFilter(f);
     if (f === "low_stock" || f === "oos") setLowStockOnly(f === "low_stock");
     if (s === "margin_asc" || s === "margin_desc" || s === "stock_asc" || s === "stock_desc") {
       setSortMode(s);
     }
+    if (v === "pass" || v === "attention" || v === "fail") setVerifyFilter(v);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const clearAuditFilter = () => {
     setAuditFilter("");
+    setVerifyFilter("");
     const next = new URLSearchParams(searchParams);
     next.delete("filter");
     next.delete("sort");
+    next.delete("verify");
     setSearchParams(next, { replace: true });
+  };
+  const toggleVerify = (v: DescriptionVerifyStatus) => {
+    const nextVal = verifyFilter === v ? "" : v;
+    setVerifyFilter(nextVal);
+    const next = new URLSearchParams(searchParams);
+    if (nextVal) next.set("verify", nextVal); else next.delete("verify");
+    setSearchParams(next, { replace: true });
+    setCurrentPage(1);
   };
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
