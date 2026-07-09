@@ -240,22 +240,67 @@ const Products = () => {
 
   /**
    * Download the currently filtered + sorted product list as CSV.
-   * Uses the same serializer as import/export so schema stays in sync,
-   * including the standardized fields (sku, subcategory, meta_*, etc.).
+   * When an audit filter (oos / low_stock / duplicates) is active, the CSV is
+   * an audit-scoped report with only the columns relevant to that report —
+   * otherwise it uses the full import/export serializer.
    */
   const handleExportFiltered = useCallback(() => {
-    const csv = productsToCsv(filteredProducts as unknown as Record<string, any>[]);
+    const stamp = new Date().toISOString().slice(0, 10);
+    let csv: string;
+    let filename: string;
+
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const priceOf = (p: AdminProduct) => Number(p.sale_price || p.price || 0);
+
+    if (auditFilter === "oos" || auditFilter === "low_stock") {
+      const header = ["id", "name", "sku", "category", "subcategory", "stock", "price", "sale_price", "verify_status"];
+      const rows = filteredProducts.map((p) => [
+        p.id, p.name, p.sku ?? "", p.category, p.subcategory ?? "",
+        p.stock ?? 0, p.price, p.sale_price ?? "",
+        getDescriptionVerifyStatus(p.description),
+      ].map(esc).join(","));
+      csv = [header.join(","), ...rows].join("\n");
+      filename = `products-audit-${auditFilter}-${stamp}.csv`;
+    } else if (auditFilter === "duplicates") {
+      // Group duplicate rows so the report clearly shows which items share a name.
+      const groups = new Map<string, AdminProduct[]>();
+      filteredProducts.forEach((p) => {
+        const k = p.name.trim().toLowerCase().replace(/\s+/g, " ");
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k)!.push(p);
+      });
+      const header = ["duplicate_group", "id", "name", "sku", "category", "subcategory", "price", "stock", "verify_status"];
+      const rows: string[] = [];
+      let gi = 0;
+      for (const [, group] of groups) {
+        gi += 1;
+        group.forEach((p) => {
+          rows.push([
+            `G${gi}`, p.id, p.name, p.sku ?? "", p.category, p.subcategory ?? "",
+            priceOf(p), p.stock ?? 0,
+            getDescriptionVerifyStatus(p.description),
+          ].map(esc).join(","));
+        });
+      }
+      csv = [header.join(","), ...rows].join("\n");
+      filename = `products-audit-duplicates-${stamp}.csv`;
+    } else {
+      csv = productsToCsv(filteredProducts as unknown as Record<string, any>[]);
+      filename = verifyFilter
+        ? `products-verify-${verifyFilter}-${stamp}.csv`
+        : `products-filtered-${stamp}.csv`;
+    }
+
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const stamp = new Date().toISOString().slice(0, 10);
-    a.download = `products-filtered-${stamp}.csv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [filteredProducts]);
+  }, [filteredProducts, auditFilter, verifyFilter]);
 
   return (
     <AdminLayout>
