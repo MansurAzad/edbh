@@ -88,6 +88,7 @@ const InventorySync = lazy(() => import("./pages/admin/InventorySync"));
 const SecurityCenter = lazy(() => import("./pages/admin/SecurityCenter"));
 const WhatsAppShareEventsAdmin = lazy(() => import("./pages/admin/WhatsAppShareEvents"));
 const BusinessAudit = lazy(() => import("./pages/admin/BusinessAudit"));
+const CustomerInsights = lazy(() => import("./pages/admin/CustomerInsights"));
 
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
@@ -184,6 +185,7 @@ const App = () => (
                     <Route path="/admin/security" element={<PermissionGuard><SecurityCenter /></PermissionGuard>} />
                     <Route path="/admin/whatsapp-events" element={<PermissionGuard><WhatsAppShareEventsAdmin /></PermissionGuard>} />
                     <Route path="/admin/business-audit" element={<PermissionGuard><BusinessAudit /></PermissionGuard>} />
+                    <Route path="/admin/customer-insights" element={<PermissionGuard><CustomerInsights /></PermissionGuard>} />
 
 
                     <Route path="/return-policy" element={<ReturnPolicy />} />

@@ -1,15 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import AdminLayout from "@/components/admin/AdminLayout";
 import AuditCard from "@/components/admin/audit/AuditCard";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DollarSign, TrendingUp, ShoppingCart, Package, Users, MapPin, AlertTriangle,
   Truck, RotateCcw, BarChart3, Layers, Boxes, Award, Snowflake, ClipboardCheck,
-  UserPlus, PhoneCall, PackageX, Repeat, Building2,
+  UserPlus, PhoneCall, PackageX, Repeat, Building2, RefreshCw, Download,
 } from "lucide-react";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -23,9 +26,12 @@ const WORKFLOW_STATUSES = [
 const money = (n: number) => `৳${Math.round(n).toLocaleString()}`;
 
 export default function BusinessAudit() {
-  const { data, isLoading } = useQuery({
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const { data, isLoading, refetch, isFetching, dataUpdatedAt } = useQuery({
     queryKey: ["business-audit-v1"],
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
+    refetchInterval: autoRefresh ? 60 * 1000 : false, // live poll every 60s
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const [ordersRes, itemsRes, productsRes, variantsRes, profilesRes, cartsRes] = await Promise.all([
         supabase.from("orders").select("id,total,status,payment_method,payment_status,advance_amount,shipping_city,shipping_phone,user_id,guest_name,created_at").order("created_at", { ascending: false }).limit(2000),
@@ -212,18 +218,79 @@ export default function BusinessAudit() {
     </div>
   );
 
+  // ── CSV export of the current audit snapshot ────────────────────────────
+  const exportAuditCsv = () => {
+    if (!m) return;
+    const flat: Array<[string, string | number]> = [
+      ["Daily sales", money(m.daily)],
+      ["Weekly sales", money(m.weekly)],
+      ["Monthly sales", money(m.monthly)],
+      ["Gross revenue (delivered)", money(m.gross)],
+      ["Average order value", money(m.aov)],
+      ["Net profit (est.)", money(m.netProfit)],
+      ["Products missing purchase_cost", m.missingCostCount],
+      ["Return / cancel rate %", m.returnCancelRate.toFixed(2)],
+      ["COD pending amount", money(m.codPending)],
+      ["Best sellers", m.bestSellers.map((b: any) => `${b.name}(${b.qty})`).join(" | ")],
+      ["Top categories", m.topCategories.map(([n, v]: any) => `${n}:${money(v)}`).join(" | ")],
+      ["Slow moving count", m.slow.length],
+      ["Dead stock count", m.dead.length],
+      ["Out of stock count", m.outOfStock],
+      ["Low stock count", m.lowStock],
+      ["Variant mismatch count", m.variantMismatch.length],
+      ["Duplicate products", m.duplicates],
+      ["Repeat customers (2+ orders)", m.repeatCustomers],
+      ["High-value customers", m.highValueCustomers],
+      ["Abandoned carts", m.abandonedUsers.size],
+      ["Cancelled-order customers", m.cancelledCustomers],
+      ["Total customers", m.totalCustomers],
+      ["Total orders (sampled)", m.totalOrders],
+      ["Missing workflow statuses", m.missingStatuses.join(" | ") || "None"],
+    ];
+    const csv = ["Metric,Value", ...flat.map(([k, v]) => `"${k}","${String(v).replace(/"/g, '""')}"`)].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `business-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Warn explicitly when the shop only tracks Pending / Complete style statuses.
+  const activeStatuses = Object.entries(m.workflowCounts).filter(([, n]) => (n as number) > 0).map(([s]) => s);
+  const workflowTooFlat = activeStatuses.length > 0 && activeStatuses.every((s) => ["pending", "delivered", "completed"].includes(s));
+  const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : "—";
+
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-display font-bold flex items-center gap-2">
-            <ClipboardCheck className="w-6 h-6 text-primary" />
-            Business Audit
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            ব্যবসার Sales, Product, Customer এবং Order workflow — এক নজরে অডিট রিপোর্ট
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-display font-bold flex items-center gap-2">
+              <ClipboardCheck className="w-6 h-6 text-primary" />
+              Business Audit
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              ব্যবসার Sales, Product, Customer এবং Order workflow — এক নজরে অডিট রিপোর্ট
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Last refreshed: {lastUpdated}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="auto-refresh" className="text-xs text-muted-foreground">Auto-refresh 60s</Label>
+              <Switch id="auto-refresh" checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+            </div>
+            <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportAuditCsv}>
+              <Download className="w-4 h-4 mr-2" /> CSV
+            </Button>
+          </div>
         </div>
+
 
         {/* 7.1 Sales report */}
         <SectionHeading n="৭.১" title="Sales Report" desc="Revenue, profit ও operational cash-flow indicators" />
@@ -307,38 +374,48 @@ export default function BusinessAudit() {
         <SectionHeading n="৭.৩" title="Customer Report" desc="Repeat, retention ও geo/source insights" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <AuditCard title="Repeat customers" icon={Repeat} status={m.repeatCustomers > 0 ? "ok" : "warn"}
-            metric={m.repeatCustomers} hint="২+ orders" to="/admin/customers" />
+            metric={m.repeatCustomers} hint="২+ orders" to="/admin/customer-insights?filter=repeat" ctaLabel="Drill down" />
           <AuditCard title="High-value customers" icon={Award} status="info"
-            metric={m.highValueCustomers} hint="Lifetime spend ≥ ৳5,000" to="/admin/customers" />
+            metric={m.highValueCustomers} hint="Lifetime spend ≥ ৳5,000"
+            to="/admin/customer-insights?filter=high_value" ctaLabel="Drill down" />
           <AuditCard title="City-wise orders" icon={MapPin} status="info"
             metric={m.topCities[0]?.[0] || "—"}
             hint={m.topCities.slice(0, 3).map(([c, n]: any) => `${c} (${n})`).join(" · ")}
-            to="/admin/reports" />
+            to="/admin/customer-insights?filter=city" ctaLabel="View breakdown" />
           <AuditCard title="District-wise orders" icon={MapPin} status="warn"
-            metric="Not tracked" hint="District field অর্ডারে সংরক্ষিত নেই"
-            to="/admin/delivery-zones" ctaLabel="Enable district capture" />
+            metric="Uses city field" hint="Separate district column নেই — city-based grouping দেখানো হচ্ছে"
+            to="/admin/customer-insights?filter=district" ctaLabel="View breakdown" />
           <AuditCard title="Customer source" icon={UserPlus} status="warn"
             metric="Not tracked" hint="Facebook / Website / WhatsApp / Walk-in tag চালু নেই"
-            to="/admin/orders" ctaLabel="Add source field" />
+            to="/admin/customer-insights?filter=source" ctaLabel="See why" />
           <AuditCard title="Abandoned carts" icon={ShoppingCart}
             status={m.abandonedUsers.size > 0 ? "warn" : "ok"}
             metric={m.abandonedUsers.size} hint=">24h idle carts"
-            to="/admin/reports" />
+            to="/admin/customer-insights?filter=abandoned" ctaLabel="Drill down" />
           <AuditCard title="Cancelled-order customers" icon={PackageX}
             status={m.cancelledCustomers > 0 ? "warn" : "ok"}
-            metric={m.cancelledCustomers} to="/admin/orders?status=cancelled" />
+            metric={m.cancelledCustomers} to="/admin/customer-insights?filter=cancelled" ctaLabel="Drill down" />
           <AuditCard title="Total customers" icon={Users} status="info"
             metric={m.totalCustomers} to="/admin/customers" />
         </div>
 
         {/* 7.4 Order workflow */}
         <SectionHeading n="৭.৪" title="Order Workflow Health" desc="Canonical status coverage" />
+        {workflowTooFlat && (
+          <Alert variant="destructive">
+            <AlertTriangle className="w-4 h-4" />
+            <AlertTitle>Sales operation risk: workflow শুধু Pending/Complete</AlertTitle>
+            <AlertDescription>
+              বর্তমানে অর্ডারগুলো <b>{activeStatuses.join(" / ")}</b> — এই flat workflow-এ processing, packed, shipped, returned, exchange, refunded track হচ্ছে না।
+              অপারেশন সঠিকভাবে audit করতে হলে Orders পেজ থেকে পূর্ণ status ladder ব্যবহার শুরু করুন।
+            </AlertDescription>
+          </Alert>
+        )}
         {m.missingStatuses.length > 0 && (
           <Alert variant="default" className="border-amber-500/40">
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             <AlertTitle>Order workflow অসম্পূর্ণ</AlertTitle>
             <AlertDescription>
-              যদি শুধু Pending/Complete থাকে, তাহলে sales operation ঠিকভাবে track হবে না।
               এই status গুলো এখনো ব্যবহৃত হয়নি: <b>{m.missingStatuses.join(", ")}</b>
             </AlertDescription>
           </Alert>
