@@ -348,7 +348,7 @@ const Products = () => {
           lowStockThreshold={lowStockThreshold}
           setLowStockThreshold={onFilterChange(setLowStockThreshold)}
           sortMode={sortMode}
-          setSortMode={onFilterChange(setSortMode)}
+          setSortMode={changeSortMode}
           lowStockCount={lowStockCount}
           onOpenBulkInventory={() => setBulkInventoryOpen(true)}
           onExportFiltered={handleExportFiltered}
