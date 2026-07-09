@@ -164,6 +164,7 @@ export const ROUTE_PERMISSIONS: Record<string, PermissionKey | "admin_only"> = {
   "/admin/categories": "products.manage",
   "/admin/blog": "content.manage",
   "/admin/products": "products.manage",
+  "/admin/product-descriptions": "products.manage",
   "/admin/orders": "orders.manage",
   "/admin/customers": "customers.view",
   "/admin/reviews": "reviews.manage",

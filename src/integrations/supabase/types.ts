@@ -2030,6 +2030,19 @@ export type Database = {
         }[]
       }
       detect_injection: { Args: { input: string }; Returns: string }
+      find_duplicate_product_descriptions: {
+        Args: { _threshold?: number }
+        Returns: {
+          exact_match: boolean
+          name_a: string
+          name_b: string
+          product_a: string
+          product_b: string
+          similarity: number
+          slug_a: string
+          slug_b: string
+        }[]
+      }
       get_active_ai_provider: {
         Args: { _scope: string }
         Returns: {
@@ -2094,8 +2107,18 @@ export type Database = {
           scope: string
         }[]
       }
+      restore_product_description: {
+        Args: { _product_id: string }
+        Returns: {
+          product_id: string
+          restored: boolean
+          restored_text: string
+        }[]
+      }
       sanitize_html_content: { Args: { input: string }; Returns: string }
       security_scan_is_due: { Args: { _settings_id: string }; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       track_order_by_id: {
         Args: { order_id: string }
         Returns: {

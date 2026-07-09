@@ -46,6 +46,7 @@ const DeveloperDocs = lazy(() => import("./pages/DeveloperDocs"));
 // Admin pages - lazy loaded
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const AdminProducts = lazy(() => import("./pages/admin/Products"));
+const AdminProductDescriptions = lazy(() => import("./pages/admin/ProductDescriptions"));
 const AdminOrders = lazy(() => import("./pages/admin/Orders"));
 const AdminCustomers = lazy(() => import("./pages/admin/Customers"));
 const AdminReviews = lazy(() => import("./pages/admin/Reviews"));
@@ -145,7 +146,8 @@ const App = () => (
                     <Route path="/admin/seo-debug" element={<PermissionGuard><SeoDebug /></PermissionGuard>} />
                     <Route path="/admin/categories" element={<PermissionGuard><AdminCategories /></PermissionGuard>} />
                     <Route path="/admin/blog" element={<PermissionGuard><BlogPosts /></PermissionGuard>} />
-                    <Route path="/admin/products" element={<PermissionGuard><AdminProducts /></PermissionGuard>} />
+                   <Route path="/admin/products" element={<PermissionGuard><AdminProducts /></PermissionGuard>} />
+                   <Route path="/admin/product-descriptions" element={<PermissionGuard><AdminProductDescriptions /></PermissionGuard>} />
                     <Route path="/admin/orders" element={<PermissionGuard><AdminOrders /></PermissionGuard>} />
                     <Route path="/admin/customers" element={<PermissionGuard><AdminCustomers /></PermissionGuard>} />
                     <Route path="/admin/reviews" element={<PermissionGuard><AdminReviews /></PermissionGuard>} />

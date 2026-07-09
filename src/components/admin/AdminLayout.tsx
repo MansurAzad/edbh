@@ -23,6 +23,7 @@ const navItems = [
   { path: "/admin/categories", icon: Tag, label: "Categories" },
   { path: "/admin/blog", icon: FileText, label: "Blog Posts" },
   { path: "/admin/products", icon: Package, label: "Products" },
+  { path: "/admin/product-descriptions", icon: Edit3, label: "Product Descriptions" },
   { path: "/admin/orders", icon: ShoppingCart, label: "Orders" },
   { path: "/admin/customers", icon: Users, label: "Customers" },
   { path: "/admin/reviews", icon: Star, label: "Reviews" },
