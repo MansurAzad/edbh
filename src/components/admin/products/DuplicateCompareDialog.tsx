@@ -60,7 +60,7 @@ export default function DuplicateCompareDialog({ focus, allProducts, onOpenChang
       .slice(0, 12);
   }, [focus, allProducts]);
 
-  const focusStatus = focus ? getDescriptionVerifyStatus(focus.description) : "pass";
+  const focusDetail = focus ? getDescriptionVerifyDetail(focus.description) : null;
 
   return (
     <Dialog open={!!focus} onOpenChange={onOpenChange}>
