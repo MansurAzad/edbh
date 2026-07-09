@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DESCRIPTION_VERIFY_META,
-  getDescriptionVerifyStatus,
+  getDescriptionVerifyDetail,
   LOW_STOCK_THRESHOLD,
   type AdminProduct,
 } from "@/lib/admin/productHelpers";
