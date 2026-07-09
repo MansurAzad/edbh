@@ -69,17 +69,33 @@ vi.mock("@/integrations/supabase/client", () => {
         }),
       };
     }
+    if (table === "products") {
+      return {
+        select: () => ({
+          in: async () => ({ data: [], error: null }),
+        }),
+      };
+    }
     if (table === "whatsapp_share_events") {
       return {
-        insert: async (row: Record<string, unknown>) => {
+        insert: (row: Record<string, unknown>) => {
           captured.eventInserts.push(row);
-          return { data: null, error: null };
+          return {
+            select: () => ({
+              maybeSingle: async () => ({ data: { id: `evt-${captured.eventInserts.length}` }, error: null }),
+            }),
+          };
         },
       };
     }
     throw new Error(`unexpected table: ${table}`);
   };
-  return { supabase: { from } };
+  return {
+    supabase: {
+      from,
+      functions: { invoke: async () => ({ data: null, error: new Error("skip cloud api in tests") }) },
+    },
+  };
 });
 
 // -- System under test (must be imported AFTER vi.mock) -----------------------
