@@ -82,9 +82,11 @@ export default function DuplicateCompareDialog({ focus, allProducts, onOpenChang
                     {focus.category}{focus.subcategory ? ` · ${focus.subcategory}` : ""}
                   </div>
                 </div>
-                <Badge variant="outline" className={`text-xs ${DESCRIPTION_VERIFY_META[focusStatus].badge}`}>
-                  Desc: {DESCRIPTION_VERIFY_META[focusStatus].label}
-                </Badge>
+                {focusDetail && (
+                  <Badge variant="outline" className={`text-xs ${DESCRIPTION_VERIFY_META[focusDetail.status].badge}`} title={focusDetail.message}>
+                    Desc: {DESCRIPTION_VERIFY_META[focusDetail.status].label} · {focusDetail.reason}
+                  </Badge>
+                )}
               </div>
               <p className="text-xs mt-2 whitespace-pre-wrap line-clamp-6">
                 {focus.description || <span className="text-muted-foreground italic">(কোন ডেসক্রিপশন নেই)</span>}
