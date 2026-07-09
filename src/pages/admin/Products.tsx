@@ -150,19 +150,10 @@ const Products = () => {
     // banner to point the admin to Business Audit for the authoritative list.
 
     if (sortMode !== "newest") {
-      filtered = [...filtered].sort((a, b) => {
-        if (sortMode === "stock_asc" || sortMode === "stock_desc") {
-          const sa = a.stock ?? 0;
-          const sb = b.stock ?? 0;
-          return sortMode === "stock_asc" ? sa - sb : sb - sa;
-        }
-        const ma = marginOf(a);
-        const mb = marginOf(b);
-        return sortMode === "margin_asc" ? ma - mb : mb - ma;
-      });
+      filtered = sortAdminProducts(filtered, sortMode, { simMap: similarityMap, marginOf });
     }
     return filtered;
-  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode, auditFilter, verifyFilter]);
+  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode, auditFilter, verifyFilter, similarityMap]);
 
   /** Count-by-verify-status for banner chip labels. */
   const verifyCounts = useMemo(() => {
