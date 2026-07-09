@@ -315,15 +315,52 @@ const Products = () => {
           </Button>
         </div>
 
-        {auditFilter && (
-          <div className="flex items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-            <span>
-              Business Audit filter active: <b>{auditFilter.replace("_", " ")}</b>
-              {(auditFilter === "slow" || auditFilter === "dead") && (
-                <span className="text-muted-foreground"> — showing full catalog; see Business Audit for the authoritative list.</span>
-              )}
-            </span>
-            <Button size="sm" variant="ghost" onClick={clearAuditFilter}>Clear</Button>
+        {/* Report banner: audit filter + description verify chips + audit CSV export */}
+        {(auditFilter || verifyFilter || true) && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">Report</span>
+                {auditFilter ? (
+                  <span>
+                    Business Audit filter: <b>{auditFilter.replace("_", " ")}</b>
+                    {(auditFilter === "slow" || auditFilter === "dead") && (
+                      <span className="text-muted-foreground"> — showing full catalog; see Business Audit for the authoritative list.</span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">No audit filter active</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {(auditFilter === "oos" || auditFilter === "low_stock" || auditFilter === "duplicates") && (
+                  <Button size="sm" variant="outline" onClick={handleExportFiltered}>
+                    Download {auditFilter.replace("_", " ")} CSV ({filteredProducts.length})
+                  </Button>
+                )}
+                {(auditFilter || verifyFilter) && (
+                  <Button size="sm" variant="ghost" onClick={clearAuditFilter}>Clear</Button>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">Description verify:</span>
+              {(["pass", "attention", "fail"] as DescriptionVerifyStatus[]).map((s) => {
+                const meta = DESCRIPTION_VERIFY_META[s];
+                const active = verifyFilter === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => toggleVerify(s)}
+                    className={`text-xs px-2 py-1 rounded border transition ${meta.badge} ${active ? "ring-2 ring-offset-1 ring-primary" : "opacity-80 hover:opacity-100"}`}
+                    aria-pressed={active}
+                  >
+                    {meta.label} · {verifyCounts[s]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
