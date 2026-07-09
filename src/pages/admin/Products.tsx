@@ -120,6 +120,13 @@ const Products = () => {
     return ((sell - cost) / sell) * 100;
   };
 
+  /** Precompute max name-similarity so `similarity_desc` sort is O(1) per row. */
+  const similarityMap = useMemo(
+    () => (sortMode === "similarity_desc" ? computeMaxNameSimilarity(products) : new Map<string, number>()),
+    [products, sortMode],
+  );
+
+
   const filteredProducts = useMemo(() => {
     let filtered = products;
     if (searchQuery) {
