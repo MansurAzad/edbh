@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
     const svc = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: products, error: fetchErr } = await svc
       .from("products")
-      .select("id, name, description, category, material, colors, sizes, price")
+      .select("id, name, description, category, subcategory, material, fabric, work_type, part, hijab_included, inner_included, colors, sizes, price")
       .in("id", productIds);
     if (fetchErr) return errorResponse(fetchErr.message, 500);
 
