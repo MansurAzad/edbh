@@ -87,6 +87,13 @@ const Products = () => {
     return Array.from(set).sort();
   }, [products, formData.category]);
 
+  const marginOf = (p: AdminProduct) => {
+    const cost = Number((p as any).purchase_cost ?? 0);
+    const sell = Number(p.sale_price || p.price || 0);
+    if (!cost || !sell) return -Infinity;
+    return ((sell - cost) / sell) * 100;
+  };
+
   const filteredProducts = useMemo(() => {
     let filtered = products;
     if (searchQuery) {
@@ -97,15 +104,35 @@ const Products = () => {
     if (minPrice) filtered = filtered.filter((p) => (p.sale_price || p.price) >= Number(minPrice));
     if (maxPrice) filtered = filtered.filter((p) => (p.sale_price || p.price) <= Number(maxPrice));
     if (lowStockOnly) filtered = filtered.filter((p) => (p.stock ?? 0) <= lowStockThreshold);
+
+    // Business Audit deep-link filters
+    if (auditFilter === "oos") filtered = filtered.filter((p) => (p.stock ?? 0) <= 0);
+    if (auditFilter === "low_stock") filtered = filtered.filter((p) => (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5);
+    if (auditFilter === "duplicates") {
+      const counts = new Map<string, number>();
+      products.forEach((p) => {
+        const k = p.name.trim().toLowerCase().replace(/\s+/g, " ");
+        counts.set(k, (counts.get(k) || 0) + 1);
+      });
+      filtered = filtered.filter((p) => (counts.get(p.name.trim().toLowerCase().replace(/\s+/g, " ")) || 0) > 1);
+    }
+    // slow/dead can't be computed from products alone; leave list intact and rely on the
+    // banner to point the admin to Business Audit for the authoritative list.
+
     if (sortMode !== "newest") {
       filtered = [...filtered].sort((a, b) => {
-        const sa = a.stock ?? 0;
-        const sb = b.stock ?? 0;
-        return sortMode === "stock_asc" ? sa - sb : sb - sa;
+        if (sortMode === "stock_asc" || sortMode === "stock_desc") {
+          const sa = a.stock ?? 0;
+          const sb = b.stock ?? 0;
+          return sortMode === "stock_asc" ? sa - sb : sb - sa;
+        }
+        const ma = marginOf(a);
+        const mb = marginOf(b);
+        return sortMode === "margin_asc" ? ma - mb : mb - ma;
       });
     }
     return filtered;
-  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode]);
+  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode, auditFilter]);
 
   const lowStockCount = useMemo(
     () => products.filter((p) => (p.stock ?? 0) <= lowStockThreshold).length,
