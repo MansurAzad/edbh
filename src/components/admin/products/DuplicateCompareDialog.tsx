@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import {
   DESCRIPTION_VERIFY_META,
-  getDescriptionVerifyStatus,
+  getDescriptionVerifyDetail,
   type AdminProduct,
 } from "@/lib/admin/productHelpers";
 
