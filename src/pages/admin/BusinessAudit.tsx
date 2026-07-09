@@ -218,18 +218,79 @@ export default function BusinessAudit() {
     </div>
   );
 
+  // ── CSV export of the current audit snapshot ────────────────────────────
+  const exportAuditCsv = () => {
+    if (!m) return;
+    const flat: Array<[string, string | number]> = [
+      ["Daily sales", money(m.daily)],
+      ["Weekly sales", money(m.weekly)],
+      ["Monthly sales", money(m.monthly)],
+      ["Gross revenue (delivered)", money(m.gross)],
+      ["Average order value", money(m.aov)],
+      ["Net profit (est.)", money(m.netProfit)],
+      ["Products missing purchase_cost", m.missingCostCount],
+      ["Return / cancel rate %", m.returnCancelRate.toFixed(2)],
+      ["COD pending amount", money(m.codPending)],
+      ["Best sellers", m.bestSellers.map((b: any) => `${b.name}(${b.qty})`).join(" | ")],
+      ["Top categories", m.topCategories.map(([n, v]: any) => `${n}:${money(v)}`).join(" | ")],
+      ["Slow moving count", m.slow.length],
+      ["Dead stock count", m.dead.length],
+      ["Out of stock count", m.outOfStock],
+      ["Low stock count", m.lowStock],
+      ["Variant mismatch count", m.variantMismatch.length],
+      ["Duplicate products", m.duplicates],
+      ["Repeat customers (2+ orders)", m.repeatCustomers],
+      ["High-value customers", m.highValueCustomers],
+      ["Abandoned carts", m.abandonedUsers.size],
+      ["Cancelled-order customers", m.cancelledCustomers],
+      ["Total customers", m.totalCustomers],
+      ["Total orders (sampled)", m.totalOrders],
+      ["Missing workflow statuses", m.missingStatuses.join(" | ") || "None"],
+    ];
+    const csv = ["Metric,Value", ...flat.map(([k, v]) => `"${k}","${String(v).replace(/"/g, '""')}"`)].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `business-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Warn explicitly when the shop only tracks Pending / Complete style statuses.
+  const activeStatuses = Object.entries(m.workflowCounts).filter(([, n]) => (n as number) > 0).map(([s]) => s);
+  const workflowTooFlat = activeStatuses.length > 0 && activeStatuses.every((s) => ["pending", "delivered", "completed"].includes(s));
+  const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : "—";
+
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-display font-bold flex items-center gap-2">
-            <ClipboardCheck className="w-6 h-6 text-primary" />
-            Business Audit
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            ব্যবসার Sales, Product, Customer এবং Order workflow — এক নজরে অডিট রিপোর্ট
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-display font-bold flex items-center gap-2">
+              <ClipboardCheck className="w-6 h-6 text-primary" />
+              Business Audit
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              ব্যবসার Sales, Product, Customer এবং Order workflow — এক নজরে অডিট রিপোর্ট
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Last refreshed: {lastUpdated}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="auto-refresh" className="text-xs text-muted-foreground">Auto-refresh 60s</Label>
+              <Switch id="auto-refresh" checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+            </div>
+            <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportAuditCsv}>
+              <Download className="w-4 h-4 mr-2" /> CSV
+            </Button>
+          </div>
         </div>
+
 
         {/* 7.1 Sales report */}
         <SectionHeading n="৭.১" title="Sales Report" desc="Revenue, profit ও operational cash-flow indicators" />
