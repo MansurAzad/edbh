@@ -104,7 +104,7 @@ export default function DuplicateCompareDialog({ focus, allProducts, onOpenChang
               ) : (
                 <ul className="space-y-2">
                   {matches.map((m) => {
-                    const s = getDescriptionVerifyStatus(m.product.description);
+                    const d = getDescriptionVerifyDetail(m.product.description);
                     return (
                       <li key={m.product.id} className="rounded-md border p-3">
                         <div className="flex items-start justify-between gap-2">
@@ -115,8 +115,8 @@ export default function DuplicateCompareDialog({ focus, allProducts, onOpenChang
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-1 shrink-0">
-                            <Badge variant="outline" className={`text-xs ${DESCRIPTION_VERIFY_META[s].badge}`}>
-                              Desc: {DESCRIPTION_VERIFY_META[s].label}
+                            <Badge variant="outline" className={`text-xs ${DESCRIPTION_VERIFY_META[d.status].badge}`} title={d.message}>
+                              Desc: {DESCRIPTION_VERIFY_META[d.status].label} · {d.reason}
                             </Badge>
                             <div className="text-[10px] text-muted-foreground">
                               name {(m.nameSim * 100).toFixed(0)}% · desc {(m.descSim * 100).toFixed(0)}%
