@@ -1,15 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import AdminLayout from "@/components/admin/AdminLayout";
 import AuditCard from "@/components/admin/audit/AuditCard";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DollarSign, TrendingUp, ShoppingCart, Package, Users, MapPin, AlertTriangle,
   Truck, RotateCcw, BarChart3, Layers, Boxes, Award, Snowflake, ClipboardCheck,
-  UserPlus, PhoneCall, PackageX, Repeat, Building2,
+  UserPlus, PhoneCall, PackageX, Repeat, Building2, RefreshCw, Download,
 } from "lucide-react";
 
 const DAY = 24 * 60 * 60 * 1000;
