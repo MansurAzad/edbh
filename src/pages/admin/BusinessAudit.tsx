@@ -50,15 +50,15 @@ export default function BusinessAudit() {
     if (!data) return null;
     const { orders, items, products, variants, profiles, carts } = data as any;
     const now = Date.now();
-    const in = (d: string, days: number) => (now - new Date(d).getTime()) <= days * DAY;
+    const within = (d: string, days: number) => (now - new Date(d).getTime()) <= days * DAY;
 
     const delivered = orders.filter((o: any) => o.status === "delivered");
     const cancelled = orders.filter((o: any) => o.status === "cancelled");
     const returned  = orders.filter((o: any) => o.status === "returned");
 
-    const daily = delivered.filter((o: any) => in(o.created_at, 1)).reduce((s: number, o: any) => s + Number(o.total || 0), 0);
-    const weekly = delivered.filter((o: any) => in(o.created_at, 7)).reduce((s: number, o: any) => s + Number(o.total || 0), 0);
-    const monthly = delivered.filter((o: any) => in(o.created_at, 30)).reduce((s: number, o: any) => s + Number(o.total || 0), 0);
+    const daily = delivered.filter((o: any) => within(o.created_at, 1)).reduce((s: number, o: any) => s + Number(o.total || 0), 0);
+    const weekly = delivered.filter((o: any) => within(o.created_at, 7)).reduce((s: number, o: any) => s + Number(o.total || 0), 0);
+    const monthly = delivered.filter((o: any) => within(o.created_at, 30)).reduce((s: number, o: any) => s + Number(o.total || 0), 0);
     const gross = delivered.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
     const aov = delivered.length ? gross / delivered.length : 0;
 
