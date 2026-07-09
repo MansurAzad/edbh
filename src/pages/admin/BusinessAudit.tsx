@@ -374,26 +374,27 @@ export default function BusinessAudit() {
         <SectionHeading n="৭.৩" title="Customer Report" desc="Repeat, retention ও geo/source insights" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <AuditCard title="Repeat customers" icon={Repeat} status={m.repeatCustomers > 0 ? "ok" : "warn"}
-            metric={m.repeatCustomers} hint="২+ orders" to="/admin/customers" />
+            metric={m.repeatCustomers} hint="২+ orders" to="/admin/customer-insights?filter=repeat" ctaLabel="Drill down" />
           <AuditCard title="High-value customers" icon={Award} status="info"
-            metric={m.highValueCustomers} hint="Lifetime spend ≥ ৳5,000" to="/admin/customers" />
+            metric={m.highValueCustomers} hint="Lifetime spend ≥ ৳5,000"
+            to="/admin/customer-insights?filter=high_value" ctaLabel="Drill down" />
           <AuditCard title="City-wise orders" icon={MapPin} status="info"
             metric={m.topCities[0]?.[0] || "—"}
             hint={m.topCities.slice(0, 3).map(([c, n]: any) => `${c} (${n})`).join(" · ")}
-            to="/admin/reports" />
+            to="/admin/customer-insights?filter=city" ctaLabel="View breakdown" />
           <AuditCard title="District-wise orders" icon={MapPin} status="warn"
-            metric="Not tracked" hint="District field অর্ডারে সংরক্ষিত নেই"
-            to="/admin/delivery-zones" ctaLabel="Enable district capture" />
+            metric="Uses city field" hint="Separate district column নেই — city-based grouping দেখানো হচ্ছে"
+            to="/admin/customer-insights?filter=district" ctaLabel="View breakdown" />
           <AuditCard title="Customer source" icon={UserPlus} status="warn"
             metric="Not tracked" hint="Facebook / Website / WhatsApp / Walk-in tag চালু নেই"
-            to="/admin/orders" ctaLabel="Add source field" />
+            to="/admin/customer-insights?filter=source" ctaLabel="See why" />
           <AuditCard title="Abandoned carts" icon={ShoppingCart}
             status={m.abandonedUsers.size > 0 ? "warn" : "ok"}
             metric={m.abandonedUsers.size} hint=">24h idle carts"
-            to="/admin/reports" />
+            to="/admin/customer-insights?filter=abandoned" ctaLabel="Drill down" />
           <AuditCard title="Cancelled-order customers" icon={PackageX}
             status={m.cancelledCustomers > 0 ? "warn" : "ok"}
-            metric={m.cancelledCustomers} to="/admin/orders?status=cancelled" />
+            metric={m.cancelledCustomers} to="/admin/customer-insights?filter=cancelled" ctaLabel="Drill down" />
           <AuditCard title="Total customers" icon={Users} status="info"
             metric={m.totalCustomers} to="/admin/customers" />
         </div>
