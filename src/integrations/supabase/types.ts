@@ -1390,6 +1390,7 @@ export type Database = {
           colors: string[] | null
           created_at: string
           description: string | null
+          description_backup: string | null
           fabric: string | null
           featured: boolean | null
           hijab_included: boolean
@@ -1420,6 +1421,7 @@ export type Database = {
           colors?: string[] | null
           created_at?: string
           description?: string | null
+          description_backup?: string | null
           fabric?: string | null
           featured?: boolean | null
           hijab_included?: boolean
@@ -1450,6 +1452,7 @@ export type Database = {
           colors?: string[] | null
           created_at?: string
           description?: string | null
+          description_backup?: string | null
           fabric?: string | null
           featured?: boolean | null
           hijab_included?: boolean
