@@ -60,11 +60,18 @@ vi.mock("@/integrations/supabase/client", () => {
     if (table === "order_items") {
       return { select: () => ({ eq: async () => ({ data: orderItems, error: null }) }) };
     }
+    if (table === "products") {
+      return { select: () => ({ in: async () => ({ data: [], error: null }) }) };
+    }
     if (table === "whatsapp_share_events") {
       return {
-        insert: async (row: Record<string, unknown>) => {
+        insert: (row: Record<string, unknown>) => {
           captured.events.push(row);
-          return { data: null, error: null };
+          return {
+            select: () => ({
+              maybeSingle: async () => ({ data: { id: `evt-${captured.events.length}` }, error: null }),
+            }),
+          };
         },
         select: () => ({
           eq: () => ({
@@ -75,7 +82,12 @@ vi.mock("@/integrations/supabase/client", () => {
     }
     throw new Error(`unexpected table: ${table}`);
   };
-  return { supabase: { from } };
+  return {
+    supabase: {
+      from,
+      functions: { invoke: async () => ({ data: null, error: new Error("skip cloud api in tests") }) },
+    },
+  };
 });
 
 // --- SUT ---------------------------------------------------------------------
