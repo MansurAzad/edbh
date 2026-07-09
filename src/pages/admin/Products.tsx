@@ -244,7 +244,18 @@ const Products = () => {
           </Button>
         </div>
 
-        <ProductsFilters
+        {auditFilter && (
+          <div className="flex items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            <span>
+              Business Audit filter active: <b>{auditFilter.replace("_", " ")}</b>
+              {(auditFilter === "slow" || auditFilter === "dead") && (
+                <span className="text-muted-foreground"> — showing full catalog; see Business Audit for the authoritative list.</span>
+              )}
+            </span>
+            <Button size="sm" variant="ghost" onClick={clearAuditFilter}>Clear</Button>
+          </div>
+        )}
+
           searchQuery={searchQuery}
           setSearchQuery={onFilterChange(setSearchQuery)}
           categoryFilter={categoryFilter}
