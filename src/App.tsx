@@ -185,6 +185,7 @@ const App = () => (
                     <Route path="/admin/security" element={<PermissionGuard><SecurityCenter /></PermissionGuard>} />
                     <Route path="/admin/whatsapp-events" element={<PermissionGuard><WhatsAppShareEventsAdmin /></PermissionGuard>} />
                     <Route path="/admin/business-audit" element={<PermissionGuard><BusinessAudit /></PermissionGuard>} />
+                    <Route path="/admin/customer-insights" element={<PermissionGuard><CustomerInsights /></PermissionGuard>} />
 
 
                     <Route path="/return-policy" element={<ReturnPolicy />} />
