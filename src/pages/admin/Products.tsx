@@ -131,6 +131,10 @@ const Products = () => {
       });
       filtered = filtered.filter((p) => (counts.get(p.name.trim().toLowerCase().replace(/\s+/g, " ")) || 0) > 1);
     }
+    // Description render-verify filter (independent of audit filter)
+    if (verifyFilter) {
+      filtered = filtered.filter((p) => getDescriptionVerifyStatus(p.description) === verifyFilter);
+    }
     // slow/dead can't be computed from products alone; leave list intact and rely on the
     // banner to point the admin to Business Audit for the authoritative list.
 
@@ -147,7 +151,14 @@ const Products = () => {
       });
     }
     return filtered;
-  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode, auditFilter]);
+  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode, auditFilter, verifyFilter]);
+
+  /** Count-by-verify-status for banner chip labels. */
+  const verifyCounts = useMemo(() => {
+    const acc: Record<DescriptionVerifyStatus, number> = { pass: 0, attention: 0, fail: 0 };
+    products.forEach((p) => { acc[getDescriptionVerifyStatus(p.description)] += 1; });
+    return acc;
+  }, [products]);
 
   const lowStockCount = useMemo(
     () => products.filter((p) => (p.stock ?? 0) <= lowStockThreshold).length,
