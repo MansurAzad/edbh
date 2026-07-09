@@ -43,7 +43,8 @@ describe("getDescriptionVerifyDetail", () => {
     expect(d.reason).toBe("short");
   });
   it("flags heavy html as attention/raw_html", () => {
-    const html = "<div><p>" + "<span>x</span>".repeat(30) + "</p></div>";
+    const filler = "readable content ".repeat(20); // ~340 chars stripped
+    const html = `<div><p>${filler}</p><span>${filler}</span></div>` + "<br>".repeat(40);
     const d = getDescriptionVerifyDetail(html);
     expect(d.status).toBe("attention");
     expect(["raw_html", "unbalanced_tags"]).toContain(d.reason);
