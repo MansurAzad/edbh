@@ -160,6 +160,7 @@ export const PERMISSION_ACCESS_MAP: Record<PermissionKey, { pages: string[]; act
  */
 export const ROUTE_PERMISSIONS: Record<string, PermissionKey | "admin_only"> = {
   "/admin": "reports.view",
+  "/admin/business-audit": "reports.view",
   "/admin/homepage": "content.manage",
   "/admin/categories": "products.manage",
   "/admin/blog": "content.manage",

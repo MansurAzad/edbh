@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, Star, Settings,
   LogOut, ChevronLeft, Tag, Mail, BarChart3, RotateCcw, Truck,
   FileText, Menu, X, MapPin, Bell, MessageCircle, Shield, Edit3, Route, Gift, ShoppingBag,
-  HardDrive, ScrollText, Cloud, Activity, BookOpen, TrendingUp, Server, Plug,
+  HardDrive, ScrollText, Cloud, Activity, BookOpen, TrendingUp, Server, Plug, ClipboardCheck,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ interface AdminLayoutProps {
 
 const navItems = [
   { path: "/admin", icon: LayoutDashboard, label: "Dashboard" },
+  { path: "/admin/business-audit", icon: ClipboardCheck, label: "Business Audit" },
   { path: "/admin/homepage", icon: FileText, label: "Homepage Sections" },
   { path: "/admin/categories", icon: Tag, label: "Categories" },
   { path: "/admin/blog", icon: FileText, label: "Blog Posts" },

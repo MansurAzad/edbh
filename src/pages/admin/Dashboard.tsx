@@ -1,5 +1,6 @@
 import { useMemo, lazy, Suspense } from "react";
-import { Package, ShoppingCart, Users, DollarSign, TrendingUp, Star, BarChart3 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Package, ShoppingCart, Users, DollarSign, TrendingUp, Star, BarChart3, ClipboardCheck, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -108,6 +109,20 @@ const Dashboard = () => {
           <h1 className="text-2xl md:text-3xl font-display font-bold">ড্যাশবোর্ড</h1>
           <p className="text-sm md:text-base text-muted-foreground">আপনার স্টোরের সামগ্রিক পরিসংখ্যান</p>
         </div>
+
+        <Link
+          to="/admin/business-audit"
+          className="group flex items-center justify-between gap-4 rounded-lg border border-primary/30 bg-gradient-to-r from-primary/10 to-primary/5 px-4 py-3 hover:from-primary/15 hover:to-primary/10 transition"
+        >
+          <div className="flex items-center gap-3">
+            <ClipboardCheck className="w-5 h-5 text-primary flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="font-semibold text-sm">Business Audit</p>
+              <p className="text-xs text-muted-foreground truncate">Sales, product, customer ও order workflow — এক নজরে অডিট</p>
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-primary group-hover:translate-x-0.5 transition-transform" />
+        </Link>
 
         <Tabs defaultValue="overview" className="space-y-4 md:space-y-6">
           <TabsList className="w-full sm:w-auto">

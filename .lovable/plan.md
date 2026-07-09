@@ -1,48 +1,64 @@
-# Product Description Standardization Plan
+## Business Audit — Admin Dashboard
 
-সব প্রোডাক্টের ডেসক্রিপশন একটি নির্দিষ্ট Bangla টেমপ্লেটে রূপান্তর করা হবে — কাঠামো একই থাকবে, কিন্তু প্রতিটি টেক্সট ইউনিক হবে (প্রোডাক্টের নাম, ফেব্রিক, কালার, সাইজ, কাজ অনুযায়ী)।
+Admin Dashboard-এ একটা নতুন **"Business Audit"** ট্যাব যোগ করব যেখানে চারটি ক্যাটাগরিতে (Sales, Product, Customer, Order Workflow) audit card grid থাকবে। প্রতিটি কার্ডে live metric + status badge (✅ OK / ⚠️ Attention / ❌ Missing) + "View report" deep-link — যেটা ইতিমধ্যে থাকা admin পেজে (Orders / Products / Customers / Advanced Reports) সঠিক filter/tab সহ নিয়ে যাবে।
 
-## Template (fixed structure)
+---
 
-```
-[Intro paragraph — প্রোডাক্ট টাইপ অনুযায়ী ইউনিক, ২–৩ লাইন]
+### 1) নতুন ফাইল
 
-পণ্যের বিবরণ:
-ফেব্রিক: [fabric]
-কাজ: [work_type]
-কালার: [colors]
-সাইজ: [sizes]
-সেট: [part / hijab_included / inner_included থেকে অটো]
-উৎপত্তি: দুবাই ইমপোর্টেড
-ডেলিভারি: সারা বাংলাদেশে ক্যাশ অন ডেলিভারি
+- `src/pages/admin/BusinessAudit.tsx` — main audit page (route: `/admin/business-audit`)
+- `src/components/admin/audit/AuditCard.tsx` — reusable card (title, metric, status, CTA link)
+- `src/components/admin/audit/useAuditMetrics.ts` — একটি hook যেটা এক ব্যাচ Supabase query দিয়ে সব metric নিয়ে আসে (react-query, 2 min stale)
+- `src/lib/admin/auditMetrics.ts` — pure calculation helpers (AOV, gross revenue, net profit, return rate, COD pending, best/slow/dead stock, repeat customers, city groupings)
 
-[Closing line — SEO keyword সহ ইউনিক, ১ লাইন]
-```
+### 2) Section layout (৪টা টাইটেল-করা group)
 
-## Steps
+**৭.১ Sales report** — cards:
+- Daily / Weekly / Monthly sales (৩টা কার্ড, delivered orders)
+- Branch-wise sales (delivery_zones থেকে group; single-branch হলে "N/A — single branch")
+- Product-wise & Category-wise top 5 (mini list) → link `/admin/reports?tab=products|categories`
+- Average Order Value, Gross Revenue, Net Profit (uses `total - purchase_cost*qty`), Return/Cancel rate, COD Pending amount (payment_method='cod' AND status ∉ delivered/cancelled)
 
-1. **`enrich-product` Edge Function এর SYSTEM_PROMPT আপডেট করব** — নতুন Bangla টেমপ্লেটকে strict format হিসেবে সেট করব, যাতে AI প্রতিবার একই কাঠামোতে কিন্তু ইউনিক টেক্সট তৈরি করে। ইনপুট হিসেবে `fabric`, `work_type`, `colors`, `sizes`, `part`, `hijab_included`, `inner_included` পাঠাব (এতদিন শুধু material/colors/sizes যেত)।
+**৭.২ Product report** — cards:
+- Best sellers (top 5 by qty) → `/admin/products?sort=sales_desc`
+- Slow moving (0 sale in 30d, stock>0) → `/admin/products?filter=slow`
+- Dead stock (0 sale in 90d) → `/admin/products?filter=dead`
+- High / Low margin (based on price vs purchase_cost) → `/admin/products?sort=margin_desc|asc`
+- Out of stock, Low stock (≤threshold) → existing `LowStockAlert` reuse + link to `/admin/products?filter=low_stock`
+- Variant mismatch (product has variants but sum(variant.stock) ≠ product.stock)
+- Duplicate product (uses existing name-normalize check) → `/admin/products?filter=duplicates`
 
-2. **Intro + closing এর ভ্যারিয়েশন গাইডলাইন যোগ করব** — AI-কে বলা হবে intro এবং closing প্রতিটি প্রোডাক্টের জন্য ভিন্ন শব্দ ও বাক্যগঠনে লিখতে (একই বাক্য কপি না হওয়ার জন্য), কিন্তু "পণ্যের বিবরণ" ব্লকটি ফিক্সড ফরম্যাটে থাকবে।
+**৭.৩ Customer report** — cards:
+- Repeat customers (orders_count ≥ 2), High-value (lifetime > ৳X threshold)
+- City-wise + District-wise breakdown (top 5 mini list) → `/admin/reports?tab=locations`
+- Customer source (order.source field — need to ensure field exists; fallback "Website" if null; show pie counts for Facebook/Website/WhatsApp/Walk-in)
+- Abandoned customers (has cart_items >24h no order) — link `/admin/reports?tab=abandoned`
+- Cancelled order customers list → `/admin/orders?status=cancelled`
 
-3. **সেট ফিল্ড অটো-লজিক** — `part` (1/2 Part), `hijab_included`, `inner_included` থেকে "সেট:" লাইন AI বানাবে (যেমন "২ পার্ট + হিজাবসহ")।
+**৭.৪ Order workflow health** — একটা wide card:
+- ১০টা canonical status (Pending, Confirmed, Processing, Packed, Shipped, Delivered, Cancelled, Returned, Exchange, Refunded) প্রত্যেকের current count চিপ হিসেবে
+- যেসব status DB-তে exist করে না (packed / returned / exchange / refunded) সেগুলো "⚠️ Not tracked" badge + একটা top-of-section alert: *"Order workflow-এ শুধু pending/complete থাকলে sales operation ঠিকভাবে track হবে না"*
+- CTA: `/admin/orders` + suggest enabling extended statuses (informational only এই turn-এ, schema পরিবর্তন করব না)
 
-4. **অ্যাডমিন থেকে bulk regenerate** — বর্তমান `AdminAIChat`/enrich flow দিয়ে সব প্রোডাক্ট (batched, max 50/call) রি-জেনারেট করা যাবে। আলাদা UI বদল লাগবে না; শুধু prompt আপডেটই যথেষ্ট।
+### 3) Wiring
 
-5. **Title unchanged** — আপনার আগের title rule (`Origin Fabric Work Type Product Type – Color – Set/Part`) বহাল থাকবে; শুধু description টেমপ্লেট বদলাবে।
+- `src/App.tsx` — নতুন route `/admin/business-audit` register
+- `src/components/admin/AdminLayout.tsx` — sidebar-এ "Business Audit" nav (icon: `ClipboardCheck`)
+- `src/pages/admin/Dashboard.tsx` — উপরে একটা compact "Business Audit summary" banner (৪টা group-এর overall pass/fail count + "Open full audit →" link)। ট্যাব add করব না — Dashboard-এর existing overview/analytics ট্যাব অক্ষুণ্ণ থাকবে।
 
-## Technical section
+### 4) Filter param support (minimal)
 
-- File: `supabase/functions/enrich-product/index.ts`
-  - `SYSTEM_PROMPT`: description RULES ব্লকটি নতুন Bangla template দিয়ে replace।
-  - `generateForProduct` এর userMsg-এ `fabric`, `work_type`, `part`, `hijab_included`, `inner_included`, `subcategory` কলামগুলো যোগ।
-  - Products select-এ সেই কলামগুলো যোগ: `.select("id, name, description, category, subcategory, material, fabric, work_type, part, hijab_included, inner_included, colors, sizes, price")`।
-- No DB migration, no frontend changes, no new tables।
-- Deploy → admin panel থেকে "Enrich" চালিয়ে সব প্রোডাক্ট আপডেট।
+`/admin/products` এবং `/admin/orders` পেজে URL search-param reader যোগ করব যাতে audit-card link থেকে filter auto-apply হয় (`?filter=low_stock|slow|dead|duplicates`, `?sort=margin_desc`, `?status=cancelled`)। existing filter state-এ mount-এ একবার sync হবে।
 
-## Out of scope
+### 5) Technical notes
 
-- English description, meta_description, title format — এই টার্নে বদলাবে না (আগের সিদ্ধান্ত বহাল)।
-- নতুন কোনো টেবিল/কলাম যোগ হবে না।
+- সব aggregation client-side react-query দিয়ে (existing dashboard-এর pattern follow) — নতুন RPC তৈরির দরকার নেই এই phase-এ
+- Net profit = Σ (order_item.price − product.purchase_cost) × qty for delivered orders (purchase_cost NULL হলে 0 ধরা হবে + কার্ডে ⚠️ "N products missing cost" hint)
+- COD pending = Σ (total − advance_amount) where payment_method='cod' AND status NOT IN ('delivered','cancelled','refunded')
+- Variant mismatch check reuses `product_variants` sum vs `products.stock`
+- সব card একই `AuditCard` component ব্যবহার করবে → consistent look, status badge, deep-link
+- Mobile responsive: 1-col → md:2-col → lg:3-col grid
 
-Approve করলে edge function টি আপডেট করে deploy করে দেব, তারপর আপনি admin থেকে bulk enrich চালাবেন।
+### 6) কোনো DB schema পরিবর্তন **নেই** এই turn-এ
+
+Missing order statuses (packed/returned/exchange/refunded) audit-এ শুধু flag করব; user চাইলে পরের turn-এ আলাদাভাবে schema extend করব।
