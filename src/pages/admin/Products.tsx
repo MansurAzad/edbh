@@ -17,10 +17,11 @@ import ProductsTable from "@/components/admin/products/ProductsTable";
 import ProductsPagination from "@/components/admin/products/ProductsPagination";
 import ProductFormDialog from "@/components/admin/products/ProductFormDialog";
 import BulkInventoryDialog from "@/components/admin/products/BulkInventoryDialog";
+import DuplicateCompareDialog from "@/components/admin/products/DuplicateCompareDialog";
 import { useAdminProducts } from "@/hooks/admin/useAdminProducts";
 import {
-  emptyProduct, PRODUCTS_PER_PAGE,
-  type AdminProduct, type AdminProductInput,
+  DESCRIPTION_VERIFY_META, emptyProduct, getDescriptionVerifyStatus, PRODUCTS_PER_PAGE,
+  type AdminProduct, type AdminProductInput, type DescriptionVerifyStatus,
 } from "@/lib/admin/productHelpers";
 
 const Products = () => {
