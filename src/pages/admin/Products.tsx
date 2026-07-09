@@ -49,9 +49,11 @@ const Products = () => {
     const v = searchParams.get("verify");
     if (f) setAuditFilter(f);
     if (f === "low_stock" || f === "oos") setLowStockOnly(f === "low_stock");
-    if (s === "margin_asc" || s === "margin_desc" || s === "stock_asc" || s === "stock_desc") {
-      setSortMode(s);
-    }
+    const validSorts: ProductSortMode[] = [
+      "newest", "stock_asc", "stock_desc", "margin_asc", "margin_desc",
+      "verify_worst", "verify_best", "similarity_desc",
+    ];
+    if (s && (validSorts as string[]).includes(s)) setSortMode(s as ProductSortMode);
     if (v === "pass" || v === "attention" || v === "fail") setVerifyFilter(v);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -69,6 +71,14 @@ const Products = () => {
     setVerifyFilter(nextVal);
     const next = new URLSearchParams(searchParams);
     if (nextVal) next.set("verify", nextVal); else next.delete("verify");
+    setSearchParams(next, { replace: true });
+    setCurrentPage(1);
+  };
+  /** Persist sort mode to `?sort=...` so audit deep-links stay shareable. */
+  const changeSortMode = (v: ProductSortMode) => {
+    setSortMode(v);
+    const next = new URLSearchParams(searchParams);
+    if (v && v !== "newest") next.set("sort", v); else next.delete("sort");
     setSearchParams(next, { replace: true });
     setCurrentPage(1);
   };
