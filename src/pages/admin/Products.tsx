@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { productsToCsv } from "@/lib/admin/productCsv";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,9 +19,11 @@ import BulkInventoryDialog from "@/components/admin/products/BulkInventoryDialog
 import DuplicateCompareDialog from "@/components/admin/products/DuplicateCompareDialog";
 import { useAdminProducts } from "@/hooks/admin/useAdminProducts";
 import {
-  DESCRIPTION_VERIFY_META, emptyProduct, getDescriptionVerifyStatus, PRODUCTS_PER_PAGE,
-  type AdminProduct, type AdminProductInput, type DescriptionVerifyStatus,
+  DESCRIPTION_VERIFY_META, computeMaxNameSimilarity, emptyProduct,
+  getDescriptionVerifyStatus, PRODUCTS_PER_PAGE, sortAdminProducts,
+  type AdminProduct, type AdminProductInput, type DescriptionVerifyStatus, type ProductSortMode,
 } from "@/lib/admin/productHelpers";
+import { buildProductAuditCsv } from "@/lib/admin/productAuditCsv";
 
 const Products = () => {
   const { products, loading, invalidateProducts, saveMutation, deleteMutation } = useAdminProducts();
