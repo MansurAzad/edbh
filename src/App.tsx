@@ -88,6 +88,7 @@ const InventorySync = lazy(() => import("./pages/admin/InventorySync"));
 const SecurityCenter = lazy(() => import("./pages/admin/SecurityCenter"));
 const WhatsAppShareEventsAdmin = lazy(() => import("./pages/admin/WhatsAppShareEvents"));
 const BusinessAudit = lazy(() => import("./pages/admin/BusinessAudit"));
+const CustomerInsights = lazy(() => import("./pages/admin/CustomerInsights"));
 
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
