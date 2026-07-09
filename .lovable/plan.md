@@ -1,73 +1,48 @@
-## Plan: WhatsApp share upgrade pack
+# Product Description Standardization Plan
 
-### 1. Schema (migration)
-Extend `whatsapp_share_events`:
-- `wa_message_id text` — WhatsApp Business API message id
-- `delivery_status text` — `pending | sent | delivered | read | failed`
-- `delivery_updated_at timestamptz`
-- `attempt_variant text` — `primary | fallback_short | fallback_plain`
-- `payload_snapshot jsonb` — exact text + image URL sent
+সব প্রোডাক্টের ডেসক্রিপশন একটি নির্দিষ্ট Bangla টেমপ্লেটে রূপান্তর করা হবে — কাঠামো একই থাকবে, কিন্তু প্রতিটি টেক্সট ইউনিক হবে (প্রোডাক্টের নাম, ফেব্রিক, কালার, সাইজ, কাজ অনুযায়ী)।
 
-### 2. Payload builder (`src/lib/checkout/whatsappShare.ts`)
-Rewrite `buildReceiptMessage`:
-- Full customer name, mobile, complete address
-- Per-item: name, **size**, color, qty, price
-- Product image thumbnail URL (first image) as a linked line
-- Order total, delivery charge
-- Return `{ text, imageUrl, phone }`
+## Template (fixed structure)
 
-### 3. Preview screen (`src/components/checkout/WhatsAppSharePreview.tsx`)
-New Dialog shown before opening WhatsApp:
-- Renders receipt text in monospace
-- Shows product image thumbnails grid
-- Buttons: "Send on WhatsApp" / "Copy text" / "Cancel"
-- Wired from `FloatingCartSidebar` (auto-share) and `CheckoutSuccess` retry
+```
+[Intro paragraph — প্রোডাক্ট টাইপ অনুযায়ী ইউনিক, ২–৩ লাইন]
 
-### 4. WhatsApp Business Cloud API edge function
-New `supabase/functions/whatsapp-send/index.ts`:
-- POSTs to `graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages`
-- Sends image + caption template
-- Records `wa_message_id`, sets `delivery_status='sent'`
-- Requires secrets: `META_WHATSAPP_TOKEN`, `META_WHATSAPP_PHONE_ID`
+পণ্যের বিবরণ:
+ফেব্রিক: [fabric]
+কাজ: [work_type]
+কালার: [colors]
+সাইজ: [sizes]
+সেট: [part / hijab_included / inner_included থেকে অটো]
+উৎপত্তি: দুবাই ইমপোর্টেড
+ডেলিভারি: সারা বাংলাদেশে ক্যাশ অন ডেলিভারি
 
-New `supabase/functions/whatsapp-webhook/index.ts`:
-- Meta webhook verify (GET) + status callback (POST)
-- Updates `whatsapp_share_events` by `wa_message_id` → `delivered | read | failed`
-- Public URL user pastes into Meta App dashboard
+[Closing line — SEO keyword সহ ইউনিক, ১ লাইন]
+```
 
-Frontend: two modes
-- If `META_WHATSAPP_*` secrets present → Cloud API path (real delivery status)
-- Else → existing `wa.me` click path (heuristic)
+## Steps
 
-### 5. Retry escalation (`src/lib/admin/whatsappRetry.ts`)
-On admin retry:
-- Look up last attempt's `error_reason`
-- If reason matches `blocked | rate_limited | template_rejected` → use `attempt_variant='fallback_short'` (trimmed template, no image caption)
-- If still fails → `fallback_plain` (text-only, no links)
-- Escalation ladder recorded in `attempt_variant`
+1. **`enrich-product` Edge Function এর SYSTEM_PROMPT আপডেট করব** — নতুন Bangla টেমপ্লেটকে strict format হিসেবে সেট করব, যাতে AI প্রতিবার একই কাঠামোতে কিন্তু ইউনিক টেক্সট তৈরি করে। ইনপুট হিসেবে `fabric`, `work_type`, `colors`, `sizes`, `part`, `hijab_included`, `inner_included` পাঠাব (এতদিন শুধু material/colors/sizes যেত)।
 
-### 6. Admin per-order history (`src/components/admin/orders/OrderWhatsAppHistory.tsx`)
-Section inside `OrderDetailDialog`:
-- Chronological timeline: timestamp, actor, status, delivery_status badge, error_reason, variant used
-- "Retry" and "Retry with fallback" buttons
-- Realtime subscribe to `whatsapp_share_events` for that order
+2. **Intro + closing এর ভ্যারিয়েশন গাইডলাইন যোগ করব** — AI-কে বলা হবে intro এবং closing প্রতিটি প্রোডাক্টের জন্য ভিন্ন শব্দ ও বাক্যগঠনে লিখতে (একই বাক্য কপি না হওয়ার জন্য), কিন্তু "পণ্যের বিবরণ" ব্লকটি ফিক্সড ফরম্যাটে থাকবে।
 
-### 7. Admin list polling
-`WhatsAppShareEvents.tsx`: subscribe to realtime + 20s poll fallback so delivery status flips live.
+3. **সেট ফিল্ড অটো-লজিক** — `part` (1/2 Part), `hijab_included`, `inner_included` থেকে "সেট:" লাইন AI বানাবে (যেমন "২ পার্ট + হিজাবসহ")।
 
-### Secrets to request
-- `META_WHATSAPP_TOKEN` (System User permanent token)
-- `META_WHATSAPP_PHONE_ID`
-- `META_WHATSAPP_VERIFY_TOKEN` (auto-generated)
+4. **অ্যাডমিন থেকে bulk regenerate** — বর্তমান `AdminAIChat`/enrich flow দিয়ে সব প্রোডাক্ট (batched, max 50/call) রি-জেনারেট করা যাবে। আলাদা UI বদল লাগবে না; শুধু prompt আপডেটই যথেষ্ট।
 
-### Files touched
-Migration • `whatsappShare.ts` • `WhatsAppSharePreview.tsx` (new) • `FloatingCartSidebar.tsx` • `CheckoutSuccess.tsx` • `whatsappRetry.ts` • `OrderWhatsAppHistory.tsx` (new) • `OrderDetailDialog.tsx` • `WhatsAppShareEvents.tsx` • 2 edge functions • realtime enable for `whatsapp_share_events`
+5. **Title unchanged** — আপনার আগের title rule (`Origin Fabric Work Type Product Type – Color – Set/Part`) বহাল থাকবে; শুধু description টেমপ্লেট বদলাবে।
 
-### Order of execution
-1. Request Meta secrets (blocks Cloud API path)
-2. Migration
-3. Edge functions
-4. Payload builder + preview modal
-5. Retry escalation + admin history + realtime
+## Technical section
 
-Approve and I'll ship. If you don't have Meta WhatsApp Business API credentials yet, I can build everything except the Cloud API send/webhook now, then wire those in when you paste the token + phone id.
+- File: `supabase/functions/enrich-product/index.ts`
+  - `SYSTEM_PROMPT`: description RULES ব্লকটি নতুন Bangla template দিয়ে replace।
+  - `generateForProduct` এর userMsg-এ `fabric`, `work_type`, `part`, `hijab_included`, `inner_included`, `subcategory` কলামগুলো যোগ।
+  - Products select-এ সেই কলামগুলো যোগ: `.select("id, name, description, category, subcategory, material, fabric, work_type, part, hijab_included, inner_included, colors, sizes, price")`।
+- No DB migration, no frontend changes, no new tables।
+- Deploy → admin panel থেকে "Enrich" চালিয়ে সব প্রোডাক্ট আপডেট।
+
+## Out of scope
+
+- English description, meta_description, title format — এই টার্নে বদলাবে না (আগের সিদ্ধান্ত বহাল)।
+- নতুন কোনো টেবিল/কলাম যোগ হবে না।
+
+Approve করলে edge function টি আপডেট করে deploy করে দেব, তারপর আপনি admin থেকে bulk enrich চালাবেন।
