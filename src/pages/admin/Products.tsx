@@ -403,6 +403,13 @@ const Products = () => {
           onVariants={setVariantProduct}
           onEdit={openEditDialog}
           onDelete={setDeleteId}
+          onCompareDuplicates={auditFilter === "duplicates" ? setCompareFocus : undefined}
+        />
+
+        <DuplicateCompareDialog
+          focus={compareFocus}
+          allProducts={products}
+          onOpenChange={(open) => { if (!open) setCompareFocus(null); }}
         />
 
         <ProductsPagination
