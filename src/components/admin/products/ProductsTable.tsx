@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DESCRIPTION_VERIFY_META,
-  getDescriptionVerifyStatus,
+  getDescriptionVerifyDetail,
   LOW_STOCK_THRESHOLD,
   type AdminProduct,
 } from "@/lib/admin/productHelpers";
@@ -139,15 +139,24 @@ export default function ProductsTable({
                     ) : null /* Healthy stock — no badge */}
                   </div>
                 </TableCell>
-                {/* Description render-verify — pass / attention / fail */}
+                {/* Description render-verify — pass / attention / fail + reason */}
                 <TableCell className="hidden md:table-cell">
                   {(() => {
-                    const status = getDescriptionVerifyStatus(product.description);
-                    const meta = DESCRIPTION_VERIFY_META[status];
+                    const detail = getDescriptionVerifyDetail(product.description);
+                    const meta = DESCRIPTION_VERIFY_META[detail.status];
                     return (
-                      <Badge variant="outline" className={`text-xs ${meta.badge}`} title={`Description verify: ${meta.label}`}>
-                        {meta.label}
-                      </Badge>
+                      <div className="flex flex-col gap-0.5 max-w-[180px]">
+                        <Badge
+                          variant="outline"
+                          className={`text-xs w-fit ${meta.badge}`}
+                          title={`${meta.label} — ${detail.message} (reason: ${detail.reason})`}
+                        >
+                          {meta.label}
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground truncate" title={detail.message}>
+                          {detail.reason === "ok" ? "readable" : detail.reason.replace(/_/g, " ")}
+                        </span>
+                      </div>
                     );
                   })()}
                 </TableCell>

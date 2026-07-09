@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { productsToCsv } from "@/lib/admin/productCsv";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,9 +19,11 @@ import BulkInventoryDialog from "@/components/admin/products/BulkInventoryDialog
 import DuplicateCompareDialog from "@/components/admin/products/DuplicateCompareDialog";
 import { useAdminProducts } from "@/hooks/admin/useAdminProducts";
 import {
-  DESCRIPTION_VERIFY_META, emptyProduct, getDescriptionVerifyStatus, PRODUCTS_PER_PAGE,
-  type AdminProduct, type AdminProductInput, type DescriptionVerifyStatus,
+  DESCRIPTION_VERIFY_META, computeMaxNameSimilarity, emptyProduct,
+  getDescriptionVerifyStatus, PRODUCTS_PER_PAGE, sortAdminProducts,
+  type AdminProduct, type AdminProductInput, type DescriptionVerifyStatus, type ProductSortMode,
 } from "@/lib/admin/productHelpers";
+import { buildProductAuditCsv } from "@/lib/admin/productAuditCsv";
 
 const Products = () => {
   const { products, loading, invalidateProducts, saveMutation, deleteMutation } = useAdminProducts();
@@ -34,7 +35,7 @@ const Products = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
-  const [sortMode, setSortMode] = useState<"newest" | "stock_asc" | "stock_desc" | "margin_asc" | "margin_desc">("newest");
+  const [sortMode, setSortMode] = useState<ProductSortMode>("newest");
   const [bulkInventoryOpen, setBulkInventoryOpen] = useState(false);
   const [auditFilter, setAuditFilter] = useState<string>(""); // slow|dead|oos|low_stock|duplicates
   const [verifyFilter, setVerifyFilter] = useState<"" | DescriptionVerifyStatus>("");
@@ -48,9 +49,11 @@ const Products = () => {
     const v = searchParams.get("verify");
     if (f) setAuditFilter(f);
     if (f === "low_stock" || f === "oos") setLowStockOnly(f === "low_stock");
-    if (s === "margin_asc" || s === "margin_desc" || s === "stock_asc" || s === "stock_desc") {
-      setSortMode(s);
-    }
+    const validSorts: ProductSortMode[] = [
+      "newest", "stock_asc", "stock_desc", "margin_asc", "margin_desc",
+      "verify_worst", "verify_best", "similarity_desc",
+    ];
+    if (s && (validSorts as string[]).includes(s)) setSortMode(s as ProductSortMode);
     if (v === "pass" || v === "attention" || v === "fail") setVerifyFilter(v);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -68,6 +71,14 @@ const Products = () => {
     setVerifyFilter(nextVal);
     const next = new URLSearchParams(searchParams);
     if (nextVal) next.set("verify", nextVal); else next.delete("verify");
+    setSearchParams(next, { replace: true });
+    setCurrentPage(1);
+  };
+  /** Persist sort mode to `?sort=...` so audit deep-links stay shareable. */
+  const changeSortMode = (v: ProductSortMode) => {
+    setSortMode(v);
+    const next = new URLSearchParams(searchParams);
+    if (v && v !== "newest") next.set("sort", v); else next.delete("sort");
     setSearchParams(next, { replace: true });
     setCurrentPage(1);
   };
@@ -109,6 +120,13 @@ const Products = () => {
     return ((sell - cost) / sell) * 100;
   };
 
+  /** Precompute max name-similarity so `similarity_desc` sort is O(1) per row. */
+  const similarityMap = useMemo(
+    () => (sortMode === "similarity_desc" ? computeMaxNameSimilarity(products) : new Map<string, number>()),
+    [products, sortMode],
+  );
+
+
   const filteredProducts = useMemo(() => {
     let filtered = products;
     if (searchQuery) {
@@ -139,19 +157,10 @@ const Products = () => {
     // banner to point the admin to Business Audit for the authoritative list.
 
     if (sortMode !== "newest") {
-      filtered = [...filtered].sort((a, b) => {
-        if (sortMode === "stock_asc" || sortMode === "stock_desc") {
-          const sa = a.stock ?? 0;
-          const sb = b.stock ?? 0;
-          return sortMode === "stock_asc" ? sa - sb : sb - sa;
-        }
-        const ma = marginOf(a);
-        const mb = marginOf(b);
-        return sortMode === "margin_asc" ? ma - mb : mb - ma;
-      });
+      filtered = sortAdminProducts(filtered, sortMode, { simMap: similarityMap, marginOf });
     }
     return filtered;
-  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode, auditFilter, verifyFilter]);
+  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode, auditFilter, verifyFilter, similarityMap]);
 
   /** Count-by-verify-status for banner chip labels. */
   const verifyCounts = useMemo(() => {
@@ -245,52 +254,11 @@ const Products = () => {
    * otherwise it uses the full import/export serializer.
    */
   const handleExportFiltered = useCallback(() => {
-    const stamp = new Date().toISOString().slice(0, 10);
-    let csv: string;
-    let filename: string;
-
-    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const priceOf = (p: AdminProduct) => Number(p.sale_price || p.price || 0);
-
-    if (auditFilter === "oos" || auditFilter === "low_stock") {
-      const header = ["id", "name", "sku", "category", "subcategory", "stock", "price", "sale_price", "verify_status"];
-      const rows = filteredProducts.map((p) => [
-        p.id, p.name, p.sku ?? "", p.category, p.subcategory ?? "",
-        p.stock ?? 0, p.price, p.sale_price ?? "",
-        getDescriptionVerifyStatus(p.description),
-      ].map(esc).join(","));
-      csv = [header.join(","), ...rows].join("\n");
-      filename = `products-audit-${auditFilter}-${stamp}.csv`;
-    } else if (auditFilter === "duplicates") {
-      // Group duplicate rows so the report clearly shows which items share a name.
-      const groups = new Map<string, AdminProduct[]>();
-      filteredProducts.forEach((p) => {
-        const k = p.name.trim().toLowerCase().replace(/\s+/g, " ");
-        if (!groups.has(k)) groups.set(k, []);
-        groups.get(k)!.push(p);
-      });
-      const header = ["duplicate_group", "id", "name", "sku", "category", "subcategory", "price", "stock", "verify_status"];
-      const rows: string[] = [];
-      let gi = 0;
-      for (const [, group] of groups) {
-        gi += 1;
-        group.forEach((p) => {
-          rows.push([
-            `G${gi}`, p.id, p.name, p.sku ?? "", p.category, p.subcategory ?? "",
-            priceOf(p), p.stock ?? 0,
-            getDescriptionVerifyStatus(p.description),
-          ].map(esc).join(","));
-        });
-      }
-      csv = [header.join(","), ...rows].join("\n");
-      filename = `products-audit-duplicates-${stamp}.csv`;
-    } else {
-      csv = productsToCsv(filteredProducts as unknown as Record<string, any>[]);
-      filename = verifyFilter
-        ? `products-verify-${verifyFilter}-${stamp}.csv`
-        : `products-filtered-${stamp}.csv`;
-    }
-
+    const { csv, filename } = buildProductAuditCsv(
+      filteredProducts,
+      (auditFilter || "") as Parameters<typeof buildProductAuditCsv>[1],
+      verifyFilter,
+    );
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -380,7 +348,7 @@ const Products = () => {
           lowStockThreshold={lowStockThreshold}
           setLowStockThreshold={onFilterChange(setLowStockThreshold)}
           sortMode={sortMode}
-          setSortMode={onFilterChange(setSortMode)}
+          setSortMode={changeSortMode}
           lowStockCount={lowStockCount}
           onOpenBulkInventory={() => setBulkInventoryOpen(true)}
           onExportFiltered={handleExportFiltered}
