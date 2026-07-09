@@ -35,7 +35,7 @@ const Products = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
-  const [sortMode, setSortMode] = useState<"newest" | "stock_asc" | "stock_desc" | "margin_asc" | "margin_desc">("newest");
+  const [sortMode, setSortMode] = useState<ProductSortMode>("newest");
   const [bulkInventoryOpen, setBulkInventoryOpen] = useState(false);
   const [auditFilter, setAuditFilter] = useState<string>(""); // slow|dead|oos|low_stock|duplicates
   const [verifyFilter, setVerifyFilter] = useState<"" | DescriptionVerifyStatus>("");
