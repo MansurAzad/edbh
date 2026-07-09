@@ -36,6 +36,7 @@ const navItems = [
   { path: "/admin/segments", icon: Users, label: "Customer Segments" },
   { path: "/admin/notifications", icon: Bell, label: "Notifications" },
   { path: "/admin/chat-histories", icon: MessageCircle, label: "Chat Histories" },
+  { path: "/admin/whatsapp-events", icon: MessageCircle, label: "WhatsApp Events" },
   { path: "/admin/bulk-edit", icon: Edit3, label: "Bulk Edit" },
   { path: "/admin/bulk-add", icon: Package, label: "Bulk Add Products" },
   { path: "/admin/staff-permissions", icon: Shield, label: "Staff Permissions" },
