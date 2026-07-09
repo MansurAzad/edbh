@@ -26,9 +26,12 @@ const WORKFLOW_STATUSES = [
 const money = (n: number) => `৳${Math.round(n).toLocaleString()}`;
 
 export default function BusinessAudit() {
-  const { data, isLoading } = useQuery({
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const { data, isLoading, refetch, isFetching, dataUpdatedAt } = useQuery({
     queryKey: ["business-audit-v1"],
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
+    refetchInterval: autoRefresh ? 60 * 1000 : false, // live poll every 60s
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const [ordersRes, itemsRes, productsRes, variantsRes, profilesRes, cartsRes] = await Promise.all([
         supabase.from("orders").select("id,total,status,payment_method,payment_status,advance_amount,shipping_city,shipping_phone,user_id,guest_name,created_at").order("created_at", { ascending: false }).limit(2000),
