@@ -84,11 +84,11 @@ export default function ProductsTable({
         </TableHeader>
         <TableBody>
           {loading ? (
-            // Loading state — single spanning row, colSpan must match header count (7)
-            <TableRow><TableCell colSpan={7} className="text-center py-8">Loading...</TableCell></TableRow>
+            <TableRow><TableCell colSpan={colSpan} className="text-center py-8">Loading...</TableCell></TableRow>
           ) : products.length === 0 ? (
-            // Empty state — checks the unfiltered list so "no products at all" is distinct from a filter miss upstream
-            <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No products found</TableCell></TableRow>
+            <TableRow><TableCell colSpan={colSpan} className="text-center py-8 text-muted-foreground">No products found</TableCell></TableRow>
+          ) : visible.length === 0 ? (
+            <TableRow><TableCell colSpan={colSpan} className="text-center py-8 text-muted-foreground">এই ফিল্টারে কোন প্রোডাক্ট মেলেনি।</TableCell></TableRow>
           ) : (
             // Render the paginated slice; key by product id for stable reconciliation
             visible.map((product) => (
