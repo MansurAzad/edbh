@@ -33,23 +33,51 @@ TITLE RULES — follow this format exactly:
 - Set/Part: "2 Part" / "Full Set" / "Open Abaya" if applicable, otherwise omit
 - 60–90 chars, Title Case, English only, no emojis, no "Dubai Collection" suffix.
 
-DESCRIPTION RULES:
-- 220–380 chars, first 2 lines Bangla, rest English.
-- Mention fabric, work, occasion (daily/party/eid), size range 52–58, COD available, delivery all over Bangladesh.
-- No spam keywords, no HTML tags, no phone numbers, no external links.
-- Natural, conversion-focused, unique per product.`;
+DESCRIPTION RULES — return "description" in Bangla using EXACTLY this template
+(structure fixed, wording unique per product):
+
+Line 1–2 (Intro): ২–৩ বাক্যে প্রোডাক্টের সৌন্দর্য, শালীনতা, আরাম ও উপলক্ষ (দৈনন্দিন/পার্টি/ঈদ/দাওয়াত) —
+প্রতিটি প্রোডাক্টে ভিন্ন শব্দ ও বাক্যগঠন ব্যবহার করবে, কখনোই একই বাক্য পুনরাবৃত্তি করবে না।
+
+তারপর একটি ফাঁকা লাইন, তারপর হুবহু এই ব্লক (label গুলো একদম একই থাকবে):
+
+পণ্যের বিবরণ:
+ফেব্রিক: [input fabric — Nida/Chiffon/Barbie/Georgette/Crepe/Organza/Silk]
+কাজ: [input work_type — এম্ব্রয়ডারি/কারচুপি/স্টোন/বিডেড/অ্যাপ্লিক/প্লেইন]
+কালার: [input colors — কমা দিয়ে আলাদা]
+সাইজ: [input sizes — যেমন 52", 54", 56", 58"]
+সেট: [part + hijab_included + inner_included থেকে অটো — যেমন "২ পার্ট + হিজাবসহ + ইনারসহ", না থাকলে "১ পার্ট"]
+উৎপত্তি: দুবাই ইমপোর্টেড
+ডেলিভারি: সারা বাংলাদেশে ক্যাশ অন ডেলিভারি
+
+তারপর একটি ফাঁকা লাইন, তারপর ১টি closing বাক্য যেটাতে "প্রিমিয়াম দুবাই আবায়া",
+"বোরকা" বা "ইসলামিক হিজাব" এর মতো SEO keyword থাকবে — প্রতিটি প্রোডাক্টে ভিন্নভাবে লিখবে।
+
+STRICT:
+- পুরো description Bangla, কোনো ইংরেজি বাক্য নয় (label ও fabric/color name ছাড়া)।
+- কোনো HTML, phone number, external link, বা spam keyword নয়।
+- Intro এবং closing অবশ্যই প্রতিটি প্রোডাক্টে ইউনিক হবে; শুধু মাঝের "পণ্যের বিবরণ" ব্লক ফিক্সড।
+- ৪৫০–৭৫০ character এর মধ্যে রাখবে।`;
 
 async function generateForProduct(p: any): Promise<{ title: string; description: string }> {
+  const setParts: string[] = [];
+  if (p.part) setParts.push(String(p.part));
+  if (p.hijab_included) setParts.push("hijab included");
+  if (p.inner_included) setParts.push("inner included");
+
   const userMsg = `Product data:
 - Current name: ${p.name}
 - Category: ${p.category}
-- Material: ${p.material || "unknown"}
+- Subcategory: ${p.subcategory || "n/a"}
+- Fabric: ${p.fabric || p.material || "unknown"}
+- Work type: ${p.work_type || "unknown"}
 - Colors: ${(p.colors || []).join(", ") || "unknown"}
 - Sizes: ${(p.sizes || []).join(", ") || "52-58"}
+- Set / parts: ${setParts.join(", ") || "1 part"}
 - Current description: ${(p.description || "").slice(0, 400) || "(empty)"}
 - Price: ${p.price} BDT
 
-Return the JSON object only.`;
+Return the JSON object only, following the exact Bangla description template.`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -114,7 +142,7 @@ Deno.serve(async (req) => {
     const svc = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: products, error: fetchErr } = await svc
       .from("products")
-      .select("id, name, description, category, material, colors, sizes, price")
+      .select("id, name, description, category, subcategory, material, fabric, work_type, part, hijab_included, inner_included, colors, sizes, price")
       .in("id", productIds);
     if (fetchErr) return errorResponse(fetchErr.message, 500);
 
