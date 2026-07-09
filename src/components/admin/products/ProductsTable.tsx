@@ -59,8 +59,9 @@ interface Props {
  * it is a presentation concern.
  */
 export default function ProductsTable({
-  loading, products, visible, onZoom, onGallery, onVariants, onEdit, onDelete,
+  loading, products, visible, onZoom, onGallery, onVariants, onEdit, onDelete, onCompareDuplicates,
 }: Props) {
+  const colSpan = 8; // Image, Name, Category, Price, Stock, Desc verify, Featured, Actions
   return (
     // overflow-x-auto allows the table to scroll horizontally on narrow viewports
     <div className="border rounded-lg overflow-x-auto">
@@ -74,6 +75,8 @@ export default function ProductsTable({
             <TableHead>Price</TableHead>
             {/* Stock hidden below sm — shown via Featured/Actions on tiny screens */}
             <TableHead className="hidden sm:table-cell">Stock</TableHead>
+            {/* Description render-verify: pass / attention / fail — hidden below md */}
+            <TableHead className="hidden md:table-cell">Desc.</TableHead>
             {/* Featured flag hidden below lg — rarely consulted on mobile */}
             <TableHead className="hidden lg:table-cell">Featured</TableHead>
             <TableHead className="text-right">Actions</TableHead>
