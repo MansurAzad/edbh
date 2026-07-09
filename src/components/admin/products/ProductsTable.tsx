@@ -139,26 +139,39 @@ export default function ProductsTable({
                     ) : null /* Healthy stock — no badge */}
                   </div>
                 </TableCell>
+                {/* Description render-verify — pass / attention / fail */}
+                <TableCell className="hidden md:table-cell">
+                  {(() => {
+                    const status = getDescriptionVerifyStatus(product.description);
+                    const meta = DESCRIPTION_VERIFY_META[status];
+                    return (
+                      <Badge variant="outline" className={`text-xs ${meta.badge}`} title={`Description verify: ${meta.label}`}>
+                        {meta.label}
+                      </Badge>
+                    );
+                  })()}
+                </TableCell>
                 {/* Featured cell — pill when true, plain "No" otherwise */}
                 <TableCell className="hidden lg:table-cell">
                   {product.featured ? <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Yes</span> : "No"}
                 </TableCell>
-                {/* Actions cell — icon buttons for Gallery / Variants / Edit / Delete */}
+                {/* Actions cell — icon buttons for Compare (duplicates only) / Gallery / Variants / Edit / Delete */}
                 <TableCell className="text-right">
                   <div className="flex justify-end flex-wrap gap-0.5">
-                    {/* Gallery — manage additional product images */}
+                    {onCompareDuplicates && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onCompareDuplicates(product)} title="Compare near-duplicate descriptions">
+                        <GitCompare className="w-4 h-4 text-amber-600" />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onGallery(product)} title="Manage Gallery">
                       <Images className="w-4 h-4" />
                     </Button>
-                    {/* Variants — manage size/colour and per-variant pricing/stock */}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onVariants(product)} title="Manage Variants">
                       <Layers className="w-4 h-4" />
                     </Button>
-                    {/* Edit — open the product form dialog */}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(product)}>
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    {/* Delete — parent shows the confirm dialog before hard-deleting */}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete(product.id)}>
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
