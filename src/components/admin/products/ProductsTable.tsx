@@ -12,11 +12,16 @@
  * Bengali UI strings: image button tooltip "ক্লিক করে জুম করুন" (click to zoom).
  * All other labels remain English to match the rest of the admin shell.
  */
-import { AlertTriangle, Images, Layers, Pencil, Trash2 } from "lucide-react";
+import { AlertTriangle, GitCompare, Images, Layers, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LOW_STOCK_THRESHOLD, type AdminProduct } from "@/lib/admin/productHelpers";
+import {
+  DESCRIPTION_VERIFY_META,
+  getDescriptionVerifyStatus,
+  LOW_STOCK_THRESHOLD,
+  type AdminProduct,
+} from "@/lib/admin/productHelpers";
 
 /**
  * Props for {@link ProductsTable}.
@@ -38,6 +43,8 @@ interface Props {
   onEdit: (p: AdminProduct) => void;
   /** Delete a product by id — confirmation is handled upstream. */
   onDelete: (id: string) => void;
+  /** When set, renders a "Compare" button that opens a near-duplicate details modal. */
+  onCompareDuplicates?: (p: AdminProduct) => void;
 }
 
 /**
