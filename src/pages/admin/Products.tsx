@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { productsToCsv } from "@/lib/admin/productCsv";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -32,8 +33,29 @@ const Products = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
-  const [sortMode, setSortMode] = useState<"newest" | "stock_asc" | "stock_desc">("newest");
+  const [sortMode, setSortMode] = useState<"newest" | "stock_asc" | "stock_desc" | "margin_asc" | "margin_desc">("newest");
   const [bulkInventoryOpen, setBulkInventoryOpen] = useState(false);
+  const [auditFilter, setAuditFilter] = useState<string>(""); // slow|dead|oos|low_stock|duplicates
+
+  // Deep-link support from Business Audit: /admin/products?filter=oos&sort=margin_desc
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const f = searchParams.get("filter") || "";
+    const s = searchParams.get("sort");
+    if (f) setAuditFilter(f);
+    if (f === "low_stock" || f === "oos") setLowStockOnly(f === "low_stock");
+    if (s === "margin_asc" || s === "margin_desc" || s === "stock_asc" || s === "stock_desc") {
+      setSortMode(s);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const clearAuditFilter = () => {
+    setAuditFilter("");
+    const next = new URLSearchParams(searchParams);
+    next.delete("filter");
+    next.delete("sort");
+    setSearchParams(next, { replace: true });
+  };
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
@@ -65,6 +87,13 @@ const Products = () => {
     return Array.from(set).sort();
   }, [products, formData.category]);
 
+  const marginOf = (p: AdminProduct) => {
+    const cost = Number((p as any).purchase_cost ?? 0);
+    const sell = Number(p.sale_price || p.price || 0);
+    if (!cost || !sell) return -Infinity;
+    return ((sell - cost) / sell) * 100;
+  };
+
   const filteredProducts = useMemo(() => {
     let filtered = products;
     if (searchQuery) {
@@ -75,15 +104,35 @@ const Products = () => {
     if (minPrice) filtered = filtered.filter((p) => (p.sale_price || p.price) >= Number(minPrice));
     if (maxPrice) filtered = filtered.filter((p) => (p.sale_price || p.price) <= Number(maxPrice));
     if (lowStockOnly) filtered = filtered.filter((p) => (p.stock ?? 0) <= lowStockThreshold);
+
+    // Business Audit deep-link filters
+    if (auditFilter === "oos") filtered = filtered.filter((p) => (p.stock ?? 0) <= 0);
+    if (auditFilter === "low_stock") filtered = filtered.filter((p) => (p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5);
+    if (auditFilter === "duplicates") {
+      const counts = new Map<string, number>();
+      products.forEach((p) => {
+        const k = p.name.trim().toLowerCase().replace(/\s+/g, " ");
+        counts.set(k, (counts.get(k) || 0) + 1);
+      });
+      filtered = filtered.filter((p) => (counts.get(p.name.trim().toLowerCase().replace(/\s+/g, " ")) || 0) > 1);
+    }
+    // slow/dead can't be computed from products alone; leave list intact and rely on the
+    // banner to point the admin to Business Audit for the authoritative list.
+
     if (sortMode !== "newest") {
       filtered = [...filtered].sort((a, b) => {
-        const sa = a.stock ?? 0;
-        const sb = b.stock ?? 0;
-        return sortMode === "stock_asc" ? sa - sb : sb - sa;
+        if (sortMode === "stock_asc" || sortMode === "stock_desc") {
+          const sa = a.stock ?? 0;
+          const sb = b.stock ?? 0;
+          return sortMode === "stock_asc" ? sa - sb : sb - sa;
+        }
+        const ma = marginOf(a);
+        const mb = marginOf(b);
+        return sortMode === "margin_asc" ? ma - mb : mb - ma;
       });
     }
     return filtered;
-  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode]);
+  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode, auditFilter]);
 
   const lowStockCount = useMemo(
     () => products.filter((p) => (p.stock ?? 0) <= lowStockThreshold).length,
@@ -194,6 +243,18 @@ const Products = () => {
             <Plus className="w-4 h-4 mr-2" /> Add Product
           </Button>
         </div>
+
+        {auditFilter && (
+          <div className="flex items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            <span>
+              Business Audit filter active: <b>{auditFilter.replace("_", " ")}</b>
+              {(auditFilter === "slow" || auditFilter === "dead") && (
+                <span className="text-muted-foreground"> — showing full catalog; see Business Audit for the authoritative list.</span>
+              )}
+            </span>
+            <Button size="sm" variant="ghost" onClick={clearAuditFilter}>Clear</Button>
+          </div>
+        )}
 
         <ProductsFilters
           searchQuery={searchQuery}

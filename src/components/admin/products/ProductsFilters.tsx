@@ -116,8 +116,8 @@ interface Props {
   lowStockThreshold: number;
   setLowStockThreshold: (v: number) => void;
   /** Current sort mode for the products list. */
-  sortMode: "newest" | "stock_asc" | "stock_desc";
-  setSortMode: (v: "newest" | "stock_asc" | "stock_desc") => void;
+  sortMode: "newest" | "stock_asc" | "stock_desc" | "margin_asc" | "margin_desc";
+  setSortMode: (v: "newest" | "stock_asc" | "stock_desc" | "margin_asc" | "margin_desc") => void;
   /** Number of products currently at or below the threshold. */
   lowStockCount: number;
   /** Export the current filtered/sorted list as CSV. */
@@ -254,6 +254,8 @@ export default function ProductsFilters({
               <SelectItem value="newest">Newest first</SelectItem>
               <SelectItem value="stock_asc">Stock: low → high</SelectItem>
               <SelectItem value="stock_desc">Stock: high → low</SelectItem>
+              <SelectItem value="margin_desc">Margin: high → low</SelectItem>
+              <SelectItem value="margin_asc">Margin: low → high</SelectItem>
             </SelectContent>
           </Select>
         </div>
