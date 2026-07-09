@@ -254,6 +254,8 @@ export default function ProductsFilters({
               <SelectItem value="newest">Newest first</SelectItem>
               <SelectItem value="stock_asc">Stock: low → high</SelectItem>
               <SelectItem value="stock_desc">Stock: high → low</SelectItem>
+              <SelectItem value="margin_desc">Margin: high → low</SelectItem>
+              <SelectItem value="margin_asc">Margin: low → high</SelectItem>
             </SelectContent>
           </Select>
         </div>
