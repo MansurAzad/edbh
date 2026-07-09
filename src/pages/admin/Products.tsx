@@ -17,10 +17,11 @@ import ProductsTable from "@/components/admin/products/ProductsTable";
 import ProductsPagination from "@/components/admin/products/ProductsPagination";
 import ProductFormDialog from "@/components/admin/products/ProductFormDialog";
 import BulkInventoryDialog from "@/components/admin/products/BulkInventoryDialog";
+import DuplicateCompareDialog from "@/components/admin/products/DuplicateCompareDialog";
 import { useAdminProducts } from "@/hooks/admin/useAdminProducts";
 import {
-  emptyProduct, PRODUCTS_PER_PAGE,
-  type AdminProduct, type AdminProductInput,
+  DESCRIPTION_VERIFY_META, emptyProduct, getDescriptionVerifyStatus, PRODUCTS_PER_PAGE,
+  type AdminProduct, type AdminProductInput, type DescriptionVerifyStatus,
 } from "@/lib/admin/productHelpers";
 
 const Products = () => {
@@ -36,25 +37,39 @@ const Products = () => {
   const [sortMode, setSortMode] = useState<"newest" | "stock_asc" | "stock_desc" | "margin_asc" | "margin_desc">("newest");
   const [bulkInventoryOpen, setBulkInventoryOpen] = useState(false);
   const [auditFilter, setAuditFilter] = useState<string>(""); // slow|dead|oos|low_stock|duplicates
+  const [verifyFilter, setVerifyFilter] = useState<"" | DescriptionVerifyStatus>("");
+  const [compareFocus, setCompareFocus] = useState<AdminProduct | null>(null);
 
   // Deep-link support from Business Audit: /admin/products?filter=oos&sort=margin_desc
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     const f = searchParams.get("filter") || "";
     const s = searchParams.get("sort");
+    const v = searchParams.get("verify");
     if (f) setAuditFilter(f);
     if (f === "low_stock" || f === "oos") setLowStockOnly(f === "low_stock");
     if (s === "margin_asc" || s === "margin_desc" || s === "stock_asc" || s === "stock_desc") {
       setSortMode(s);
     }
+    if (v === "pass" || v === "attention" || v === "fail") setVerifyFilter(v);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const clearAuditFilter = () => {
     setAuditFilter("");
+    setVerifyFilter("");
     const next = new URLSearchParams(searchParams);
     next.delete("filter");
     next.delete("sort");
+    next.delete("verify");
     setSearchParams(next, { replace: true });
+  };
+  const toggleVerify = (v: DescriptionVerifyStatus) => {
+    const nextVal = verifyFilter === v ? "" : v;
+    setVerifyFilter(nextVal);
+    const next = new URLSearchParams(searchParams);
+    if (nextVal) next.set("verify", nextVal); else next.delete("verify");
+    setSearchParams(next, { replace: true });
+    setCurrentPage(1);
   };
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -116,6 +131,10 @@ const Products = () => {
       });
       filtered = filtered.filter((p) => (counts.get(p.name.trim().toLowerCase().replace(/\s+/g, " ")) || 0) > 1);
     }
+    // Description render-verify filter (independent of audit filter)
+    if (verifyFilter) {
+      filtered = filtered.filter((p) => getDescriptionVerifyStatus(p.description) === verifyFilter);
+    }
     // slow/dead can't be computed from products alone; leave list intact and rely on the
     // banner to point the admin to Business Audit for the authoritative list.
 
@@ -132,7 +151,14 @@ const Products = () => {
       });
     }
     return filtered;
-  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode, auditFilter]);
+  }, [products, searchQuery, categoryFilter, minPrice, maxPrice, lowStockOnly, lowStockThreshold, sortMode, auditFilter, verifyFilter]);
+
+  /** Count-by-verify-status for banner chip labels. */
+  const verifyCounts = useMemo(() => {
+    const acc: Record<DescriptionVerifyStatus, number> = { pass: 0, attention: 0, fail: 0 };
+    products.forEach((p) => { acc[getDescriptionVerifyStatus(p.description)] += 1; });
+    return acc;
+  }, [products]);
 
   const lowStockCount = useMemo(
     () => products.filter((p) => (p.stock ?? 0) <= lowStockThreshold).length,
@@ -214,22 +240,67 @@ const Products = () => {
 
   /**
    * Download the currently filtered + sorted product list as CSV.
-   * Uses the same serializer as import/export so schema stays in sync,
-   * including the standardized fields (sku, subcategory, meta_*, etc.).
+   * When an audit filter (oos / low_stock / duplicates) is active, the CSV is
+   * an audit-scoped report with only the columns relevant to that report —
+   * otherwise it uses the full import/export serializer.
    */
   const handleExportFiltered = useCallback(() => {
-    const csv = productsToCsv(filteredProducts as unknown as Record<string, any>[]);
+    const stamp = new Date().toISOString().slice(0, 10);
+    let csv: string;
+    let filename: string;
+
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const priceOf = (p: AdminProduct) => Number(p.sale_price || p.price || 0);
+
+    if (auditFilter === "oos" || auditFilter === "low_stock") {
+      const header = ["id", "name", "sku", "category", "subcategory", "stock", "price", "sale_price", "verify_status"];
+      const rows = filteredProducts.map((p) => [
+        p.id, p.name, p.sku ?? "", p.category, p.subcategory ?? "",
+        p.stock ?? 0, p.price, p.sale_price ?? "",
+        getDescriptionVerifyStatus(p.description),
+      ].map(esc).join(","));
+      csv = [header.join(","), ...rows].join("\n");
+      filename = `products-audit-${auditFilter}-${stamp}.csv`;
+    } else if (auditFilter === "duplicates") {
+      // Group duplicate rows so the report clearly shows which items share a name.
+      const groups = new Map<string, AdminProduct[]>();
+      filteredProducts.forEach((p) => {
+        const k = p.name.trim().toLowerCase().replace(/\s+/g, " ");
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k)!.push(p);
+      });
+      const header = ["duplicate_group", "id", "name", "sku", "category", "subcategory", "price", "stock", "verify_status"];
+      const rows: string[] = [];
+      let gi = 0;
+      for (const [, group] of groups) {
+        gi += 1;
+        group.forEach((p) => {
+          rows.push([
+            `G${gi}`, p.id, p.name, p.sku ?? "", p.category, p.subcategory ?? "",
+            priceOf(p), p.stock ?? 0,
+            getDescriptionVerifyStatus(p.description),
+          ].map(esc).join(","));
+        });
+      }
+      csv = [header.join(","), ...rows].join("\n");
+      filename = `products-audit-duplicates-${stamp}.csv`;
+    } else {
+      csv = productsToCsv(filteredProducts as unknown as Record<string, any>[]);
+      filename = verifyFilter
+        ? `products-verify-${verifyFilter}-${stamp}.csv`
+        : `products-filtered-${stamp}.csv`;
+    }
+
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const stamp = new Date().toISOString().slice(0, 10);
-    a.download = `products-filtered-${stamp}.csv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [filteredProducts]);
+  }, [filteredProducts, auditFilter, verifyFilter]);
 
   return (
     <AdminLayout>
@@ -244,15 +315,52 @@ const Products = () => {
           </Button>
         </div>
 
-        {auditFilter && (
-          <div className="flex items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-            <span>
-              Business Audit filter active: <b>{auditFilter.replace("_", " ")}</b>
-              {(auditFilter === "slow" || auditFilter === "dead") && (
-                <span className="text-muted-foreground"> — showing full catalog; see Business Audit for the authoritative list.</span>
-              )}
-            </span>
-            <Button size="sm" variant="ghost" onClick={clearAuditFilter}>Clear</Button>
+        {/* Report banner: audit filter + description verify chips + audit CSV export */}
+        {(auditFilter || verifyFilter || true) && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">Report</span>
+                {auditFilter ? (
+                  <span>
+                    Business Audit filter: <b>{auditFilter.replace("_", " ")}</b>
+                    {(auditFilter === "slow" || auditFilter === "dead") && (
+                      <span className="text-muted-foreground"> — showing full catalog; see Business Audit for the authoritative list.</span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">No audit filter active</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {(auditFilter === "oos" || auditFilter === "low_stock" || auditFilter === "duplicates") && (
+                  <Button size="sm" variant="outline" onClick={handleExportFiltered}>
+                    Download {auditFilter.replace("_", " ")} CSV ({filteredProducts.length})
+                  </Button>
+                )}
+                {(auditFilter || verifyFilter) && (
+                  <Button size="sm" variant="ghost" onClick={clearAuditFilter}>Clear</Button>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">Description verify:</span>
+              {(["pass", "attention", "fail"] as DescriptionVerifyStatus[]).map((s) => {
+                const meta = DESCRIPTION_VERIFY_META[s];
+                const active = verifyFilter === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => toggleVerify(s)}
+                    className={`text-xs px-2 py-1 rounded border transition ${meta.badge} ${active ? "ring-2 ring-offset-1 ring-primary" : "opacity-80 hover:opacity-100"}`}
+                    aria-pressed={active}
+                  >
+                    {meta.label} · {verifyCounts[s]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -295,6 +403,13 @@ const Products = () => {
           onVariants={setVariantProduct}
           onEdit={openEditDialog}
           onDelete={setDeleteId}
+          onCompareDuplicates={auditFilter === "duplicates" ? setCompareFocus : undefined}
+        />
+
+        <DuplicateCompareDialog
+          focus={compareFocus}
+          allProducts={products}
+          onOpenChange={(open) => { if (!open) setCompareFocus(null); }}
         />
 
         <ProductsPagination

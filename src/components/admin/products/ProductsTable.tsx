@@ -12,11 +12,16 @@
  * Bengali UI strings: image button tooltip "ক্লিক করে জুম করুন" (click to zoom).
  * All other labels remain English to match the rest of the admin shell.
  */
-import { AlertTriangle, Images, Layers, Pencil, Trash2 } from "lucide-react";
+import { AlertTriangle, GitCompare, Images, Layers, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LOW_STOCK_THRESHOLD, type AdminProduct } from "@/lib/admin/productHelpers";
+import {
+  DESCRIPTION_VERIFY_META,
+  getDescriptionVerifyStatus,
+  LOW_STOCK_THRESHOLD,
+  type AdminProduct,
+} from "@/lib/admin/productHelpers";
 
 /**
  * Props for {@link ProductsTable}.
@@ -38,6 +43,8 @@ interface Props {
   onEdit: (p: AdminProduct) => void;
   /** Delete a product by id — confirmation is handled upstream. */
   onDelete: (id: string) => void;
+  /** When set, renders a "Compare" button that opens a near-duplicate details modal. */
+  onCompareDuplicates?: (p: AdminProduct) => void;
 }
 
 /**
@@ -52,8 +59,9 @@ interface Props {
  * it is a presentation concern.
  */
 export default function ProductsTable({
-  loading, products, visible, onZoom, onGallery, onVariants, onEdit, onDelete,
+  loading, products, visible, onZoom, onGallery, onVariants, onEdit, onDelete, onCompareDuplicates,
 }: Props) {
+  const colSpan = 8; // Image, Name, Category, Price, Stock, Desc verify, Featured, Actions
   return (
     // overflow-x-auto allows the table to scroll horizontally on narrow viewports
     <div className="border rounded-lg overflow-x-auto">
@@ -67,6 +75,8 @@ export default function ProductsTable({
             <TableHead>Price</TableHead>
             {/* Stock hidden below sm — shown via Featured/Actions on tiny screens */}
             <TableHead className="hidden sm:table-cell">Stock</TableHead>
+            {/* Description render-verify: pass / attention / fail — hidden below md */}
+            <TableHead className="hidden md:table-cell">Desc.</TableHead>
             {/* Featured flag hidden below lg — rarely consulted on mobile */}
             <TableHead className="hidden lg:table-cell">Featured</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -74,11 +84,11 @@ export default function ProductsTable({
         </TableHeader>
         <TableBody>
           {loading ? (
-            // Loading state — single spanning row, colSpan must match header count (7)
-            <TableRow><TableCell colSpan={7} className="text-center py-8">Loading...</TableCell></TableRow>
+            <TableRow><TableCell colSpan={colSpan} className="text-center py-8">Loading...</TableCell></TableRow>
           ) : products.length === 0 ? (
-            // Empty state — checks the unfiltered list so "no products at all" is distinct from a filter miss upstream
-            <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No products found</TableCell></TableRow>
+            <TableRow><TableCell colSpan={colSpan} className="text-center py-8 text-muted-foreground">No products found</TableCell></TableRow>
+          ) : visible.length === 0 ? (
+            <TableRow><TableCell colSpan={colSpan} className="text-center py-8 text-muted-foreground">এই ফিল্টারে কোন প্রোডাক্ট মেলেনি।</TableCell></TableRow>
           ) : (
             // Render the paginated slice; key by product id for stable reconciliation
             visible.map((product) => (
@@ -129,26 +139,39 @@ export default function ProductsTable({
                     ) : null /* Healthy stock — no badge */}
                   </div>
                 </TableCell>
+                {/* Description render-verify — pass / attention / fail */}
+                <TableCell className="hidden md:table-cell">
+                  {(() => {
+                    const status = getDescriptionVerifyStatus(product.description);
+                    const meta = DESCRIPTION_VERIFY_META[status];
+                    return (
+                      <Badge variant="outline" className={`text-xs ${meta.badge}`} title={`Description verify: ${meta.label}`}>
+                        {meta.label}
+                      </Badge>
+                    );
+                  })()}
+                </TableCell>
                 {/* Featured cell — pill when true, plain "No" otherwise */}
                 <TableCell className="hidden lg:table-cell">
                   {product.featured ? <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Yes</span> : "No"}
                 </TableCell>
-                {/* Actions cell — icon buttons for Gallery / Variants / Edit / Delete */}
+                {/* Actions cell — icon buttons for Compare (duplicates only) / Gallery / Variants / Edit / Delete */}
                 <TableCell className="text-right">
                   <div className="flex justify-end flex-wrap gap-0.5">
-                    {/* Gallery — manage additional product images */}
+                    {onCompareDuplicates && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onCompareDuplicates(product)} title="Compare near-duplicate descriptions">
+                        <GitCompare className="w-4 h-4 text-amber-600" />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onGallery(product)} title="Manage Gallery">
                       <Images className="w-4 h-4" />
                     </Button>
-                    {/* Variants — manage size/colour and per-variant pricing/stock */}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onVariants(product)} title="Manage Variants">
                       <Layers className="w-4 h-4" />
                     </Button>
-                    {/* Edit — open the product form dialog */}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(product)}>
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    {/* Delete — parent shows the confirm dialog before hard-deleting */}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete(product.id)}>
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>

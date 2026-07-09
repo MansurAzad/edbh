@@ -236,3 +236,47 @@ export const emptyProduct: AdminProductInput = {
   meta_description: "",
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Description render-verify status
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Verify status buckets shown in the admin table + audit banner filter. */
+export type DescriptionVerifyStatus = "pass" | "attention" | "fail";
+
+/**
+ * Pure, cheap heuristic that classifies whether a product description will
+ * render safely and usefully on the storefront.
+ *
+ * - **fail**       : missing/blank, or contains raw script/iframe residue.
+ * - **attention**  : very short (<80 chars), looks like raw HTML with no
+ *                    Bengali/Latin prose, or has unbalanced tags.
+ * - **pass**       : plain readable prose over the length threshold.
+ *
+ * Kept sync + framework-free so it can be reused by table cells, CSV export,
+ * and the compare modal without any network calls.
+ */
+export function getDescriptionVerifyStatus(desc: string | null | undefined): DescriptionVerifyStatus {
+  const raw = (desc || "").trim();
+  if (!raw) return "fail";
+  if (/<\s*(script|iframe|object|embed)\b/i.test(raw)) return "fail";
+  // Strip tags for length + prose checks
+  const stripped = raw.replace(/<[^>]*>/g, "").trim();
+  if (stripped.length < 80) return "attention";
+  // Detect leftover HTML-ish payload (>25% angle brackets is suspicious)
+  const angleRatio = (raw.match(/[<>]/g)?.length ?? 0) / raw.length;
+  if (angleRatio > 0.05) return "attention";
+  // Unbalanced tags → attention
+  const opens = (raw.match(/<[a-z]/gi) || []).length;
+  const closes = (raw.match(/<\/[a-z]/gi) || []).length;
+  if (opens !== closes) return "attention";
+  return "pass";
+}
+
+/** Human label + tailwind class for a verify status. */
+export const DESCRIPTION_VERIFY_META: Record<DescriptionVerifyStatus, { label: string; badge: string }> = {
+  pass:       { label: "Pass",      badge: "border-emerald-300 text-emerald-700 bg-emerald-50" },
+  attention:  { label: "Attention", badge: "border-amber-300 text-amber-700 bg-amber-50" },
+  fail:       { label: "Fail",      badge: "border-red-300 text-red-700 bg-red-50" },
+};
+
+
