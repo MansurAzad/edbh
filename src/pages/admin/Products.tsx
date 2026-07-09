@@ -33,8 +33,29 @@ const Products = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState(5);
-  const [sortMode, setSortMode] = useState<"newest" | "stock_asc" | "stock_desc">("newest");
+  const [sortMode, setSortMode] = useState<"newest" | "stock_asc" | "stock_desc" | "margin_asc" | "margin_desc">("newest");
   const [bulkInventoryOpen, setBulkInventoryOpen] = useState(false);
+  const [auditFilter, setAuditFilter] = useState<string>(""); // slow|dead|oos|low_stock|duplicates
+
+  // Deep-link support from Business Audit: /admin/products?filter=oos&sort=margin_desc
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const f = searchParams.get("filter") || "";
+    const s = searchParams.get("sort");
+    if (f) setAuditFilter(f);
+    if (f === "low_stock" || f === "oos") setLowStockOnly(f === "low_stock");
+    if (s === "margin_asc" || s === "margin_desc" || s === "stock_asc" || s === "stock_desc") {
+      setSortMode(s);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const clearAuditFilter = () => {
+    setAuditFilter("");
+    const next = new URLSearchParams(searchParams);
+    next.delete("filter");
+    next.delete("sort");
+    setSearchParams(next, { replace: true });
+  };
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
