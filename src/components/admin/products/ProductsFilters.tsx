@@ -256,6 +256,9 @@ export default function ProductsFilters({
               <SelectItem value="stock_desc">Stock: high → low</SelectItem>
               <SelectItem value="margin_desc">Margin: high → low</SelectItem>
               <SelectItem value="margin_asc">Margin: low → high</SelectItem>
+              <SelectItem value="verify_worst">Desc verify: fail first</SelectItem>
+              <SelectItem value="verify_best">Desc verify: pass first</SelectItem>
+              <SelectItem value="similarity_desc">Similarity: most alike first</SelectItem>
             </SelectContent>
           </Select>
         </div>
