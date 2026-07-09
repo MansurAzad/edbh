@@ -256,6 +256,7 @@ const Products = () => {
           </div>
         )}
 
+        <ProductsFilters
           searchQuery={searchQuery}
           setSearchQuery={onFilterChange(setSearchQuery)}
           categoryFilter={categoryFilter}
