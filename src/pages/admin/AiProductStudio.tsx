@@ -59,7 +59,7 @@ const DEFAULT_STOCK = 10;
 const MAX_IMAGES = 20;
 const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 6];
 
-type DraftStatus = "uploading" | "analyzing" | "ready" | "saving" | "saved" | "error";
+type DraftStatus = "queued" | "uploading" | "analyzing" | "ready" | "saving" | "saved" | "error" | "cancelled";
 
 interface Draft {
   id: string;
