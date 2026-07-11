@@ -69,6 +69,7 @@ import {
   download,
 } from "@/lib/admin/aiStudio/exportDrafts";
 import { validateSchema, type FieldError } from "@/lib/admin/aiStudio/validator";
+import { runStudioAudit, type AuditResult } from "@/lib/admin/aiStudio/audit";
 
 const DEFAULT_SIZES = ["52", "54", "56", "58"];
 const SIZE_POOL = ["50", "52", "54", "56", "58", "60", "62"];
