@@ -18,7 +18,7 @@
  *    on the card and a top-level summary; invalid drafts are skipped in the
  *    bulk save with an explanatory toast.
  */
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadProductImage } from "@/lib/storage-upload";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -49,15 +49,38 @@ import {
   CheckCircle2,
   StopCircle,
   History,
+  Download,
+  FileJson,
+  Gauge,
+  Copy,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProductFieldSuggestions } from "@/hooks/admin/useProductFieldSuggestions";
+import {
+  DEFAULT_RULES,
+  applyRule,
+  type SizeRuleSet,
+} from "@/lib/admin/aiStudio/sizeRules";
+import { RuleBuilder } from "@/components/admin/aiStudio/RuleBuilder";
+import { ImageZoomDialog } from "@/components/admin/aiStudio/ImageZoomDialog";
+import {
+  draftsToCsv,
+  draftsToJson,
+  download,
+} from "@/lib/admin/aiStudio/exportDrafts";
+import { validateSchema, type FieldError } from "@/lib/admin/aiStudio/validator";
 
 const DEFAULT_SIZES = ["52", "54", "56", "58"];
 const SIZE_POOL = ["50", "52", "54", "56", "58", "60", "62"];
 const DEFAULT_STOCK = 10;
 const MAX_IMAGES = 20;
 const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 6];
+
+interface SkippedItem {
+  filename: string;
+  hash: string;
+  reason: "existing-session" | "duplicate-in-batch";
+}
 
 type DraftStatus = "queued" | "uploading" | "analyzing" | "ready" | "saving" | "saved" | "error" | "cancelled";
 
