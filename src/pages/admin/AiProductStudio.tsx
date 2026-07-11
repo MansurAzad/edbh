@@ -18,7 +18,7 @@
  *    on the card and a top-level summary; invalid drafts are skipped in the
  *    bulk save with an explanatory toast.
  */
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadProductImage } from "@/lib/storage-upload";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -49,15 +49,38 @@ import {
   CheckCircle2,
   StopCircle,
   History,
+  Download,
+  FileJson,
+  Gauge,
+  Copy,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProductFieldSuggestions } from "@/hooks/admin/useProductFieldSuggestions";
+import {
+  DEFAULT_RULES,
+  applyRule,
+  type SizeRuleSet,
+} from "@/lib/admin/aiStudio/sizeRules";
+import { RuleBuilder } from "@/components/admin/aiStudio/RuleBuilder";
+import { ImageZoomDialog } from "@/components/admin/aiStudio/ImageZoomDialog";
+import {
+  draftsToCsv,
+  draftsToJson,
+  download,
+} from "@/lib/admin/aiStudio/exportDrafts";
+import { validateSchema, type FieldError } from "@/lib/admin/aiStudio/validator";
 
 const DEFAULT_SIZES = ["52", "54", "56", "58"];
 const SIZE_POOL = ["50", "52", "54", "56", "58", "60", "62"];
 const DEFAULT_STOCK = 10;
 const MAX_IMAGES = 20;
 const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 6];
+
+interface SkippedItem {
+  filename: string;
+  hash: string;
+  reason: "existing-session" | "duplicate-in-batch";
+}
 
 type DraftStatus = "queued" | "uploading" | "analyzing" | "ready" | "saving" | "saved" | "error" | "cancelled";
 
@@ -166,9 +189,21 @@ export default function AiProductStudio() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [globalBusy, setGlobalBusy] = useState(false);
   const [concurrency, setConcurrency] = useState(3);
+  const [rules, setRules] = useState<SizeRuleSet>(DEFAULT_RULES);
+  const [skippedItems, setSkippedItems] = useState<SkippedItem[]>([]);
+  const [batchStartedAt, setBatchStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const [zoomFor, setZoomFor] = useState<Draft | null>(null);
   const dragRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { data: suggestions } = useProductFieldSuggestions();
+
+  // tick every 500ms so throughput/timers update while batch is running
+  useEffect(() => {
+    if (!batchStartedAt) return;
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, [batchStartedAt]);
 
   /**
    * Cancellation flag. When the admin clicks Cancel we set this ref → new
@@ -214,11 +249,13 @@ export default function AiProductStudio() {
       });
       if (error) throw error;
       const d = data?.draft || {};
+      const cat = d.category || "Abaya";
+      const applied = applyRule({ category: cat }, rules);
       updateDraft(id, {
         status: "ready",
         analyzeEndedAt: Date.now(),
         name: d.name || "",
-        category: d.category || "Abaya",
+        category: cat,
         subcategory: d.subcategory || "",
         fabric: d.fabric || "",
         work_type: d.work_type || "",
@@ -226,6 +263,8 @@ export default function AiProductStudio() {
         hijab_included: !!d.hijab_included,
         inner_included: !!d.inner_included,
         colors: Array.isArray(d.colors) ? d.colors.join(", ") : "",
+        sizes: applied.sizes,
+        stock: applied.stock,
         price: Number(d.estimated_price_bdt) || 0,
         sale_price: d.sale_price_bdt ? Number(d.sale_price_bdt) : null,
         description: d.description || "",
@@ -238,7 +277,7 @@ export default function AiProductStudio() {
       updateDraft(id, { status: "error", error: msg, analyzeEndedAt: Date.now() });
       toast.error(`AI বিশ্লেষণে ব্যর্থ: ${msg}`);
     }
-  }, [updateDraft]);
+  }, [updateDraft, rules]);
 
 
   /**
@@ -259,7 +298,7 @@ export default function AiProductStudio() {
     );
     const seenThisBatch = new Set<string>();
     const accepted: Array<{ id: string; file: File; fileHash: string }> = [];
-    let skipped = 0;
+    const newlySkipped: SkippedItem[] = [];
     for (const file of imgs) {
       let hash = "";
       try {
@@ -267,15 +306,20 @@ export default function AiProductStudio() {
       } catch {
         hash = `${file.name}:${file.size}:${file.lastModified}`;
       }
-      if (existingHashes.has(hash) || seenThisBatch.has(hash)) {
-        skipped++;
+      if (existingHashes.has(hash)) {
+        newlySkipped.push({ filename: file.name, hash, reason: "existing-session" });
+        continue;
+      }
+      if (seenThisBatch.has(hash)) {
+        newlySkipped.push({ filename: file.name, hash, reason: "duplicate-in-batch" });
         continue;
       }
       seenThisBatch.add(hash);
       accepted.push({ id: newId(), file, fileHash: hash });
     }
-    if (skipped > 0) {
-      toast.warning(`${skipped}টি ডুপ্লিকেট ছবি স্কিপ করা হয়েছে (একই hash আগে থেকেই আছে)`);
+    if (newlySkipped.length > 0) {
+      setSkippedItems((prev) => [...prev, ...newlySkipped]);
+      toast.warning(`${newlySkipped.length}টি ডুপ্লিকেট ছবি স্কিপ করা হয়েছে`);
     }
     if (!accepted.length) return;
     if (drafts.length + accepted.length > MAX_IMAGES) {
@@ -285,6 +329,7 @@ export default function AiProductStudio() {
 
     cancelRef.current = false;
     setGlobalBusy(true);
+    setBatchStartedAt(Date.now());
 
     // Seed as queued so the admin sees the whole list, and so cancel can
     // distinguish untouched jobs from in-flight ones without racing.
@@ -442,13 +487,52 @@ export default function AiProductStudio() {
   }, [drafts]);
 
   const invalidReadyCount = useMemo(
-    () => drafts.filter((d) => d.status === "ready" && validateDraft(d).length > 0).length,
+    () => drafts.filter((d) => d.status === "ready" && validateSchema(d as any).length > 0).length,
     [drafts],
   );
 
   const total = drafts.length;
   const inFlight = counts.queued + counts.uploading + counts.analyzing + counts.saving;
   const showSummary = total > 0 && inFlight === 0 && (counts.saved > 0 || counts.error > 0 || counts.cancelled > 0);
+
+  // Batch throughput: how many drafts have moved past analysis / were saved.
+  const processed = counts.ready + counts.saved + counts.error + counts.cancelled;
+  const elapsedMs = batchStartedAt ? now - batchStartedAt : 0;
+  const throughput = elapsedMs > 0 && processed > 0
+    ? (processed / (elapsedMs / 1000))
+    : 0;
+
+  // Reset batch timer once everything is idle.
+  useEffect(() => {
+    if (batchStartedAt && inFlight === 0) {
+      // keep the value so the summary shows final throughput; only clear on next batch
+    }
+  }, [batchStartedAt, inFlight]);
+
+  const applyRulesToAll = useCallback(() => {
+    setDrafts((prev) =>
+      prev.map((d) => {
+        if (d.status !== "ready") return d;
+        const { sizes, stock } = applyRule({ category: d.category }, rules);
+        return { ...d, sizes, stock };
+      }),
+    );
+    toast.success("Rules applied to all ready drafts");
+  }, [rules]);
+
+  const exportCsv = useCallback(() => {
+    if (!drafts.length) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    download(`ai-studio-drafts-${stamp}.csv`, draftsToCsv(drafts as any), "text/csv");
+  }, [drafts]);
+
+  const exportJson = useCallback(() => {
+    if (!drafts.length) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    download(`ai-studio-drafts-${stamp}.json`, draftsToJson(drafts as any), "application/json");
+  }, [drafts]);
+
+
 
 
   return (
@@ -488,6 +572,12 @@ export default function AiProductStudio() {
                 <StopCircle className="w-4 h-4 mr-2" /> Cancel
               </Button>
             )}
+            <Button variant="outline" onClick={exportCsv} disabled={!drafts.length} data-testid="export-csv">
+              <Download className="w-4 h-4 mr-2" /> CSV
+            </Button>
+            <Button variant="outline" onClick={exportJson} disabled={!drafts.length} data-testid="export-json">
+              <FileJson className="w-4 h-4 mr-2" /> JSON
+            </Button>
             <Button onClick={saveAll} disabled={!counts.ready || globalBusy} data-testid="save-all">
               {globalBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
               Save All ({counts.ready})
@@ -495,28 +585,69 @@ export default function AiProductStudio() {
           </div>
         </div>
 
-        {/* Live status strip */}
+        {/* Rule builder for size/stock auto-fill with per-category exceptions */}
+        <RuleBuilder rules={rules} onChange={setRules} onApplyAll={applyRulesToAll} />
+
+        {/* Live status strip with overall progress + throughput */}
         {total > 0 && (
-          <Card className="p-3" aria-live="polite" data-testid="status-strip">
+          <Card className="p-3 space-y-2" aria-live="polite" data-testid="status-strip">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="secondary">Total: {total}</Badge>
-              {counts.queued > 0 && <Badge className="bg-muted">Queued: {counts.queued}</Badge>}
-              {counts.uploading > 0 && <Badge className="bg-muted">Uploading: {counts.uploading}</Badge>}
-              {counts.analyzing > 0 && (
-                <Badge className="bg-blue-500/10 text-blue-700">
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin inline" /> Analysing: {counts.analyzing}
+              <Badge className="bg-muted" data-testid="count-uploaded">
+                Uploaded: {total - counts.queued}
+              </Badge>
+              <Badge className="bg-blue-500/10 text-blue-700" data-testid="count-analyzed">
+                Analyzed: {counts.ready + counts.saved}
+              </Badge>
+              <Badge className="bg-green-500/10 text-green-700" data-testid="count-ready">Ready: {counts.ready}</Badge>
+              <Badge className="bg-primary/10 text-primary" data-testid="count-saved">Saved: {counts.saved}</Badge>
+              {counts.cancelled > 0 && (
+                <Badge className="bg-muted text-muted-foreground" data-testid="count-cancelled">
+                  Cancelled: {counts.cancelled}
                 </Badge>
               )}
-              <Badge className="bg-green-500/10 text-green-700">Ready: {counts.ready}</Badge>
-              {counts.saving > 0 && <Badge className="bg-yellow-500/10 text-yellow-700">Saving: {counts.saving}</Badge>}
-              <Badge className="bg-primary/10 text-primary">Saved: {counts.saved}</Badge>
               {counts.error > 0 && (
                 <Badge className="bg-destructive/10 text-destructive">Failed: {counts.error}</Badge>
               )}
-              {counts.cancelled > 0 && (
-                <Badge className="bg-muted text-muted-foreground">Cancelled: {counts.cancelled}</Badge>
+              {batchStartedAt && (
+                <Badge variant="outline" data-testid="throughput" title="Average images per second">
+                  <Gauge className="w-3 h-3 mr-1" />
+                  {throughput.toFixed(2)} img/s · {(elapsedMs / 1000).toFixed(1)}s
+                </Badge>
               )}
             </div>
+            <Progress value={total ? (processed / total) * 100 : 0} className="h-1.5" />
+          </Card>
+        )}
+
+        {/* Skipped duplicates */}
+        {skippedItems.length > 0 && (
+          <Card className="p-3 border-orange-500/40 bg-orange-500/5" data-testid="skipped-card">
+            <details>
+              <summary className="cursor-pointer text-sm flex items-center gap-2">
+                <Copy className="w-4 h-4 text-orange-700" />
+                <span className="font-medium">{skippedItems.length}টি ডুপ্লিকেট ছবি স্কিপ হয়েছে</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto h-6"
+                  onClick={(e) => { e.preventDefault(); setSkippedItems([]); }}
+                >
+                  Clear
+                </Button>
+              </summary>
+              <ul className="mt-2 space-y-1 text-xs">
+                {skippedItems.map((s, i) => (
+                  <li key={i} className="flex gap-2 items-center">
+                    <Badge variant="outline" className="text-[9px]">
+                      {s.reason === "existing-session" ? "already-added" : "in-batch-dupe"}
+                    </Badge>
+                    <span className="font-medium">{s.filename}</span>
+                    <span className="font-mono text-muted-foreground">sha256:{s.hash.slice(0, 12)}…</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
           </Card>
         )}
 
@@ -585,11 +716,21 @@ export default function AiProductStudio() {
                 onRemove={() => removeDraft(d.id)}
                 onReanalyze={() => d.imageUrl && analyzeOne(d.id, d.imageUrl)}
                 onSave={() => saveOne(d)}
+                onZoom={() => setZoomFor(d)}
               />
             ))}
           </div>
         )}
       </div>
+      {zoomFor && (
+        <ImageZoomDialog
+          open={!!zoomFor}
+          onOpenChange={(v) => !v && setZoomFor(null)}
+          imageUrl={zoomFor.imageUrl}
+          filename={zoomFor.file?.name}
+          hash={zoomFor.fileHash}
+        />
+      )}
     </AdminLayout>
   );
 }
@@ -640,6 +781,7 @@ function DraftCard({
   onRemove,
   onReanalyze,
   onSave,
+  onZoom,
 }: {
   draft: Draft;
   suggestions?: ReturnType<typeof useProductFieldSuggestions>["data"];
@@ -647,6 +789,7 @@ function DraftCard({
   onRemove: () => void;
   onReanalyze: () => void;
   onSave: () => void;
+  onZoom?: () => void;
 }) {
   const statusColor: Record<DraftStatus, string> = {
     queued: "bg-muted text-muted-foreground",
@@ -672,8 +815,11 @@ function DraftCard({
   };
 
   const isFailed = d.status === "error";
-  const missing = d.status === "ready" ? validateDraft(d) : [];
-  const hasMissing = missing.length > 0;
+  const schemaErrors: FieldError[] = d.status === "ready" ? validateSchema(d as any) : [];
+  const hasMissing = schemaErrors.length > 0;
+  const errorFields = new Set(schemaErrors.map((e) => e.field));
+  const fieldClass = (name: string) =>
+    errorFields.has(name as any) ? "ring-2 ring-yellow-500/60 rounded-md" : "";
 
   return (
     <Card
@@ -682,15 +828,28 @@ function DraftCard({
       data-status={d.status}
     >
       <div className="flex gap-3">
-        <div className="w-32 h-32 flex-shrink-0 rounded-md overflow-hidden bg-muted relative">
+        <button
+          type="button"
+          onClick={onZoom}
+          className="w-32 h-32 flex-shrink-0 rounded-md overflow-hidden bg-muted relative group cursor-zoom-in"
+          data-testid="thumb-zoom"
+          disabled={!d.imageUrl}
+        >
           {d.imageUrl ? (
-            <img src={d.imageUrl} alt="" className="w-full h-full object-cover" />
+            <>
+              <img src={d.imageUrl} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+              {d.fileHash && (
+                <span className="absolute bottom-0 left-0 right-0 text-[9px] bg-black/60 text-white font-mono px-1 py-0.5 truncate">
+                  {d.fileHash.slice(0, 10)}…
+                </span>
+              )}
+            </>
           ) : (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           )}
-        </div>
+        </button>
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -793,6 +952,8 @@ function DraftCard({
             placeholder="Product name (Bangla)"
             value={d.name}
             onChange={(e) => onChange({ name: e.target.value })}
+            className={fieldClass("name")}
+            data-field-error={errorFields.has("name") ? "true" : undefined}
           />
         </div>
       </div>
@@ -806,7 +967,8 @@ function DraftCard({
         >
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
           <div>
-            <strong>বাধ্যতামূলক তথ্য মিসিং:</strong> {missing.join(", ")} — Save All-এ এটি স্কিপ হবে।
+            <strong>বাধ্যতামূলক তথ্য মিসিং:</strong>{" "}
+            {schemaErrors.map((e) => `${e.label} (${e.message})`).join(" · ")}
           </div>
         </div>
       )}
@@ -975,7 +1137,7 @@ function DraftCard({
           size="sm"
           onClick={onSave}
           disabled={d.status !== "ready" || hasMissing}
-          title={hasMissing ? `Missing: ${missing.join(", ")}` : undefined}
+          title={hasMissing ? `Missing: ${schemaErrors.map((e) => e.label).join(", ")}` : undefined}
         >
           <Save className="w-4 h-4 mr-2" /> Save this product
         </Button>
