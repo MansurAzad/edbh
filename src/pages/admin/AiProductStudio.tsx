@@ -1135,7 +1135,7 @@ function DraftCard({
           size="sm"
           onClick={onSave}
           disabled={d.status !== "ready" || hasMissing}
-          title={hasMissing ? `Missing: ${missing.join(", ")}` : undefined}
+          title={hasMissing ? `Missing: ${schemaErrors.map((e) => e.label).join(", ")}` : undefined}
         >
           <Save className="w-4 h-4 mr-2" /> Save this product
         </Button>
