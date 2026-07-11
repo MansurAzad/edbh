@@ -1,8 +1,8 @@
 import { ReactNode, useState, memo, useCallback, forwardRef, lazy, Suspense, useMemo, useEffect } from "react";
 import { Link, useLocation, Navigate } from "react-router-dom";
 import {
-  LayoutDashboard, Package, ShoppingCart, Users, Star, Settings,
-  LogOut, ChevronLeft, Tag, BarChart3, RotateCcw, Truck,
+  LayoutDashboard, Package, ShoppingCart, Users, Settings,
+  LogOut, ChevronLeft, BarChart3, Truck,
   FileText, Menu, X, ClipboardCheck, Megaphone, Activity,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
