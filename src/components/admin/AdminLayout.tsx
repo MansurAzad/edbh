@@ -118,7 +118,7 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
 
 
   return (
-    <div className="min-h-screen flex bg-muted/30">
+    <div className="h-dvh overflow-hidden flex bg-muted/30">
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[70] lg:hidden animate-fade-in"
@@ -218,20 +218,22 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
         </div>
       </aside>
 
-      <main data-testid="admin-main" className="flex-1 overflow-auto min-w-0">
-        <div className="lg:hidden sticky top-0 z-40 bg-card border-b border-border px-4 py-3 flex items-center gap-3">
+      <main data-testid="admin-main" className="flex-1 min-w-0 h-dvh overflow-hidden flex flex-col">
+        <div
+          data-testid="admin-mobile-header"
+          className="lg:hidden flex-none z-40 bg-card border-b border-border px-4 py-3 flex items-center gap-3"
+        >
           <button onClick={openSidebar} className="p-2 hover:bg-muted rounded-lg">
             <Menu className="w-5 h-5" />
           </button>
           <h1 className="font-display text-lg font-bold text-gradient-gold">{panelTitle}</h1>
         </div>
-        {/* Page header (title + hub tabs + active-state chip) stays pinned to
-            the top of the scroll container so it never scrolls away with the
-            content. Rendered on every admin route so every page has a fixed
-            title bar, regardless of whether it belongs to a hub. */}
+        {/* Page header (title + hub tabs + active-state chip) lives outside the
+            scrolling content area. Sidebar, mobile header, title, and tabs stay
+            fixed while only the page content panel below scrolls. */}
         <div
           data-testid="admin-page-header"
-          className="sticky top-[52px] lg:top-0 z-30 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b border-border px-4 md:px-8 pt-3 pb-1"
+          className="flex-none z-30 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b border-border px-4 md:px-8 pt-3 pb-1"
         >
           <div className="flex items-center justify-between gap-3 mb-2">
             <AdminPageTitle />
@@ -239,11 +241,11 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
           {hubGroup && <HubTabsBar group={hubGroup} />}
           <ActiveStateSummary />
         </div>
-        {/* scroll-mt keeps anchor jumps clear of the sticky header + hub tab bar. */}
+        {/* Only this content section scrolls. Headers and navigation never move. */}
         <div
           key={location.pathname}
           data-testid="admin-page-content"
-          className="p-4 md:p-8 pt-6 md:pt-8 scroll-mt-[140px] lg:scroll-mt-[120px] animate-fade-in"
+          className="flex-1 min-h-0 overflow-auto overscroll-contain p-4 md:p-8 pt-6 md:pt-8 scroll-mt-[140px] lg:scroll-mt-[120px] animate-fade-in"
           style={{ animationDuration: '150ms' }}
         >
           {children}
