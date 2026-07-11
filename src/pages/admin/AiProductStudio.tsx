@@ -716,11 +716,21 @@ export default function AiProductStudio() {
                 onRemove={() => removeDraft(d.id)}
                 onReanalyze={() => d.imageUrl && analyzeOne(d.id, d.imageUrl)}
                 onSave={() => saveOne(d)}
+                onZoom={() => setZoomFor(d)}
               />
             ))}
           </div>
         )}
       </div>
+      {zoomFor && (
+        <ImageZoomDialog
+          open={!!zoomFor}
+          onOpenChange={(v) => !v && setZoomFor(null)}
+          imageUrl={zoomFor.imageUrl}
+          filename={zoomFor.file?.name}
+          hash={zoomFor.fileHash}
+        />
+      )}
     </AdminLayout>
   );
 }
