@@ -572,12 +572,21 @@ export default function AiProductStudio() {
                 <StopCircle className="w-4 h-4 mr-2" /> Cancel
               </Button>
             )}
+            <Button variant="outline" onClick={exportCsv} disabled={!drafts.length} data-testid="export-csv">
+              <Download className="w-4 h-4 mr-2" /> CSV
+            </Button>
+            <Button variant="outline" onClick={exportJson} disabled={!drafts.length} data-testid="export-json">
+              <FileJson className="w-4 h-4 mr-2" /> JSON
+            </Button>
             <Button onClick={saveAll} disabled={!counts.ready || globalBusy} data-testid="save-all">
               {globalBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
               Save All ({counts.ready})
             </Button>
           </div>
         </div>
+
+        {/* Rule builder for size/stock auto-fill with per-category exceptions */}
+        <RuleBuilder rules={rules} onChange={setRules} onApplyAll={applyRulesToAll} />
 
         {/* Live status strip */}
         {total > 0 && (
