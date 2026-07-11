@@ -500,6 +500,7 @@ export default function AiProductStudio() {
           <Card className="p-3" aria-live="polite" data-testid="status-strip">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="secondary">Total: {total}</Badge>
+              {counts.queued > 0 && <Badge className="bg-muted">Queued: {counts.queued}</Badge>}
               {counts.uploading > 0 && <Badge className="bg-muted">Uploading: {counts.uploading}</Badge>}
               {counts.analyzing > 0 && (
                 <Badge className="bg-blue-500/10 text-blue-700">
@@ -511,6 +512,9 @@ export default function AiProductStudio() {
               <Badge className="bg-primary/10 text-primary">Saved: {counts.saved}</Badge>
               {counts.error > 0 && (
                 <Badge className="bg-destructive/10 text-destructive">Failed: {counts.error}</Badge>
+              )}
+              {counts.cancelled > 0 && (
+                <Badge className="bg-muted text-muted-foreground">Cancelled: {counts.cancelled}</Badge>
               )}
             </div>
           </Card>
