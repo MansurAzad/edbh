@@ -189,9 +189,21 @@ export default function AiProductStudio() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [globalBusy, setGlobalBusy] = useState(false);
   const [concurrency, setConcurrency] = useState(3);
+  const [rules, setRules] = useState<SizeRuleSet>(DEFAULT_RULES);
+  const [skippedItems, setSkippedItems] = useState<SkippedItem[]>([]);
+  const [batchStartedAt, setBatchStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const [zoomFor, setZoomFor] = useState<Draft | null>(null);
   const dragRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { data: suggestions } = useProductFieldSuggestions();
+
+  // tick every 500ms so throughput/timers update while batch is running
+  useEffect(() => {
+    if (!batchStartedAt) return;
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, [batchStartedAt]);
 
   /**
    * Cancellation flag. When the admin clicks Cancel we set this ref → new
