@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
       return errorResponse("imageUrl is required", 400);
     }
 
-    const draft = await analyze(imageUrl, hint);
+    const draft = await analyze(svc, imageUrl, hint);
     return jsonResponse({ draft });
   } catch (e) {
     return errorResponse((e as Error).message, 500);
