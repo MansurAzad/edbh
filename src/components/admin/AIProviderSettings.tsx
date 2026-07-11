@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Bot, Loader2, CheckCircle2, XCircle, Pencil, Save, X, Trash2, Play, Shield, AlertTriangle, RefreshCw,
+  Bot, Loader2, CheckCircle2, XCircle, Pencil, Save, X, Trash2, Play, Shield, AlertTriangle, RefreshCw, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
