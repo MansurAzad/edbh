@@ -32,9 +32,24 @@ Then commit the new PNGs under `tests/visual/__screenshots__/`.
 
 ## What's covered
 
+Pages (`homepage-shop.visual.spec.ts` + `additional-pages.visual.spec.ts`):
+
 - Premium homepage (`/`) — hero above-the-fold + full-page scroll.
 - Shop landing (`/shop`).
 - Shop with price filter (`/shop?maxPrice=3000`) — protects the price-chip → URL → slider wiring.
+- Product detail (`/product/:id`) — first product resolved dynamically from `/shop`.
+- Cart empty state (`/cart`).
+- Checkout (`/checkout`).
+- Blog listing (`/blog`).
+- Contact (`/contact`).
+
+Interaction states (`interaction-states.visual.spec.ts`):
+
+- Shop product card **hover**.
+- Homepage primary CTA (`.btn-gold`) **hover**.
+- Homepage PriceQuickShop chip **hover**.
+- Header search dialog **open**.
+- Blog category filter **active/selected**.
 
 ## Notes
 
