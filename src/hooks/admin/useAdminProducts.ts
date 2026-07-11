@@ -235,8 +235,19 @@ export function useAdminProducts() {
         stock:     Number(data.stock),
         sizes:     data.sizes?.filter(Boolean) || [],
         colors:    data.colors?.filter(Boolean) || [],
-        material:  data.material  || null,
-        video_url: data.video_url || null,
+        image_url: data.image_url?.trim() || null,
+        description: data.description?.trim() || null,
+        material:  data.material?.trim()  || null,
+        video_url: data.video_url?.trim() || null,
+        sku: data.sku?.trim() || null,
+        subcategory: data.subcategory?.trim() || null,
+        fabric: data.fabric?.trim() || null,
+        work_type: data.work_type?.trim() || null,
+        part: data.part?.trim() || null,
+        image_alt_text: data.image_alt_text?.trim() || null,
+        meta_title: data.meta_title?.trim() || null,
+        meta_description: data.meta_description?.trim() || null,
+        purchase_cost: data.purchase_cost ? Number(data.purchase_cost) : null,
       };
 
       // Sanitise gallery URLs (trim whitespace, drop empty strings)

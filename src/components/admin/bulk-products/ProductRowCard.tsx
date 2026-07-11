@@ -86,7 +86,7 @@ const ProductRowCard = ({
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <Select value={product.category} onValueChange={v => onUpdate(product.id, "category", v)}>
+            <Select value={product.category ?? ""} onValueChange={v => onUpdate(product.id, "category", v)}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="ক্যাটাগরি" /></SelectTrigger>
               <CategorySelectContent items={categories} />
             </Select>
@@ -127,7 +127,7 @@ const ProductRowCard = ({
           </div>
           <div className="col-span-2">
             <Label className="text-xs">ক্যাটাগরি *</Label>
-            <Select value={product.category} onValueChange={v => onUpdate(product.id, "category", v)}>
+            <Select value={product.category ?? ""} onValueChange={v => onUpdate(product.id, "category", v)}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="সিলেক্ট" /></SelectTrigger>
               <CategorySelectContent items={categories} />
             </Select>
