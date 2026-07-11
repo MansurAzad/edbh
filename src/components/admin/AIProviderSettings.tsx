@@ -323,6 +323,7 @@ const AIProviderSettings = () => {
                 <SelectContent>
                   <SelectItem value="customer">Customer Chatbot</SelectItem>
                   <SelectItem value="admin">Admin AI Agent</SelectItem>
+                  <SelectItem value="product_studio">AI Product Studio (Vision)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
