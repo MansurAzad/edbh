@@ -9,6 +9,8 @@ import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { ROUTE_PERMISSIONS } from "@/lib/permissions";
+import { findHubGroupByPath } from "@/lib/admin/hubGroups";
+import HubTabsBar from "@/components/admin/HubTabsBar";
 
 const AdminAIChat = lazy(() => import("@/components/admin/AdminAIChat"));
 
@@ -105,17 +107,9 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
     return <Navigate to="/" replace />;
   }
 
-  // Embed mode: when rendered inside a hub-page iframe (?embed=1),
-  // skip the sidebar/topbar chrome so the sub-page fills the frame cleanly.
-  const isEmbed = typeof window !== "undefined"
-    && new URLSearchParams(window.location.search).get("embed") === "1";
-  if (isEmbed) {
-    return (
-      <main className="min-h-screen bg-muted/30">
-        <div className="p-4 md:p-6">{children}</div>
-      </main>
-    );
-  }
+  const hubGroup = findHubGroupByPath(location.pathname);
+
+
 
 
   return (
@@ -162,14 +156,21 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto overscroll-contain">
-          {visibleNavItems.map((item) => (
-            <NavItem
-              key={item.path}
-              {...item}
-              isActive={location.pathname === item.path}
-              onClick={closeSidebar}
-            />
-          ))}
+          {visibleNavItems.map((item) => {
+            const grp = findHubGroupByPath(item.path);
+            const isActive = grp
+              ? grp.hubPath === location.pathname ||
+                grp.tabs.some((t) => t.path === location.pathname)
+              : location.pathname === item.path;
+            return (
+              <NavItem
+                key={item.path}
+                {...item}
+                isActive={isActive}
+                onClick={closeSidebar}
+              />
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-border space-y-2">
@@ -199,6 +200,7 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
           <h1 className="font-display text-lg font-bold text-gradient-gold">{panelTitle}</h1>
         </div>
         <div key={location.pathname} className="p-4 md:p-8 animate-fade-in" style={{ animationDuration: '150ms' }}>
+          {hubGroup && <HubTabsBar group={hubGroup} />}
           {children}
         </div>
       </main>
