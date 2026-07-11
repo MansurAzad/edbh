@@ -588,28 +588,66 @@ export default function AiProductStudio() {
         {/* Rule builder for size/stock auto-fill with per-category exceptions */}
         <RuleBuilder rules={rules} onChange={setRules} onApplyAll={applyRulesToAll} />
 
-        {/* Live status strip */}
+        {/* Live status strip with overall progress + throughput */}
         {total > 0 && (
-          <Card className="p-3" aria-live="polite" data-testid="status-strip">
+          <Card className="p-3 space-y-2" aria-live="polite" data-testid="status-strip">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="secondary">Total: {total}</Badge>
-              {counts.queued > 0 && <Badge className="bg-muted">Queued: {counts.queued}</Badge>}
-              {counts.uploading > 0 && <Badge className="bg-muted">Uploading: {counts.uploading}</Badge>}
-              {counts.analyzing > 0 && (
-                <Badge className="bg-blue-500/10 text-blue-700">
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin inline" /> Analysing: {counts.analyzing}
+              <Badge className="bg-muted" data-testid="count-uploaded">
+                Uploaded: {total - counts.queued}
+              </Badge>
+              <Badge className="bg-blue-500/10 text-blue-700" data-testid="count-analyzed">
+                Analyzed: {counts.ready + counts.saved}
+              </Badge>
+              <Badge className="bg-green-500/10 text-green-700" data-testid="count-ready">Ready: {counts.ready}</Badge>
+              <Badge className="bg-primary/10 text-primary" data-testid="count-saved">Saved: {counts.saved}</Badge>
+              {counts.cancelled > 0 && (
+                <Badge className="bg-muted text-muted-foreground" data-testid="count-cancelled">
+                  Cancelled: {counts.cancelled}
                 </Badge>
               )}
-              <Badge className="bg-green-500/10 text-green-700">Ready: {counts.ready}</Badge>
-              {counts.saving > 0 && <Badge className="bg-yellow-500/10 text-yellow-700">Saving: {counts.saving}</Badge>}
-              <Badge className="bg-primary/10 text-primary">Saved: {counts.saved}</Badge>
               {counts.error > 0 && (
                 <Badge className="bg-destructive/10 text-destructive">Failed: {counts.error}</Badge>
               )}
-              {counts.cancelled > 0 && (
-                <Badge className="bg-muted text-muted-foreground">Cancelled: {counts.cancelled}</Badge>
+              {batchStartedAt && (
+                <Badge variant="outline" data-testid="throughput" title="Average images per second">
+                  <Gauge className="w-3 h-3 mr-1" />
+                  {throughput.toFixed(2)} img/s · {(elapsedMs / 1000).toFixed(1)}s
+                </Badge>
               )}
             </div>
+            <Progress value={total ? (processed / total) * 100 : 0} className="h-1.5" />
+          </Card>
+        )}
+
+        {/* Skipped duplicates */}
+        {skippedItems.length > 0 && (
+          <Card className="p-3 border-orange-500/40 bg-orange-500/5" data-testid="skipped-card">
+            <details>
+              <summary className="cursor-pointer text-sm flex items-center gap-2">
+                <Copy className="w-4 h-4 text-orange-700" />
+                <span className="font-medium">{skippedItems.length}টি ডুপ্লিকেট ছবি স্কিপ হয়েছে</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto h-6"
+                  onClick={(e) => { e.preventDefault(); setSkippedItems([]); }}
+                >
+                  Clear
+                </Button>
+              </summary>
+              <ul className="mt-2 space-y-1 text-xs">
+                {skippedItems.map((s, i) => (
+                  <li key={i} className="flex gap-2 items-center">
+                    <Badge variant="outline" className="text-[9px]">
+                      {s.reason === "existing-session" ? "already-added" : "in-batch-dupe"}
+                    </Badge>
+                    <span className="font-medium">{s.filename}</span>
+                    <span className="font-mono text-muted-foreground">sha256:{s.hash.slice(0, 12)}…</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
           </Card>
         )}
 
