@@ -10,11 +10,11 @@
 import { corsHeaders, corsPreflight, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const MODEL = "google/gemini-2.5-flash";
+const FALLBACK_MODEL = "google/gemini-2.5-flash";
 
 const SYSTEM = `You are a product cataloguer for "Dubai Borka House Bangladesh",
 a premium Dubai-imported Islamic modest-wear e-commerce store.
