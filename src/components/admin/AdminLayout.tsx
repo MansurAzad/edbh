@@ -43,6 +43,8 @@ const NavItem = memo(forwardRef<HTMLAnchorElement, {
     ref={ref}
     to={path}
     onClick={onClick}
+    onPointerEnter={() => prefetchAdminRoute(path)}
+    onFocus={() => prefetchAdminRoute(path)}
     data-testid="admin-sidebar-item"
     data-path={path}
     data-active={isActive ? "true" : "false"}
