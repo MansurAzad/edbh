@@ -53,6 +53,8 @@ import {
   FileJson,
   Gauge,
   Copy,
+  ShieldCheck,
+  Activity,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProductFieldSuggestions } from "@/hooks/admin/useProductFieldSuggestions";
