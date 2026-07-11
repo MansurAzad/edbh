@@ -229,7 +229,7 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
         {(hubGroup) && (
           <div
             data-testid="admin-page-header"
-            className="sticky top-0 lg:top-0 z-30 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b border-border px-4 md:px-8 pt-3"
+            className="sticky top-[52px] lg:top-0 z-30 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b border-border px-4 md:px-8 pt-3"
           >
             <HubTabsBar group={hubGroup} />
             <ActiveStateSummary />
