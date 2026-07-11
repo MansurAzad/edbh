@@ -497,7 +497,7 @@ const AIProviderSettings = () => {
               {customerProviders.length === 0 ? (
                 <p className="text-sm text-muted-foreground">কোনো custom provider নেই — Lovable AI ব্যবহার হচ্ছে।</p>
               ) : (
-                <div className="space-y-2">{customerProviders.map(renderRow)}</div>
+                <div className="space-y-2">{customerProviders.map((r, i, l) => renderRow(r, i, l))}</div>
               )}
             </div>
             <div className="space-y-3">
@@ -505,7 +505,7 @@ const AIProviderSettings = () => {
               {adminProviders.length === 0 ? (
                 <p className="text-sm text-muted-foreground">কোনো custom provider নেই — Lovable AI ব্যবহার হচ্ছে।</p>
               ) : (
-                <div className="space-y-2">{adminProviders.map(renderRow)}</div>
+                <div className="space-y-2">{adminProviders.map((r, i, l) => renderRow(r, i, l))}</div>
               )}
             </div>
             <div className="space-y-3">
@@ -513,7 +513,7 @@ const AIProviderSettings = () => {
               {studioProviders.length === 0 ? (
                 <p className="text-sm text-muted-foreground">কোনো custom provider নেই — Lovable AI (Gemini Vision) ব্যবহার হচ্ছে।</p>
               ) : (
-                <div className="space-y-2">{studioProviders.map(renderRow)}</div>
+                <div className="space-y-2">{studioProviders.map((r, i, l) => renderRow(r, i, l))}</div>
               )}
             </div>
           </>
