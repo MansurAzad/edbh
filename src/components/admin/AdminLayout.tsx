@@ -218,15 +218,32 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
       </aside>
 
       <main data-testid="admin-main" className="flex-1 overflow-auto min-w-0">
-        <div className="lg:hidden sticky top-0 z-30 bg-card border-b border-border px-4 py-3 flex items-center gap-3">
+        <div className="lg:hidden sticky top-0 z-40 bg-card border-b border-border px-4 py-3 flex items-center gap-3">
           <button onClick={openSidebar} className="p-2 hover:bg-muted rounded-lg">
             <Menu className="w-5 h-5" />
           </button>
           <h1 className="font-display text-lg font-bold text-gradient-gold">{panelTitle}</h1>
         </div>
+        {/* Page header (hub tabs + active-state chip) stays pinned to the top
+            of the scroll container so it never scrolls away with the content. */}
+        {(hubGroup) && (
+          <div
+            data-testid="admin-page-header"
+            className="sticky top-0 lg:top-0 z-30 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b border-border px-4 md:px-8 pt-3"
+          >
+            <HubTabsBar group={hubGroup} />
+            <ActiveStateSummary />
+          </div>
+        )}
+        {!hubGroup && (
+          <div
+            data-testid="admin-page-header"
+            className="sticky top-0 z-30 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b border-border px-4 md:px-8 py-2"
+          >
+            <ActiveStateSummary />
+          </div>
+        )}
         <div key={location.pathname} className="p-4 md:p-8 animate-fade-in" style={{ animationDuration: '150ms' }}>
-          {hubGroup && <HubTabsBar group={hubGroup} />}
-          <ActiveStateSummary />
           {children}
         </div>
 
