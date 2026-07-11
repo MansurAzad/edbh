@@ -41,6 +41,10 @@ const NavItem = memo(forwardRef<HTMLAnchorElement, {
     ref={ref}
     to={path}
     onClick={onClick}
+    data-testid="admin-sidebar-item"
+    data-path={path}
+    data-active={isActive ? "true" : "false"}
+    aria-current={isActive ? "page" : undefined}
     className={cn(
       "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
       isActive
@@ -120,6 +124,7 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
       )}
 
       <aside
+        data-testid="admin-sidebar"
         className={cn(
           "fixed lg:sticky inset-y-0 left-0 lg:top-0 z-[80] h-dvh lg:h-dvh w-[min(82vw,20rem)] max-w-[calc(100vw-2rem)] bg-card border-r border-border flex flex-col transition-transform duration-300 ease-in-out lg:w-64 lg:max-w-none lg:translate-x-0 will-change-transform overflow-hidden lg:self-start",
           sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
@@ -188,7 +193,7 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto min-w-0">
+      <main data-testid="admin-main" className="flex-1 overflow-auto min-w-0">
         <div className="lg:hidden sticky top-0 z-30 bg-card border-b border-border px-4 py-3 flex items-center gap-3">
           <button onClick={openSidebar} className="p-2 hover:bg-muted rounded-lg">
             <Menu className="w-5 h-5" />

@@ -3,6 +3,7 @@
  * Each group has:
  *  - a landing route (hubPath) that redirects to `defaultPath`
  *  - a list of tabs; on any member path the top tab bar renders
+ *  - an optional list of `sections` used to visually group tabs under labels
  *
  * The sidebar highlights the hub whenever the user is on any member path.
  */
@@ -11,13 +12,66 @@ export interface HubTabDef {
   path: string;
 }
 
+export interface HubSectionDef {
+  label: string;
+  tabs: HubTabDef[];
+}
+
 export interface HubGroup {
   id: string;
   hubPath: string;
   title: string;
   defaultPath: string;
   tabs: HubTabDef[];
+  /** Optional visual grouping for the tab bar (labels + subsets of `tabs`). */
+  sections?: HubSectionDef[];
 }
+
+const marketingSections: HubSectionDef[] = [
+  {
+    label: "Marketing Commands",
+    tabs: [
+      { label: "Email Campaigns", path: "/admin/email-campaigns" },
+      { label: "Notifications", path: "/admin/notifications" },
+      { label: "Hot Sale", path: "/admin/hot-sale" },
+    ],
+  },
+  {
+    label: "Marketing Automations",
+    tabs: [
+      { label: "Referrals", path: "/admin/referrals" },
+      { label: "Social Proof", path: "/admin/social-proof" },
+      { label: "Customer Segments", path: "/admin/segments" },
+    ],
+  },
+  {
+    label: "Comms",
+    tabs: [
+      { label: "Chat Histories", path: "/admin/chat-histories" },
+      { label: "WhatsApp Events", path: "/admin/whatsapp-events" },
+    ],
+  },
+];
+
+const settingsSections: HubSectionDef[] = [
+  {
+    label: "Settings",
+    tabs: [
+      { label: "General", path: "/admin/settings-page" },
+      { label: "Staff Permissions", path: "/admin/staff-permissions" },
+      { label: "Security", path: "/admin/security" },
+      { label: "Backup & Reset", path: "/admin/backup" },
+    ],
+  },
+  {
+    label: "Tools",
+    tabs: [
+      { label: "Cloudinary", path: "/admin/cloudinary" },
+      { label: "Inventory Sync", path: "/admin/inventory-sync" },
+      { label: "Content Editor", path: "/admin/content" },
+    ],
+  },
+];
 
 export const HUB_GROUPS: HubGroup[] = [
   {
@@ -64,16 +118,8 @@ export const HUB_GROUPS: HubGroup[] = [
     hubPath: "/admin/marketing-hub",
     title: "Marketing & Comms",
     defaultPath: "/admin/email-campaigns",
-    tabs: [
-      { label: "Email Campaigns", path: "/admin/email-campaigns" },
-      { label: "Notifications", path: "/admin/notifications" },
-      { label: "Hot Sale", path: "/admin/hot-sale" },
-      { label: "Referrals", path: "/admin/referrals" },
-      { label: "Social Proof", path: "/admin/social-proof" },
-      { label: "Customer Segments", path: "/admin/segments" },
-      { label: "Chat Histories", path: "/admin/chat-histories" },
-      { label: "WhatsApp Events", path: "/admin/whatsapp-events" },
-    ],
+    tabs: marketingSections.flatMap((s) => s.tabs),
+    sections: marketingSections,
   },
   {
     id: "tracking",
@@ -96,15 +142,8 @@ export const HUB_GROUPS: HubGroup[] = [
     hubPath: "/admin/settings",
     title: "Settings & Tools",
     defaultPath: "/admin/settings-page",
-    tabs: [
-      { label: "General", path: "/admin/settings-page" },
-      { label: "Staff Permissions", path: "/admin/staff-permissions" },
-      { label: "Security", path: "/admin/security" },
-      { label: "Backup & Reset", path: "/admin/backup" },
-      { label: "Cloudinary", path: "/admin/cloudinary" },
-      { label: "Inventory Sync", path: "/admin/inventory-sync" },
-      { label: "Content Editor", path: "/admin/content" },
-    ],
+    tabs: settingsSections.flatMap((s) => s.tabs),
+    sections: settingsSections,
   },
 ];
 
