@@ -952,6 +952,8 @@ function DraftCard({
             placeholder="Product name (Bangla)"
             value={d.name}
             onChange={(e) => onChange({ name: e.target.value })}
+            className={fieldClass("name")}
+            data-field-error={errorFields.has("name") ? "true" : undefined}
           />
         </div>
       </div>
