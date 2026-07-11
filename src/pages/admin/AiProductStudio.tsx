@@ -187,9 +187,7 @@ export default function AiProductStudio() {
    * the DraftCard can show a chronological list of what failed and why.
    */
   const analyzeOne = useCallback(async (id: string, imageUrl: string) => {
-    // Bump attempts + capture the previous error into history before we
-    // clear it, so a Retry click never overwrites what the admin was
-    // reading a moment ago.
+    const startedAt = Date.now();
     setDrafts((prev) =>
       prev.map((d) => {
         if (d.id !== id) return d;
@@ -200,12 +198,14 @@ export default function AiProductStudio() {
           error: undefined,
           errorHistory: nextHistory,
           attempts: d.attempts + 1,
+          analyzeStartedAt: startedAt,
+          analyzeEndedAt: undefined,
         };
       }),
     );
 
     if (cancelRef.current) {
-      updateDraft(id, { status: "error", error: "Cancelled before analysis started" });
+      updateDraft(id, { status: "cancelled", error: "Cancelled before analysis started", analyzeEndedAt: Date.now() });
       return;
     }
     try {
@@ -216,6 +216,7 @@ export default function AiProductStudio() {
       const d = data?.draft || {};
       updateDraft(id, {
         status: "ready",
+        analyzeEndedAt: Date.now(),
         name: d.name || "",
         category: d.category || "Abaya",
         subcategory: d.subcategory || "",
@@ -234,10 +235,11 @@ export default function AiProductStudio() {
       });
     } catch (e: any) {
       const msg = e?.message || String(e);
-      updateDraft(id, { status: "error", error: msg });
+      updateDraft(id, { status: "error", error: msg, analyzeEndedAt: Date.now() });
       toast.error(`AI বিশ্লেষণে ব্যর্থ: ${msg}`);
     }
   }, [updateDraft]);
+
 
   /**
    * Worker-pool driven bulk upload. `concurrency` decides how many files
