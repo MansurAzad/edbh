@@ -30,6 +30,10 @@ const PopularCategoriesCarousel = lazy(() => import("@/components/home/PopularCa
 const HotSale = lazy(() => import("@/components/home/HotSale"));
 const TrustGuaranteeBanner = lazy(() => import("@/components/marketing/TrustGuaranteeBanner"));
 const FloatingContactButtons = lazy(() => import("@/components/layout/FloatingContactButtons"));
+const DubaiImportedProof = lazy(() => import("@/components/home/DubaiImportedProof"));
+const PriceQuickShop = lazy(() => import("@/components/home/PriceQuickShop"));
+const ShowroomLocation = lazy(() => import("@/components/home/ShowroomLocation"));
+const DeliveryReturnStrip = lazy(() => import("@/components/home/DeliveryReturnStrip"));
 
 
 const SectionLoader = () => (
@@ -107,6 +111,8 @@ const Index = () => {
       <main>
         {isActive("hero_banner") && <HeroSection />}
         <Suspense fallback={<SectionLoader />}>
+          <DeliveryReturnStrip />
+          <PriceQuickShop />
           {orderedBodySections.map((section) => {
             const Component = sectionComponents[section.section_key];
             if (!Component) return null;
@@ -115,6 +121,8 @@ const Index = () => {
               : {};
             return <div key={section.id} className="below-fold-section"><Component {...props} /></div>;
           })}
+          <DubaiImportedProof />
+          <ShowroomLocation />
         </Suspense>
       </main>
       <Footer />
