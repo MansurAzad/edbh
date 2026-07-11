@@ -120,6 +120,10 @@ interface Draft {
   meta_title: string;
   meta_description: string;
   image_alt_text: string;
+  /** Which provider/model produced the current draft (set after a successful analyze). */
+  providerUsed?: { name: string; model: string };
+  /** Per-attempt trace from the edge function (all providers tried, in order). */
+  providerTrace?: Array<{ name: string; model: string; ok: boolean; status?: number; latency_ms: number; error?: string }>;
 }
 
 async function sha256Hex(file: File): Promise<string> {
