@@ -69,8 +69,8 @@ Set sale_price_bdt slightly lower (5-15% off) only for premium items, otherwise 
 
 Return ONLY the JSON object.`;
 
-async function analyze(imageUrl: string, hint?: string): Promise<any> {
 type Candidate = { name: string; url: string; headers: Record<string, string>; model: string };
+
 
 async function buildCandidates(supabase: any): Promise<Candidate[]> {
   const candidates: Candidate[] = [];
