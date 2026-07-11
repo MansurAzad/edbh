@@ -21,6 +21,7 @@ import BackInStockAlert from "@/components/shop/BackInStockAlert";
 import { useRecentlyViewed } from "@/hooks/useRecentlyViewed";
 import StockCountdown from "@/components/marketing/StockCountdown";
 import WhatsAppOrderButton from "@/components/marketing/WhatsAppOrderButton";
+import MessengerOrderButton from "@/components/marketing/MessengerOrderButton";
 import FlashSaleTimer from "@/components/marketing/FlashSaleTimer";
 import SEOHead from "@/components/seo/SEOHead";
 import { buildProductSeo, buildProductJsonLd } from "@/lib/seo/config";
