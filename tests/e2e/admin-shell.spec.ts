@@ -198,4 +198,99 @@ test.describe("admin shell", () => {
       expect(await page.evaluate(() => window.scrollY)).toBe(0);
     }
   });
+
+  test("route change: window scrollY stays 0 and sticky header does not jump", async ({ page }) => {
+    test.skip(!(await isAdminReachable(page)), "admin session required");
+    await page.goto(`${BASE_URL}/admin/email-campaigns`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(400);
+
+    const header = page.getByTestId("admin-page-header");
+    const before = await header.boundingBox();
+    const yBefore = await page.evaluate(() => window.scrollY);
+
+    // Navigate to a sibling tab under the same hub.
+    await page.locator('[data-tab-path="/admin/notifications"]').first().click();
+    await page.waitForURL(/\/admin\/notifications$/);
+    await page.waitForTimeout(200);
+
+    const after = await header.boundingBox();
+    const yAfter = await page.evaluate(() => window.scrollY);
+
+    // Window scroll position unchanged; sticky header pinned to identical y/x.
+    expect(yAfter).toBe(yBefore);
+    expect(after?.y ?? -1).toBeCloseTo(before?.y ?? 0, 0);
+    expect(after?.x ?? -1).toBeCloseTo(before?.x ?? 0, 0);
+    expect(after?.height ?? -1).toBeCloseTo(before?.height ?? 0, 0);
+  });
+
+  test("z-index: sticky header sits above content but under sidebar overlay/menus", async ({ page }) => {
+    test.skip(!(await isAdminReachable(page)), "admin session required");
+    await page.goto(`${BASE_URL}/admin/whatsapp-events`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(400);
+
+    // Header z-index must be a positive stacking context so content scrolls under it.
+    const headerZ = await page.getByTestId("admin-page-header").evaluate((el) =>
+      parseInt(getComputedStyle(el).zIndex || "0", 10),
+    );
+    expect(headerZ).toBeGreaterThanOrEqual(20);
+
+    // Radix/portal dropdowns render at z >= 50 — must outrank header so menus don't clip.
+    const sidebarZ = await page.getByTestId("admin-sidebar").evaluate((el) =>
+      parseInt(getComputedStyle(el).zIndex || "0", 10),
+    );
+    expect(sidebarZ).toBeGreaterThan(headerZ);
+
+    // Element at a point just below the header top should be the header (not content).
+    const box = await page.getByTestId("admin-page-header").boundingBox();
+    if (box) {
+      const hit = await page.evaluate(
+        ({ x, y }) => {
+          const el = document.elementFromPoint(x, y) as HTMLElement | null;
+          return el?.closest('[data-testid="admin-page-header"]') ? "header" : "other";
+        },
+        { x: box.x + box.width / 2, y: box.y + 4 },
+      );
+      expect(hit).toBe("header");
+    }
+  });
+
+  test("mobile: header + hub tab bar stay pinned with no overlap/shift", async ({ page }) => {
+    test.skip(!(await isAdminReachable(page)), "admin session required");
+    await page.setViewportSize({ width: 390, height: 780 });
+    await page.goto(`${BASE_URL}/admin/whatsapp-events`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(400);
+
+    const mobileHeader = page.locator('main[data-testid="admin-main"] > div').first();
+    const hubHeader = page.getByTestId("admin-page-header");
+    const main = page.getByTestId("admin-main");
+
+    const mobBefore = await mobileHeader.boundingBox();
+    const hubBefore = await hubHeader.boundingBox();
+
+    // Mobile header pinned to top of main (y ≈ 0), hub header sits directly below.
+    expect(mobBefore?.y ?? -1).toBeLessThan(4);
+    expect(hubBefore?.y ?? -1).toBeGreaterThanOrEqual((mobBefore?.height ?? 0) - 2);
+    // No horizontal overlap/shift: same x, same width as main.
+    const mainBox = await main.boundingBox();
+    expect(hubBefore?.x ?? -1).toBeCloseTo(mainBox?.x ?? 0, 0);
+    expect(hubBefore?.width ?? -1).toBeCloseTo(mainBox?.width ?? 0, 0);
+
+    // Scroll the main content and confirm neither header shifts.
+    await main.evaluate((el) => el.scrollTo({ top: 900 }));
+    await page.waitForTimeout(150);
+    const mobAfter = await mobileHeader.boundingBox();
+    const hubAfter = await hubHeader.boundingBox();
+    expect(mobAfter?.y ?? -1).toBeCloseTo(mobBefore?.y ?? 0, 0);
+    expect(hubAfter?.y ?? -1).toBeCloseTo(hubBefore?.y ?? 0, 0);
+
+    // Content is padded so it does not start underneath the sticky headers.
+    const content = page.getByTestId("admin-page-content");
+    const contentBox = await content.boundingBox();
+    const stickyBottom = (hubAfter?.y ?? 0) + (hubAfter?.height ?? 0);
+    // Content top should not visually overlap the sticky hub header bottom edge.
+    expect((contentBox?.y ?? 0) + 4).toBeGreaterThanOrEqual(stickyBottom - 2);
+
+    // Window scroll never leaks.
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
 });
