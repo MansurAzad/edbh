@@ -3,14 +3,22 @@
  *
  * Flow:
  *  1. Admin uploads N images (drag/drop or picker). Each image is compressed +
- *     uploaded to Supabase Storage (`product-images` bucket).
+ *     uploaded to Supabase Storage (`product-images` bucket) with a live
+ *     per-image progress bar.
  *  2. For each uploaded image the browser calls the `analyze-product-image`
  *     edge function which returns a full product draft (Bangla name, category,
- *     fabric, work type, colors, price, description, SEO...).
- *  3. Admin can edit any field inline, then bulk-save. Saved rows are inserted
- *     into `products` with stock=10 and sizes=52,54,56,58 by default.
+ *     fabric, work type, colors, price, description, SEO...). If analysis
+ *     fails the image shows an error banner with Retry / Remove.
+ *  3. Category / Subcategory / Fabric / Work Type are rendered as Select
+ *     dropdowns backed by the existing products' option pool
+ *     (`useProductFieldSuggestions`) — same values the manual Add Product form
+ *     uses. Sizes render as toggle chips (52-58 default) and stock is a
+ *     number input. Admin can edit every field, then bulk-save.
+ *  4. A live status strip at the top summarises uploading / analysing /
+ *     ready / saving / saved / failed counts. When all rows finish, a summary
+ *     card highlights how many saved and how many failed.
  */
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadProductImage } from "@/lib/storage-upload";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -21,13 +29,33 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
-import { Sparkles, Upload, Loader2, X, RefreshCw, Save, ImagePlus } from "lucide-react";
+import {
+  Sparkles,
+  Upload,
+  Loader2,
+  X,
+  RefreshCw,
+  Save,
+  ImagePlus,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useProductFieldSuggestions } from "@/hooks/admin/useProductFieldSuggestions";
 
 const DEFAULT_SIZES = ["52", "54", "56", "58"];
+const SIZE_POOL = ["50", "52", "54", "56", "58", "60", "62"];
 const DEFAULT_STOCK = 10;
 const MAX_IMAGES = 20;
+const NEW_VALUE = "__new__";
 
 type DraftStatus = "uploading" | "analyzing" | "ready" | "saving" | "saved" | "error";
 
@@ -47,8 +75,8 @@ interface Draft {
   part: string;
   hijab_included: boolean;
   inner_included: boolean;
-  colors: string; // comma sep for editing
-  sizes: string; // comma sep
+  colors: string; // comma sep
+  sizes: string[];
   stock: number;
   price: number;
   sale_price: number | null;
@@ -78,7 +106,7 @@ function emptyDraft(id: string, imageUrl: string, file?: File): Draft {
     hijab_included: false,
     inner_included: false,
     colors: "",
-    sizes: DEFAULT_SIZES.join(","),
+    sizes: [...DEFAULT_SIZES],
     stock: DEFAULT_STOCK,
     price: 0,
     sale_price: null,
@@ -94,6 +122,7 @@ export default function AiProductStudio() {
   const [globalBusy, setGlobalBusy] = useState(false);
   const dragRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const { data: suggestions } = useProductFieldSuggestions();
 
   const updateDraft = useCallback((id: string, patch: Partial<Draft>) => {
     setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
@@ -142,7 +171,6 @@ export default function AiProductStudio() {
     setGlobalBusy(true);
     for (const file of imgs) {
       const id = newId();
-      // Placeholder draft while uploading
       setDrafts((prev) => [
         ...prev,
         { ...emptyDraft(id, "", file), status: "uploading", progress: 0 },
@@ -157,7 +185,6 @@ export default function AiProductStudio() {
         continue;
       }
       updateDraft(id, { imageUrl: res.url, progress: 100 });
-      // Fire AI analysis (do not await sequentially — parallel)
       analyzeOne(id, res.url);
     }
     setGlobalBusy(false);
@@ -201,7 +228,7 @@ export default function AiProductStudio() {
         part: d.part || null,
         hijab_included: d.hijab_included,
         inner_included: d.inner_included,
-        sizes: d.sizes.split(",").map((s) => s.trim()).filter(Boolean),
+        sizes: d.sizes,
         colors: d.colors.split(",").map((c) => c.trim()).filter(Boolean),
         featured: false,
         image_url: d.imageUrl,
@@ -240,12 +267,19 @@ export default function AiProductStudio() {
     }
   }, [drafts, saveOne, queryClient]);
 
-  const readyCount = drafts.filter((d) => d.status === "ready").length;
-  const savedCount = drafts.filter((d) => d.status === "saved").length;
+  const counts = useMemo(() => {
+    const c = { uploading: 0, analyzing: 0, ready: 0, saving: 0, saved: 0, error: 0 };
+    for (const d of drafts) c[d.status]++;
+    return c;
+  }, [drafts]);
+
+  const total = drafts.length;
+  const inFlight = counts.uploading + counts.analyzing + counts.saving;
+  const showSummary = total > 0 && inFlight === 0 && (counts.saved > 0 || counts.error > 0);
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
+      <div className="space-y-6" data-testid="ai-studio-root">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-2xl font-display font-bold flex items-center gap-2">
@@ -258,14 +292,49 @@ export default function AiProductStudio() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">Ready: {readyCount}</Badge>
-            <Badge variant="secondary">Saved: {savedCount}</Badge>
-            <Button onClick={saveAll} disabled={!readyCount || globalBusy}>
+            <Button onClick={saveAll} disabled={!counts.ready || globalBusy} data-testid="save-all">
               {globalBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-              Save All ({readyCount})
+              Save All ({counts.ready})
             </Button>
           </div>
         </div>
+
+        {/* Live status strip */}
+        {total > 0 && (
+          <Card className="p-3" aria-live="polite" data-testid="status-strip">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge variant="secondary">Total: {total}</Badge>
+              {counts.uploading > 0 && <Badge className="bg-muted">Uploading: {counts.uploading}</Badge>}
+              {counts.analyzing > 0 && (
+                <Badge className="bg-blue-500/10 text-blue-700">
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin inline" /> Analysing: {counts.analyzing}
+                </Badge>
+              )}
+              <Badge className="bg-green-500/10 text-green-700">Ready: {counts.ready}</Badge>
+              {counts.saving > 0 && <Badge className="bg-yellow-500/10 text-yellow-700">Saving: {counts.saving}</Badge>}
+              <Badge className="bg-primary/10 text-primary">Saved: {counts.saved}</Badge>
+              {counts.error > 0 && (
+                <Badge className="bg-destructive/10 text-destructive">Failed: {counts.error}</Badge>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* Summary card when all work is complete */}
+        {showSummary && (
+          <Card className="p-4 border-primary/30" data-testid="summary-card">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-6 h-6 text-primary" />
+              <div>
+                <p className="font-medium">সব কাজ শেষ</p>
+                <p className="text-sm text-muted-foreground">
+                  {counts.saved}টি প্রোডাক্ট সফলভাবে যুক্ত হয়েছে
+                  {counts.error > 0 ? `, ${counts.error}টি ছবিতে সমস্যা — retry করুন বা remove করুন।` : "।"}
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Upload zone */}
         <Card
@@ -293,6 +362,7 @@ export default function AiProductStudio() {
               <DraftCard
                 key={d.id}
                 draft={d}
+                suggestions={suggestions}
                 onChange={(patch) => updateDraft(d.id, patch)}
                 onRemove={() => removeDraft(d.id)}
                 onReanalyze={() => d.imageUrl && analyzeOne(d.id, d.imageUrl)}
@@ -306,14 +376,67 @@ export default function AiProductStudio() {
   );
 }
 
+/**
+ * SelectWithNew — a Select that also lets the admin type a brand-new value
+ * when their AI-generated option isn't already in the pool. We keep the
+ * choice controlled by the parent's string state so it round-trips into the
+ * DB insert exactly like the manual Add Product form's datalist input.
+ */
+function SelectWithNew({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+}) {
+  const inPool = value && options.includes(value);
+  // If the AI produced a value that isn't yet in the pool we still want to
+  // show it as the selected item; merge it in for this render.
+  const merged = inPool || !value ? options : [value, ...options];
+  return (
+    <div className="space-y-1">
+      <Select
+        value={value || undefined}
+        onValueChange={(v) => {
+          if (v === NEW_VALUE) return;
+          onChange(v);
+        }}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent className="max-h-64">
+          {merged.map((opt) => (
+            <SelectItem key={opt} value={opt}>
+              {opt}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={`Or type a new ${placeholder.toLowerCase()}`}
+        className="h-7 text-xs"
+      />
+    </div>
+  );
+}
+
 function DraftCard({
   draft: d,
+  suggestions,
   onChange,
   onRemove,
   onReanalyze,
   onSave,
 }: {
   draft: Draft;
+  suggestions?: ReturnType<typeof useProductFieldSuggestions>["data"];
   onChange: (p: Partial<Draft>) => void;
   onRemove: () => void;
   onReanalyze: () => void;
@@ -328,8 +451,26 @@ function DraftCard({
     error: "bg-destructive/10 text-destructive",
   };
 
+  const categoryOptions = suggestions?.categories ?? [];
+  const subOptions = d.category
+    ? suggestions?.subcategoriesByCategory[d.category] ?? []
+    : [];
+  const fabricOptions = suggestions?.fabrics ?? [];
+  const workOptions = suggestions?.workTypes ?? [];
+
+  const toggleSize = (s: string) => {
+    const next = d.sizes.includes(s) ? d.sizes.filter((x) => x !== s) : [...d.sizes, s].sort();
+    onChange({ sizes: next });
+  };
+
+  const isFailed = d.status === "error";
+
   return (
-    <Card className="p-4 space-y-3">
+    <Card
+      className={`p-4 space-y-3 ${isFailed ? "border-destructive/40" : ""}`}
+      data-testid="draft-card"
+      data-status={d.status}
+    >
       <div className="flex gap-3">
         <div className="w-32 h-32 flex-shrink-0 rounded-md overflow-hidden bg-muted relative">
           {d.imageUrl ? (
@@ -343,72 +484,192 @@ function DraftCard({
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <Badge className={statusColor[d.status]} variant="secondary">
-              {d.status === "analyzing" && <Loader2 className="w-3 h-3 mr-1 animate-spin inline" />}
+              {(d.status === "analyzing" || d.status === "saving") && (
+                <Loader2 className="w-3 h-3 mr-1 animate-spin inline" />
+              )}
               {d.status}
             </Badge>
             <div className="flex gap-1">
-              <Button size="sm" variant="ghost" onClick={onReanalyze} disabled={!d.imageUrl || d.status === "analyzing"}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onReanalyze}
+                disabled={!d.imageUrl || d.status === "analyzing"}
+                data-testid="retry-btn"
+                title="Re-analyse"
+              >
                 <RefreshCw className="w-4 h-4" />
               </Button>
-              <Button size="sm" variant="ghost" onClick={onRemove}>
+              <Button size="sm" variant="ghost" onClick={onRemove} data-testid="remove-btn" title="Remove">
                 <X className="w-4 h-4" />
               </Button>
             </div>
           </div>
           {d.status === "uploading" && <Progress value={d.progress} className="h-2" />}
-          {d.error && <p className="text-xs text-destructive">{d.error}</p>}
+          {isFailed && (
+            <div
+              className="rounded border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive space-y-2"
+              role="alert"
+            >
+              <div className="flex items-start gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <span className="break-all">{d.error || "Unknown error"}</span>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={onReanalyze} disabled={!d.imageUrl}>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1" /> Retry
+                </Button>
+                <Button size="sm" variant="ghost" onClick={onRemove}>
+                  <X className="w-3.5 h-3.5 mr-1" /> Remove
+                </Button>
+              </div>
+            </div>
+          )}
           <Input
             placeholder="Product name (Bangla)"
             value={d.name}
             onChange={(e) => onChange({ name: e.target.value })}
           />
-          <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="Category" value={d.category} onChange={(e) => onChange({ category: e.target.value })} />
-            <Input placeholder="Subcategory" value={d.subcategory} onChange={(e) => onChange({ subcategory: e.target.value })} />
-          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Category</Label>
+          <SelectWithNew
+            value={d.category}
+            onChange={(v) => onChange({ category: v })}
+            options={categoryOptions}
+            placeholder="Category"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Subcategory</Label>
+          <SelectWithNew
+            value={d.subcategory}
+            onChange={(v) => onChange({ subcategory: v })}
+            options={subOptions}
+            placeholder="Subcategory"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Fabric</Label>
+          <SelectWithNew
+            value={d.fabric}
+            onChange={(v) => onChange({ fabric: v })}
+            options={fabricOptions}
+            placeholder="Fabric"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Work Type</Label>
+          <SelectWithNew
+            value={d.work_type}
+            onChange={(v) => onChange({ work_type: v })}
+            options={workOptions}
+            placeholder="Work"
+          />
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <div>
-          <Label className="text-xs">Fabric</Label>
-          <Input value={d.fabric} onChange={(e) => onChange({ fabric: e.target.value })} />
-        </div>
-        <div>
-          <Label className="text-xs">Work</Label>
-          <Input value={d.work_type} onChange={(e) => onChange({ work_type: e.target.value })} />
-        </div>
-        <div>
           <Label className="text-xs">Part</Label>
           <Input value={d.part} onChange={(e) => onChange({ part: e.target.value })} />
         </div>
         <div>
-          <Label className="text-xs">Stock</Label>
-          <Input type="number" value={d.stock} onChange={(e) => onChange({ stock: Number(e.target.value) || 0 })} />
-        </div>
-        <div className="col-span-2">
-          <Label className="text-xs">Colors (comma-separated)</Label>
-          <Input value={d.colors} onChange={(e) => onChange({ colors: e.target.value })} />
-        </div>
-        <div className="col-span-2">
-          <Label className="text-xs">Sizes</Label>
-          <Input value={d.sizes} onChange={(e) => onChange({ sizes: e.target.value })} />
+          <Label className="text-xs">Stock qty</Label>
+          <Input
+            type="number"
+            min={0}
+            value={d.stock}
+            onChange={(e) => onChange({ stock: Math.max(0, Number(e.target.value) || 0) })}
+            data-testid="stock-input"
+          />
         </div>
         <div>
           <Label className="text-xs">Price ৳</Label>
-          <Input type="number" value={d.price} onChange={(e) => onChange({ price: Number(e.target.value) || 0 })} />
+          <Input
+            type="number"
+            value={d.price}
+            onChange={(e) => onChange({ price: Number(e.target.value) || 0 })}
+          />
         </div>
         <div>
           <Label className="text-xs">Sale ৳</Label>
-          <Input type="number" value={d.sale_price ?? ""} onChange={(e) => onChange({ sale_price: e.target.value ? Number(e.target.value) : null })} />
+          <Input
+            type="number"
+            value={d.sale_price ?? ""}
+            onChange={(e) =>
+              onChange({ sale_price: e.target.value ? Number(e.target.value) : null })
+            }
+          />
         </div>
+      </div>
+
+      <div>
+        <Label className="text-xs">Sizes (52–58 default)</Label>
+        <div className="flex flex-wrap gap-1.5 mt-1" data-testid="size-chips">
+          {SIZE_POOL.map((s) => {
+            const active = d.sizes.includes(s);
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => toggleSize(s)}
+                className={`px-2.5 py-1 rounded-md text-xs border transition-colors ${
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background hover:bg-muted border-input"
+                }`}
+                aria-pressed={active}
+              >
+                {s}"
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <Label className="text-xs">Colors (comma-separated)</Label>
+        <Input value={d.colors} onChange={(e) => onChange({ colors: e.target.value })} />
+        {suggestions?.colors?.length ? (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {suggestions.colors.slice(0, 12).map((c) => (
+              <button
+                key={c}
+                type="button"
+                className="px-2 py-0.5 rounded text-[11px] border hover:bg-muted"
+                onClick={() => {
+                  const existing = d.colors.split(",").map((x) => x.trim()).filter(Boolean);
+                  if (existing.includes(c)) return;
+                  onChange({ colors: [...existing, c].join(", ") });
+                }}
+              >
+                + {c}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex gap-4">
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={d.hijab_included} onChange={(e) => onChange({ hijab_included: e.target.checked })} />
-          Hijab
+          <input
+            type="checkbox"
+            checked={d.hijab_included}
+            onChange={(e) => onChange({ hijab_included: e.target.checked })}
+          />
+          Hijab included
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={d.inner_included} onChange={(e) => onChange({ inner_included: e.target.checked })} />
-          Inner
+          <input
+            type="checkbox"
+            checked={d.inner_included}
+            onChange={(e) => onChange({ inner_included: e.target.checked })}
+          />
+          Inner included
         </label>
       </div>
 
