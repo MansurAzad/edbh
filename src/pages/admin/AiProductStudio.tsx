@@ -436,7 +436,7 @@ export default function AiProductStudio() {
   }, [drafts, saveOne, queryClient]);
 
   const counts = useMemo(() => {
-    const c = { uploading: 0, analyzing: 0, ready: 0, saving: 0, saved: 0, error: 0 };
+    const c = { queued: 0, uploading: 0, analyzing: 0, ready: 0, saving: 0, saved: 0, error: 0, cancelled: 0 };
     for (const d of drafts) c[d.status]++;
     return c;
   }, [drafts]);
@@ -447,8 +447,9 @@ export default function AiProductStudio() {
   );
 
   const total = drafts.length;
-  const inFlight = counts.uploading + counts.analyzing + counts.saving;
-  const showSummary = total > 0 && inFlight === 0 && (counts.saved > 0 || counts.error > 0);
+  const inFlight = counts.queued + counts.uploading + counts.analyzing + counts.saving;
+  const showSummary = total > 0 && inFlight === 0 && (counts.saved > 0 || counts.error > 0 || counts.cancelled > 0);
+
 
   return (
     <AdminLayout>
