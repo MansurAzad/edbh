@@ -277,7 +277,7 @@ export default function AiProductStudio() {
       updateDraft(id, { status: "error", error: msg, analyzeEndedAt: Date.now() });
       toast.error(`AI বিশ্লেষণে ব্যর্থ: ${msg}`);
     }
-  }, [updateDraft]);
+  }, [updateDraft, rules]);
 
 
   /**
