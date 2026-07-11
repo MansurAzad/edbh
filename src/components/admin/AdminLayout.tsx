@@ -41,6 +41,10 @@ const NavItem = memo(forwardRef<HTMLAnchorElement, {
     ref={ref}
     to={path}
     onClick={onClick}
+    data-testid="admin-sidebar-item"
+    data-path={path}
+    data-active={isActive ? "true" : "false"}
+    aria-current={isActive ? "page" : undefined}
     className={cn(
       "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
       isActive
