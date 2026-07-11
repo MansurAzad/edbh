@@ -649,12 +649,14 @@ function DraftCard({
   onSave: () => void;
 }) {
   const statusColor: Record<DraftStatus, string> = {
+    queued: "bg-muted text-muted-foreground",
     uploading: "bg-muted",
     analyzing: "bg-blue-500/10 text-blue-600",
     ready: "bg-green-500/10 text-green-700",
     saving: "bg-yellow-500/10 text-yellow-700",
     saved: "bg-primary/10 text-primary",
     error: "bg-destructive/10 text-destructive",
+    cancelled: "bg-muted text-muted-foreground",
   };
 
   const categoryOptions = suggestions?.categories ?? [];
