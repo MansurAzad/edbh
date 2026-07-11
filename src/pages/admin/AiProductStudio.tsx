@@ -849,7 +849,7 @@ function DraftCard({
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           )}
-        </div>
+        </button>
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
