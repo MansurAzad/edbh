@@ -1,8 +1,8 @@
 import { ReactNode, useState, memo, useCallback, forwardRef, lazy, Suspense, useMemo, useEffect } from "react";
 import { Link, useLocation, Navigate } from "react-router-dom";
 import {
-  LayoutDashboard, Package, ShoppingCart, Users, Star, Settings,
-  LogOut, ChevronLeft, Tag, BarChart3, RotateCcw, Truck,
+  LayoutDashboard, Package, ShoppingCart, Users, Settings,
+  LogOut, ChevronLeft, BarChart3, Truck,
   FileText, Menu, X, ClipboardCheck, Megaphone, Activity,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
@@ -22,15 +22,11 @@ const navItems = [
   { path: "/admin", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/admin/business-audit", icon: ClipboardCheck, label: "Business Audit" },
   { path: "/admin/homepage", icon: FileText, label: "Homepage Sections" },
-  { path: "/admin/categories", icon: Tag, label: "Categories" },
   { path: "/admin/blog", icon: FileText, label: "Blog Posts" },
   { path: "/admin/products", icon: Package, label: "Products" },
   { path: "/admin/orders", icon: ShoppingCart, label: "Orders" },
   { path: "/admin/customers", icon: Users, label: "Customers" },
-  { path: "/admin/reviews", icon: Star, label: "Reviews" },
-  { path: "/admin/coupons", icon: Tag, label: "Coupons" },
   { path: "/admin/reports", icon: BarChart3, label: "Advanced Reports" },
-  { path: "/admin/returns", icon: RotateCcw, label: "Returns" },
   // Grouped hub pages
   { path: "/admin/shipping-hub", icon: Truck, label: "Shipping & Courier" },
   { path: "/admin/marketing-hub", icon: Megaphone, label: "Marketing & Comms" },
