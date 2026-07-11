@@ -31,12 +31,26 @@ const FloatingContactButtons = () => {
               <span className="text-sm font-medium">WhatsApp</span>
             </motion.a>
             <motion.a
+              href={MESSENGER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackContact("messenger")}
+              initial={{ opacity: 0, y: 20, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.8 }}
+              transition={{ delay: 0.08 }}
+              className="flex items-center gap-2 rounded-full bg-[#0084FF] hover:bg-[#006edc] text-white px-4 py-2.5 shadow-lg transition-colors"
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span className="text-sm font-medium">Messenger</span>
+            </motion.a>
+            <motion.a
               href={CALL_URL}
               onClick={() => trackContact("call")}
               initial={{ opacity: 0, y: 20, scale: 0.8 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.8 }}
-              transition={{ delay: 0.1 }}
+              transition={{ delay: 0.12 }}
               className="flex items-center gap-2 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 shadow-lg transition-colors"
             >
               <Phone className="w-5 h-5" />
