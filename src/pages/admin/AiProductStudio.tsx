@@ -1,22 +1,22 @@
 /**
  * AI Product Studio — bulk image upload → AI-generated product drafts → save.
  *
- * Flow:
- *  1. Admin uploads N images (drag/drop or picker). Each image is compressed +
- *     uploaded to Supabase Storage (`product-images` bucket) with a live
- *     per-image progress bar.
- *  2. For each uploaded image the browser calls the `analyze-product-image`
- *     edge function which returns a full product draft (Bangla name, category,
- *     fabric, work type, colors, price, description, SEO...). If analysis
- *     fails the image shows an error banner with Retry / Remove.
- *  3. Category / Subcategory / Fabric / Work Type are rendered as Select
- *     dropdowns backed by the existing products' option pool
- *     (`useProductFieldSuggestions`) — same values the manual Add Product form
- *     uses. Sizes render as toggle chips (52-58 default) and stock is a
- *     number input. Admin can edit every field, then bulk-save.
- *  4. A live status strip at the top summarises uploading / analysing /
- *     ready / saving / saved / failed counts. When all rows finish, a summary
- *     card highlights how many saved and how many failed.
+ * Highlights (this revision):
+ *  - Configurable **parallelism** (1–6): a worker pool decides how many
+ *    uploads/analyses run concurrently. Prevents rate-limits and lets the
+ *    admin trade speed for stability.
+ *  - **Cancel** button while work is in-flight: stops new tasks from starting
+ *    and marks queued drafts as error("Cancelled"). In-flight uploads finish
+ *    naturally (their fetch has no signal wired), but their analyse call is
+ *    skipped once cancel is pressed.
+ *  - **Retry preserves history**: each attempt bumps `attempts` and pushes the
+ *    prior error into `errorHistory`, so admins can see exactly what failed
+ *    on each try when they Retry a card.
+ *  - **Inline validation** before Save All: every draft is checked for the
+ *    mandatory Product-form fields (name, category, price, at least one
+ *    size, positive stock). Missing fields show as a coloured inline banner
+ *    on the card and a top-level summary; invalid drafts are skipped in the
+ *    bulk save with an explanatory toast.
  */
 import { useState, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +47,8 @@ import {
   ImagePlus,
   AlertTriangle,
   CheckCircle2,
+  StopCircle,
+  History,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProductFieldSuggestions } from "@/hooks/admin/useProductFieldSuggestions";
@@ -55,7 +57,7 @@ const DEFAULT_SIZES = ["52", "54", "56", "58"];
 const SIZE_POOL = ["50", "52", "54", "56", "58", "60", "62"];
 const DEFAULT_STOCK = 10;
 const MAX_IMAGES = 20;
-const NEW_VALUE = "__new__";
+const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 6];
 
 type DraftStatus = "uploading" | "analyzing" | "ready" | "saving" | "saved" | "error";
 
@@ -65,6 +67,10 @@ interface Draft {
   imageUrl: string;
   status: DraftStatus;
   error?: string;
+  /** Every failed attempt appended here so the admin sees the full retry history. */
+  errorHistory: string[];
+  /** Number of times AI analysis has been attempted (0 before first run). */
+  attempts: number;
   progress: number;
   // AI fields
   name: string;
@@ -96,6 +102,8 @@ function emptyDraft(id: string, imageUrl: string, file?: File): Draft {
     file,
     imageUrl,
     status: "analyzing",
+    errorHistory: [],
+    attempts: 0,
     progress: 0,
     name: "",
     category: "Abaya",
@@ -117,19 +125,67 @@ function emptyDraft(id: string, imageUrl: string, file?: File): Draft {
   };
 }
 
+/**
+ * Required-field check that mirrors ProductFormDialog + the DB NOT NULL
+ * constraints. Returns human-readable Bangla labels for anything missing.
+ */
+export function validateDraft(d: Draft): string[] {
+  const missing: string[] = [];
+  if (!d.name.trim()) missing.push("Name");
+  if (!d.category.trim()) missing.push("Category");
+  if (!d.price || d.price <= 0) missing.push("Price (>0)");
+  if (!d.sizes || d.sizes.length === 0) missing.push("At least 1 Size");
+  if (d.stock == null || d.stock < 0) missing.push("Stock (≥0)");
+  if (d.sale_price != null && d.sale_price >= d.price) missing.push("Sale < Price");
+  return missing;
+}
+
 export default function AiProductStudio() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [globalBusy, setGlobalBusy] = useState(false);
+  const [concurrency, setConcurrency] = useState(3);
   const dragRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { data: suggestions } = useProductFieldSuggestions();
+
+  /**
+   * Cancellation flag. When the admin clicks Cancel we set this ref → new
+   * queue workers exit their loop and any analyseOne call that hasn't yet
+   * left the client aborts (`shouldSkip` check below). Refs avoid stale
+   * closures inside the pool workers.
+   */
+  const cancelRef = useRef(false);
 
   const updateDraft = useCallback((id: string, patch: Partial<Draft>) => {
     setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
   }, []);
 
+  /**
+   * Run AI analysis on one draft. Preserves error history across retries so
+   * the DraftCard can show a chronological list of what failed and why.
+   */
   const analyzeOne = useCallback(async (id: string, imageUrl: string) => {
-    updateDraft(id, { status: "analyzing", error: undefined });
+    // Bump attempts + capture the previous error into history before we
+    // clear it, so a Retry click never overwrites what the admin was
+    // reading a moment ago.
+    setDrafts((prev) =>
+      prev.map((d) => {
+        if (d.id !== id) return d;
+        const nextHistory = d.error ? [...d.errorHistory, d.error] : d.errorHistory;
+        return {
+          ...d,
+          status: "analyzing",
+          error: undefined,
+          errorHistory: nextHistory,
+          attempts: d.attempts + 1,
+        };
+      }),
+    );
+
+    if (cancelRef.current) {
+      updateDraft(id, { status: "error", error: "Cancelled before analysis started" });
+      return;
+    }
     try {
       const { data, error } = await supabase.functions.invoke("analyze-product-image", {
         body: { imageUrl },
@@ -161,6 +217,12 @@ export default function AiProductStudio() {
     }
   }, [updateDraft]);
 
+  /**
+   * Worker-pool driven bulk upload. `concurrency` decides how many files
+   * simultaneously go through upload → analyse. Each worker pops the next
+   * task off a shared queue until either the queue is empty or Cancel is
+   * pressed. Cancelled/queued tasks are marked as error("Cancelled").
+   */
   const handleFiles = useCallback(async (files: File[]) => {
     const imgs = files.filter((f) => f.type.startsWith("image/"));
     if (!imgs.length) return;
@@ -168,27 +230,64 @@ export default function AiProductStudio() {
       toast.error(`একসাথে সর্বোচ্চ ${MAX_IMAGES}টি ছবি`);
       return;
     }
+    cancelRef.current = false;
     setGlobalBusy(true);
-    for (const file of imgs) {
-      const id = newId();
-      setDrafts((prev) => [
-        ...prev,
-        { ...emptyDraft(id, "", file), status: "uploading", progress: 0 },
-      ]);
-      const res = await uploadProductImage(file, {
-        folder: "ai-studio",
-        onProgress: (e) => updateDraft(id, { progress: e.progress }),
-      });
-      if (!res.success || !res.url) {
-        updateDraft(id, { status: "error", error: res.error || "Upload failed" });
-        toast.error(`আপলোড ব্যর্থ: ${res.error}`);
-        continue;
+
+    // Seed drafts in queued state first so admin sees the full list appear
+    // even at concurrency=1.
+    const jobs: Array<{ id: string; file: File }> = imgs.map((file) => ({
+      id: newId(),
+      file,
+    }));
+    setDrafts((prev) => [
+      ...prev,
+      ...jobs.map((j) => ({ ...emptyDraft(j.id, "", j.file), status: "uploading" as DraftStatus })),
+    ]);
+
+    const queue = [...jobs];
+    const worker = async () => {
+      while (queue.length > 0) {
+        if (cancelRef.current) break;
+        const job = queue.shift()!;
+        try {
+          const res = await uploadProductImage(job.file, {
+            folder: "ai-studio",
+            onProgress: (e) => updateDraft(job.id, { progress: e.progress }),
+          });
+          if (cancelRef.current) {
+            updateDraft(job.id, { status: "error", error: "Cancelled" });
+            continue;
+          }
+          if (!res.success || !res.url) {
+            updateDraft(job.id, { status: "error", error: res.error || "Upload failed" });
+            toast.error(`আপলোড ব্যর্থ: ${res.error}`);
+            continue;
+          }
+          updateDraft(job.id, { imageUrl: res.url, progress: 100 });
+          await analyzeOne(job.id, res.url);
+        } catch (e: any) {
+          updateDraft(job.id, { status: "error", error: e?.message || "Unexpected error" });
+        }
       }
-      updateDraft(id, { imageUrl: res.url, progress: 100 });
-      analyzeOne(id, res.url);
+    };
+
+    const workers = Array.from({ length: Math.max(1, concurrency) }, () => worker());
+    await Promise.all(workers);
+
+    // Any leftover queued job (only possible if cancelled mid-flight) gets
+    // marked so the UI is honest about what didn't run.
+    if (cancelRef.current) {
+      setDrafts((prev) =>
+        prev.map((d) =>
+          d.status === "uploading" || d.status === "analyzing"
+            ? { ...d, status: "error", error: "Cancelled" }
+            : d,
+        ),
+      );
     }
+
     setGlobalBusy(false);
-  }, [drafts.length, analyzeOne, updateDraft]);
+  }, [drafts.length, analyzeOne, updateDraft, concurrency]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -207,9 +306,15 @@ export default function AiProductStudio() {
     setDrafts((prev) => prev.filter((d) => d.id !== id));
   }, []);
 
+  const cancelAll = useCallback(() => {
+    cancelRef.current = true;
+    toast.message("Cancelling — running tasks will stop shortly");
+  }, []);
+
   const saveOne = useCallback(async (d: Draft): Promise<boolean> => {
-    if (!d.name.trim() || !d.category.trim() || !d.price) {
-      toast.error("Name, Category ও Price লাগবে");
+    const missing = validateDraft(d);
+    if (missing.length) {
+      toast.error(`Missing: ${missing.join(", ")}`);
       return false;
     }
     updateDraft(d.id, { status: "saving" });
@@ -253,9 +358,15 @@ export default function AiProductStudio() {
       toast.error("সেভ করার মতো কোনো ready draft নেই");
       return;
     }
+    const valid = ready.filter((d) => validateDraft(d).length === 0);
+    const invalidCount = ready.length - valid.length;
+    if (invalidCount > 0) {
+      toast.warning(`${invalidCount}টি draft-এ বাধ্যতামূলক তথ্য মিসিং — স্কিপ করা হবে`);
+    }
+    if (!valid.length) return;
     setGlobalBusy(true);
     let ok = 0;
-    for (const d of ready) {
+    for (const d of valid) {
       const success = await saveOne(d);
       if (success) ok++;
     }
@@ -272,6 +383,11 @@ export default function AiProductStudio() {
     for (const d of drafts) c[d.status]++;
     return c;
   }, [drafts]);
+
+  const invalidReadyCount = useMemo(
+    () => drafts.filter((d) => d.status === "ready" && validateDraft(d).length > 0).length,
+    [drafts],
+  );
 
   const total = drafts.length;
   const inFlight = counts.uploading + counts.analyzing + counts.saving;
@@ -291,7 +407,29 @@ export default function AiProductStudio() {
               (name, category, fabric, colors, price, description সহ)। Review করে Save All চাপুন।
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs whitespace-nowrap">Parallel</Label>
+              <Select
+                value={String(concurrency)}
+                onValueChange={(v) => setConcurrency(Number(v))}
+                disabled={inFlight > 0}
+              >
+                <SelectTrigger className="h-9 w-20" data-testid="concurrency-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONCURRENCY_OPTIONS.map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {inFlight > 0 && (
+              <Button variant="destructive" onClick={cancelAll} data-testid="cancel-btn">
+                <StopCircle className="w-4 h-4 mr-2" /> Cancel
+              </Button>
+            )}
             <Button onClick={saveAll} disabled={!counts.ready || globalBusy} data-testid="save-all">
               {globalBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
               Save All ({counts.ready})
@@ -316,6 +454,23 @@ export default function AiProductStudio() {
               {counts.error > 0 && (
                 <Badge className="bg-destructive/10 text-destructive">Failed: {counts.error}</Badge>
               )}
+            </div>
+          </Card>
+        )}
+
+        {/* Aggregate validation warning */}
+        {invalidReadyCount > 0 && (
+          <Card
+            className="p-3 border-yellow-500/40 bg-yellow-500/5"
+            role="status"
+            data-testid="validation-summary"
+          >
+            <div className="flex items-start gap-2 text-sm">
+              <AlertTriangle className="w-4 h-4 mt-0.5 text-yellow-700" />
+              <span>
+                <strong>{invalidReadyCount}</strong>টি ready draft-এ বাধ্যতামূলক তথ্য মিসিং।
+                Save All চাপলে সেগুলো স্কিপ হবে — কার্ডে হলুদ warning দেখে ফিল্ডগুলো পূরণ করুন।
+              </span>
             </div>
           </Card>
         )}
@@ -352,6 +507,7 @@ export default function AiProductStudio() {
           </label>
           <p className="text-xs text-muted-foreground mt-3">
             সর্বোচ্চ {MAX_IMAGES}টি ছবি একসাথে (JPG/PNG/WEBP)। প্রতিটি ছবির জন্য একটি product তৈরি হবে।
+            বর্তমান parallel: {concurrency}।
           </p>
         </Card>
 
@@ -378,9 +534,7 @@ export default function AiProductStudio() {
 
 /**
  * SelectWithNew — a Select that also lets the admin type a brand-new value
- * when their AI-generated option isn't already in the pool. We keep the
- * choice controlled by the parent's string state so it round-trips into the
- * DB insert exactly like the manual Add Product form's datalist input.
+ * when their AI-generated option isn't already in the pool.
  */
 function SelectWithNew({
   value,
@@ -394,26 +548,16 @@ function SelectWithNew({
   placeholder: string;
 }) {
   const inPool = value && options.includes(value);
-  // If the AI produced a value that isn't yet in the pool we still want to
-  // show it as the selected item; merge it in for this render.
   const merged = inPool || !value ? options : [value, ...options];
   return (
     <div className="space-y-1">
-      <Select
-        value={value || undefined}
-        onValueChange={(v) => {
-          if (v === NEW_VALUE) return;
-          onChange(v);
-        }}
-      >
+      <Select value={value || undefined} onValueChange={onChange}>
         <SelectTrigger>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent className="max-h-64">
           {merged.map((opt) => (
-            <SelectItem key={opt} value={opt}>
-              {opt}
-            </SelectItem>
+            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -464,10 +608,12 @@ function DraftCard({
   };
 
   const isFailed = d.status === "error";
+  const missing = d.status === "ready" ? validateDraft(d) : [];
+  const hasMissing = missing.length > 0;
 
   return (
     <Card
-      className={`p-4 space-y-3 ${isFailed ? "border-destructive/40" : ""}`}
+      className={`p-4 space-y-3 ${isFailed ? "border-destructive/40" : hasMissing ? "border-yellow-500/40" : ""}`}
       data-testid="draft-card"
       data-status={d.status}
     >
@@ -483,12 +629,19 @@ function DraftCard({
         </div>
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <Badge className={statusColor[d.status]} variant="secondary">
-              {(d.status === "analyzing" || d.status === "saving") && (
-                <Loader2 className="w-3 h-3 mr-1 animate-spin inline" />
+            <div className="flex items-center gap-2">
+              <Badge className={statusColor[d.status]} variant="secondary">
+                {(d.status === "analyzing" || d.status === "saving") && (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin inline" />
+                )}
+                {d.status}
+              </Badge>
+              {d.attempts > 1 && (
+                <Badge variant="outline" className="text-[10px]" title="Attempt count">
+                  <History className="w-3 h-3 mr-1" /> #{d.attempts}
+                </Badge>
               )}
-              {d.status}
-            </Badge>
+            </div>
             <div className="flex gap-1">
               <Button
                 size="sm"
@@ -506,14 +659,19 @@ function DraftCard({
             </div>
           </div>
           {d.status === "uploading" && <Progress value={d.progress} className="h-2" />}
+
+          {/* Current failure banner */}
           {isFailed && (
             <div
               className="rounded border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive space-y-2"
               role="alert"
+              data-testid="error-banner"
             >
               <div className="flex items-start gap-1">
                 <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                <span className="break-all">{d.error || "Unknown error"}</span>
+                <span className="break-all">
+                  <strong>Attempt {d.attempts || 1}:</strong> {d.error || "Unknown error"}
+                </span>
               </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={onReanalyze} disabled={!d.imageUrl}>
@@ -525,6 +683,24 @@ function DraftCard({
               </div>
             </div>
           )}
+
+          {/* Persistent history of previous failed attempts (only shown when
+              there is prior history so admins can see what changed after
+              Retry). Never removed once populated so context isn't lost. */}
+          {d.errorHistory.length > 0 && (
+            <details className="text-xs text-muted-foreground" data-testid="error-history">
+              <summary className="cursor-pointer flex items-center gap-1">
+                <History className="w-3 h-3" />
+                Previous attempts ({d.errorHistory.length})
+              </summary>
+              <ol className="mt-1 list-decimal pl-5 space-y-0.5">
+                {d.errorHistory.map((msg, i) => (
+                  <li key={i} className="break-all">{msg}</li>
+                ))}
+              </ol>
+            </details>
+          )}
+
           <Input
             placeholder="Product name (Bangla)"
             value={d.name}
@@ -532,6 +708,20 @@ function DraftCard({
           />
         </div>
       </div>
+
+      {/* Inline validation banner for ready-but-incomplete drafts */}
+      {hasMissing && (
+        <div
+          className="rounded border border-yellow-500/40 bg-yellow-500/5 p-2 text-xs text-yellow-800 flex items-start gap-2"
+          role="status"
+          data-testid="validation-banner"
+        >
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <div>
+            <strong>বাধ্যতামূলক তথ্য মিসিং:</strong> {missing.join(", ")} — Save All-এ এটি স্কিপ হবে।
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
@@ -693,7 +883,12 @@ function DraftCard({
       </div>
 
       <div className="flex justify-end">
-        <Button size="sm" onClick={onSave} disabled={d.status !== "ready" && d.status !== "error"}>
+        <Button
+          size="sm"
+          onClick={onSave}
+          disabled={d.status !== "ready" || hasMissing}
+          title={hasMissing ? `Missing: ${missing.join(", ")}` : undefined}
+        >
           <Save className="w-4 h-4 mr-2" /> Save this product
         </Button>
       </div>
