@@ -305,6 +305,30 @@ const AIProviderSettings = () => {
         )}
       </div>
       <div className="flex items-center gap-1 shrink-0 flex-wrap">
+        <div className="flex flex-col mr-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => reorder(list, index, -1)}
+            disabled={index === 0}
+            title="Move up (try earlier)"
+            aria-label="Move up"
+          >
+            <ArrowUp className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => reorder(list, index, 1)}
+            disabled={index === list.length - 1}
+            title="Move down (try later)"
+            aria-label="Move down"
+          >
+            <ArrowDown className="w-3.5 h-3.5" />
+          </Button>
+        </div>
         <div className="flex items-center gap-1 mr-2">
           <Label className="text-xs">Active</Label>
           <Switch checked={row.is_active} onCheckedChange={(c) => toggleActive(row, c)} />
@@ -313,8 +337,19 @@ const AIProviderSettings = () => {
           <Label className="text-xs">Fallback</Label>
           <Switch checked={row.is_fallback} onCheckedChange={(c) => toggleFallback(row, c)} />
         </div>
-        <Button variant="ghost" size="icon" onClick={() => testConnection(row.id)} disabled={testingId === row.id} title="Test connection">
-          {testingId === row.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => testConnection(row.id)}
+          disabled={testingId === row.id}
+          title="Send a probe request to this provider/model"
+        >
+          {testingId === row.id ? (
+            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+          ) : (
+            <Play className="w-4 h-4 mr-1" />
+          )}
+          Test
         </Button>
         <Button variant="ghost" size="icon" onClick={() => startEdit(row)}><Pencil className="w-4 h-4" /></Button>
         <Button variant="ghost" size="icon" onClick={() => remove(row.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
