@@ -557,7 +557,10 @@ const ProductDetail = () => {
               </div>
 
               <PriceDropAlert productId={product.id} currentPrice={currentPrice} />
-              <WhatsAppOrderButton productName={product.name} price={currentPrice} size={selectedSize} color={selectedColor} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <WhatsAppOrderButton productName={product.name} price={currentPrice} size={selectedSize} color={selectedColor} />
+                <MessengerOrderButton productName={product.name} price={currentPrice} size={selectedSize} color={selectedColor} />
+              </div>
 
               <div className="grid grid-cols-3 gap-4 pt-6 border-t border-border">
                 <div className="text-center">
