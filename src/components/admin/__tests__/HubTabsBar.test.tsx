@@ -72,4 +72,59 @@ describe("HubTabsBar keyboard navigation", () => {
     expect(active[0]).toHaveTextContent(/Backup & Reset/);
     expect(active[0].getAttribute("tabindex")).toBe("0");
   });
+
+  it("roving tabindex is preserved after Home/End/Arrow navigation (focus moves, tabindex does not)", () => {
+    // Landing on email-campaigns → that tab owns tabindex=0. Arrow/Home/End
+    // must only move DOM focus; the "roving" tabindex=0 slot stays anchored
+    // to the currently active (route-selected) tab so Tab-key users always
+    // re-enter the tab list at the active tab.
+    renderAt("/admin/email-campaigns", <HubTabsBar group={marketing} />);
+    const tabs = screen.getAllByRole("tab") as HTMLAnchorElement[];
+    const activeIdx = tabs.findIndex((t) => t.getAttribute("aria-selected") === "true");
+    expect(activeIdx).toBe(0);
+
+    const tabIndexes = () => tabs.map((t) => t.getAttribute("tabindex"));
+    const expected = tabs.map((_, i) => (i === activeIdx ? "0" : "-1"));
+
+    tabs[activeIdx].focus();
+    fireEvent.keyDown(tabs[activeIdx], { key: "ArrowRight" });
+    expect(document.activeElement).toBe(tabs[activeIdx + 1]);
+    expect(tabIndexes()).toEqual(expected);
+
+    fireEvent.keyDown(tabs[activeIdx + 1], { key: "End" });
+    expect(document.activeElement).toBe(tabs[tabs.length - 1]);
+    expect(tabIndexes()).toEqual(expected);
+
+    fireEvent.keyDown(tabs[tabs.length - 1], { key: "Home" });
+    expect(document.activeElement).toBe(tabs[0]);
+    expect(tabIndexes()).toEqual(expected);
+
+    // Exactly one tab holds tabindex=0 at all times.
+    const zeros = tabIndexes().filter((v) => v === "0");
+    expect(zeros).toHaveLength(1);
+  });
+
+  it("roving tabindex follows the active route after tab activation", () => {
+    // Simulate a real navigation: after activation, HubTabsBar re-renders at
+    // the new pathname and the newly-active tab should own tabindex=0 while
+    // all others are -1.
+    const { rerender } = renderAt("/admin/email-campaigns", <HubTabsBar group={marketing} />);
+    let tabs = screen.getAllByRole("tab") as HTMLAnchorElement[];
+    expect(tabs[0].getAttribute("tabindex")).toBe("0");
+    expect(tabs.slice(1).every((t) => t.getAttribute("tabindex") === "-1")).toBe(true);
+
+    rerender(
+      <MemoryRouter initialEntries={["/admin/whatsapp-events"]}>
+        <Routes>
+          <Route path="*" element={<HubTabsBar group={marketing} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    tabs = screen.getAllByRole("tab") as HTMLAnchorElement[];
+    const nowActive = tabs.find((t) => t.getAttribute("aria-selected") === "true")!;
+    expect(nowActive).toHaveTextContent(/WhatsApp Events/i);
+    expect(nowActive.getAttribute("tabindex")).toBe("0");
+    const zeros = tabs.filter((t) => t.getAttribute("tabindex") === "0");
+    expect(zeros).toHaveLength(1);
+  });
 });
