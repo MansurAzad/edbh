@@ -95,6 +95,7 @@ const MarketingHub = lazy(() => import("./pages/admin/MarketingHub"));
 const TrackingHub = lazy(() => import("./pages/admin/TrackingHub"));
 const SettingsHub = lazy(() => import("./pages/admin/SettingsHub"));
 const CustomersHub = lazy(() => import("./pages/admin/CustomersHub"));
+const AiProductStudio = lazy(() => import("./pages/admin/AiProductStudio"));
 
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
@@ -179,6 +180,7 @@ const App = () => (
                     <Route path="/admin/chat-histories" element={<PermissionGuard><ChatHistories /></PermissionGuard>} />
                     <Route path="/admin/bulk-edit" element={<PermissionGuard><BulkProductEdit /></PermissionGuard>} />
                     <Route path="/admin/bulk-add" element={<PermissionGuard><BulkAddProducts /></PermissionGuard>} />
+                    <Route path="/admin/ai-product-studio" element={<PermissionGuard><AiProductStudio /></PermissionGuard>} />
                     <Route path="/admin/staff-permissions" element={<PermissionGuard><StaffPermissions /></PermissionGuard>} />
                     <Route path="/admin/courier-integration" element={<PermissionGuard><CourierIntegration /></PermissionGuard>} />
                     <Route path="/admin/steadfast" element={<PermissionGuard><SteadfastCourier /></PermissionGuard>} />

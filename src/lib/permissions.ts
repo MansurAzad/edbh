@@ -182,6 +182,7 @@ export const ROUTE_PERMISSIONS: Record<string, PermissionKey | "admin_only"> = {
   "/admin/chat-histories": "chat.view",
   "/admin/bulk-edit": "products.manage",
   "/admin/bulk-add": "products.manage",
+  "/admin/ai-product-studio": "products.manage",
   "/admin/staff-permissions": "admin_only",
   "/admin/courier-integration": "shipping.manage",
   "/admin/steadfast": "shipping.manage",

@@ -84,6 +84,7 @@ export const HUB_GROUPS: HubGroup[] = [
       { label: "Categories", path: "/admin/categories" },
       { label: "Bulk Add", path: "/admin/bulk-add" },
       { label: "Bulk Edit", path: "/admin/bulk-edit" },
+      { label: "AI Product Studio", path: "/admin/ai-product-studio" },
       { label: "Descriptions", path: "/admin/product-descriptions" },
     ],
   },
