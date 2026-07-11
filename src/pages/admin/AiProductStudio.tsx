@@ -72,6 +72,13 @@ interface Draft {
   /** Number of times AI analysis has been attempted (0 before first run). */
   attempts: number;
   progress: number;
+  /** SHA-256 hex of the file bytes — used for de-dup across the current session. */
+  fileHash?: string;
+  /** Wall-clock timings (ms since epoch) for per-image duration metrics. */
+  uploadStartedAt?: number;
+  uploadEndedAt?: number;
+  analyzeStartedAt?: number;
+  analyzeEndedAt?: number;
   // AI fields
   name: string;
   category: string;
@@ -91,6 +98,21 @@ interface Draft {
   meta_description: string;
   image_alt_text: string;
 }
+
+async function sha256Hex(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function fmtMs(ms?: number): string {
+  if (!ms || ms < 0) return "—";
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
 
 function newId() {
   return Math.random().toString(36).slice(2, 10);
