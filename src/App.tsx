@@ -158,7 +158,8 @@ const App = () => (
                    <Route path="/admin/products-catalog" element={<PermissionGuard><AdminProducts /></PermissionGuard>} />
                    <Route path="/admin/product-descriptions" element={<PermissionGuard><AdminProductDescriptions /></PermissionGuard>} />
                     <Route path="/admin/orders" element={<PermissionGuard><AdminOrders /></PermissionGuard>} />
-                    <Route path="/admin/customers" element={<PermissionGuard><AdminCustomers /></PermissionGuard>} />
+                    <Route path="/admin/customers" element={<PermissionGuard><CustomersHub /></PermissionGuard>} />
+                    <Route path="/admin/customers-list" element={<PermissionGuard><AdminCustomers /></PermissionGuard>} />
                     <Route path="/admin/reviews" element={<PermissionGuard><AdminReviews /></PermissionGuard>} />
                     <Route path="/admin/settings" element={<PermissionGuard><SettingsHub /></PermissionGuard>} />
                     <Route path="/admin/settings-page" element={<PermissionGuard><AdminSettings /></PermissionGuard>} />
