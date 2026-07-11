@@ -56,12 +56,13 @@ const getSortConfig = (sortBy: string) => {
 const Shop = () => {
   const [searchParams] = useSearchParams();
   const urlCategory = searchParams.get("category") || "All";
+  const urlMaxPrice = Number(searchParams.get("maxPrice")) || 0;
 
   const [selectedCategory, setSelectedCategory] = useState(urlCategory);
   const [showFilters, setShowFilters] = useState(false);
   const [gridView, setGridView] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [priceRange, setPriceRange] = useState([0, 50000]);
+  const [priceRange, setPriceRange] = useState([0, urlMaxPrice > 0 ? urlMaxPrice : 50000]);
   const [sortBy, setSortBy] = useState("newest");
   const [selectedMaterial, setSelectedMaterial] = useState("All");
 
@@ -80,6 +81,12 @@ const Shop = () => {
   useEffect(() => {
     setSelectedCategory(urlCategory);
   }, [urlCategory]);
+
+  useEffect(() => {
+    if (urlMaxPrice > 0) {
+      setPriceRange([0, urlMaxPrice]);
+    }
+  }, [urlMaxPrice]);
 
   const {
     data: productPages,
