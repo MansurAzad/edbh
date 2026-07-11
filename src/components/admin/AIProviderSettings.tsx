@@ -94,6 +94,7 @@ const AIProviderSettings = () => {
 
   const customerProviders = (providers || []).filter((p) => p.scope === "customer");
   const adminProviders = (providers || []).filter((p) => p.scope === "admin");
+  const studioProviders = (providers || []).filter((p) => p.scope === "product_studio");
 
   const applyPreset = (name: string) => {
     const p = PRESETS.find((x) => x.name === name);
