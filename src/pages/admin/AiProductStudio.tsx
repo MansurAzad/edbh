@@ -724,6 +724,30 @@ function DraftCard({
           </div>
           {d.status === "uploading" && <Progress value={d.progress} className="h-2" />}
 
+          {/* Per-image timing metrics — visible once a phase has started. */}
+          {(d.uploadStartedAt || d.analyzeStartedAt) && (
+            <div
+              className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground"
+              data-testid="timing-metrics"
+            >
+              {d.uploadStartedAt && (
+                <span title="Upload duration">
+                  ⬆ upload: {fmtMs((d.uploadEndedAt ?? Date.now()) - d.uploadStartedAt)}
+                </span>
+              )}
+              {d.analyzeStartedAt && (
+                <span title="AI analyse duration">
+                  🤖 analyse: {fmtMs((d.analyzeEndedAt ?? Date.now()) - d.analyzeStartedAt)}
+                </span>
+              )}
+              {d.uploadStartedAt && (d.analyzeEndedAt || d.uploadEndedAt) && (
+                <span title="Total wall time">
+                  Σ total: {fmtMs((d.analyzeEndedAt ?? d.uploadEndedAt ?? Date.now()) - d.uploadStartedAt)}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Current failure banner */}
           {isFailed && (
             <div
