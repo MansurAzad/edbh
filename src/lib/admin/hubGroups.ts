@@ -1,10 +1,10 @@
 /**
- * Hub group definitions — replaces the old iframe embed approach with
- * plain in-app navigation. Each group has:
+ * Hub group definitions — plain in-app tab navigation.
+ * Each group has:
  *  - a landing route (hubPath) that redirects to `defaultPath`
- *  - a list of tabs; landing on any member path renders the tab bar
+ *  - a list of tabs; on any member path the top tab bar renders
  *
- * Sidebar highlights the hub when the user is on any member path.
+ * The sidebar highlights the hub whenever the user is on any member path.
  */
 export interface HubTabDef {
   label: string;
@@ -27,9 +27,22 @@ export const HUB_GROUPS: HubGroup[] = [
     defaultPath: "/admin/products-catalog",
     tabs: [
       { label: "Catalog", path: "/admin/products-catalog" },
+      { label: "Categories", path: "/admin/categories" },
       { label: "Bulk Add", path: "/admin/bulk-add" },
       { label: "Bulk Edit", path: "/admin/bulk-edit" },
       { label: "Descriptions", path: "/admin/product-descriptions" },
+    ],
+  },
+  {
+    id: "customers",
+    hubPath: "/admin/customers",
+    title: "Customers",
+    defaultPath: "/admin/customers-list",
+    tabs: [
+      { label: "Customers", path: "/admin/customers-list" },
+      { label: "Reviews", path: "/admin/reviews" },
+      { label: "Coupons", path: "/admin/coupons" },
+      { label: "Customer Insights", path: "/admin/customer-insights" },
     ],
   },
   {
@@ -43,16 +56,18 @@ export const HUB_GROUPS: HubGroup[] = [
       { label: "Courier Integration", path: "/admin/courier-integration" },
       { label: "Steadfast", path: "/admin/steadfast" },
       { label: "Courier Audit Logs", path: "/admin/courier-audit" },
+      { label: "Returns", path: "/admin/returns" },
     ],
   },
   {
     id: "marketing",
     hubPath: "/admin/marketing-hub",
-    title: "Marketing & Communications",
+    title: "Marketing & Comms",
     defaultPath: "/admin/email-campaigns",
     tabs: [
       { label: "Email Campaigns", path: "/admin/email-campaigns" },
       { label: "Notifications", path: "/admin/notifications" },
+      { label: "Hot Sale", path: "/admin/hot-sale" },
       { label: "Referrals", path: "/admin/referrals" },
       { label: "Social Proof", path: "/admin/social-proof" },
       { label: "Customer Segments", path: "/admin/segments" },
@@ -64,14 +79,16 @@ export const HUB_GROUPS: HubGroup[] = [
     id: "tracking",
     hubPath: "/admin/tracking-hub",
     title: "Tracking & Analytics",
-    defaultPath: "/admin/meta-pixel",
+    defaultPath: "/admin/tracking-funnel",
     tabs: [
+      { label: "Conversion Funnel", path: "/admin/tracking-funnel" },
+      { label: "Tracking Audit", path: "/admin/tracking-audit" },
+      { label: "Performance", path: "/admin/performance" },
       { label: "Meta Pixel", path: "/admin/meta-pixel" },
       { label: "Google Analytics", path: "/admin/google-analytics" },
-      { label: "Tracking Audit", path: "/admin/tracking-audit" },
-      { label: "Conversion Funnel", path: "/admin/tracking-funnel" },
-      { label: "Tracking Guide", path: "/admin/tracking-guide" },
       { label: "sGTM Setup", path: "/admin/sgtm-setup" },
+      { label: "Tracking Guide", path: "/admin/tracking-guide" },
+      { label: "SEO Debug", path: "/admin/seo-debug" },
     ],
   },
   {
