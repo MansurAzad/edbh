@@ -10,11 +10,11 @@
 import { corsHeaders, corsPreflight, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const MODEL = "google/gemini-2.5-flash";
+const FALLBACK_MODEL = "google/gemini-2.5-flash";
 
 const SYSTEM = `You are a product cataloguer for "Dubai Borka House Bangladesh",
 a premium Dubai-imported Islamic modest-wear e-commerce store.
@@ -69,35 +69,80 @@ Set sale_price_bdt slightly lower (5-15% off) only for premium items, otherwise 
 
 Return ONLY the JSON object.`;
 
-async function analyze(imageUrl: string, hint?: string): Promise<any> {
+type Candidate = { name: string; url: string; headers: Record<string, string>; model: string };
+
+
+async function buildCandidates(supabase: any): Promise<Candidate[]> {
+  const candidates: Candidate[] = [];
+  try {
+    const { data: rows } = await supabase.rpc("get_ai_providers_for_scope", { _scope: "product_studio" });
+    for (const p of (rows || []) as any[]) {
+      if (!p?.base_url || !p?.api_key || !p?.model) continue;
+      candidates.push({
+        name: p.provider_name,
+        url: p.base_url.replace(/\/$/, "") + "/chat/completions",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${p.api_key}`,
+          ...(p.extra_headers && typeof p.extra_headers === "object" ? p.extra_headers : {}),
+        },
+        model: p.model,
+      });
+    }
+  } catch (e) {
+    console.error("provider lookup failed", e);
+  }
+  if (LOVABLE_API_KEY) {
+    candidates.push({
+      name: "Lovable AI Gateway",
+      url: "https://ai.gateway.lovable.dev/v1/chat/completions",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
+      model: FALLBACK_MODEL,
+    });
+  }
+  return candidates;
+}
+
+async function analyze(supabase: any, imageUrl: string, hint?: string): Promise<any> {
   const userContent: any[] = [
     { type: "text", text: hint ? `Hint: ${hint}\n\nAnalyse this product image and return the JSON.` : "Analyse this product image and return the JSON." },
     { type: "image_url", image_url: { url: imageUrl } },
   ];
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: userContent },
-      ],
-      response_format: { type: "json_object" },
-    }),
-  });
+  const candidates = await buildCandidates(supabase);
+  if (candidates.length === 0) throw new Error("No AI provider configured");
+  console.log(`[AI] product_studio candidates: ${candidates.map(c => c.name).join(" -> ")}`);
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`AI Gateway ${res.status}: ${body}`);
+  let lastErr: any = null;
+  for (const c of candidates) {
+    try {
+      const res = await fetch(c.url, {
+        method: "POST",
+        headers: c.headers,
+        body: JSON.stringify({
+          model: c.model,
+          messages: [
+            { role: "system", content: SYSTEM },
+            { role: "user", content: userContent },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        lastErr = new Error(`${c.name} HTTP ${res.status}: ${body.slice(0, 200)}`);
+        console.warn(`[AI] ${c.name} failed: ${res.status}`);
+        continue;
+      }
+      const data = await res.json();
+      const content = data?.choices?.[0]?.message?.content ?? "{}";
+      return JSON.parse(content);
+    } catch (e: any) {
+      lastErr = e;
+      console.warn(`[AI] ${c.name} error: ${e?.message || e}`);
+    }
   }
-  const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content ?? "{}";
-  return JSON.parse(content);
+  throw lastErr || new Error("All AI providers failed");
 }
 
 Deno.serve(async (req) => {
@@ -121,7 +166,7 @@ Deno.serve(async (req) => {
       return errorResponse("imageUrl is required", 400);
     }
 
-    const draft = await analyze(imageUrl, hint);
+    const draft = await analyze(svc, imageUrl, hint);
     return jsonResponse({ draft });
   } catch (e) {
     return errorResponse((e as Error).message, 500);

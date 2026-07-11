@@ -17,7 +17,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-type Scope = "customer" | "admin";
+type Scope = "customer" | "admin" | "product_studio";
 
 interface ProviderRow {
   id: string;
@@ -94,6 +94,7 @@ const AIProviderSettings = () => {
 
   const customerProviders = (providers || []).filter((p) => p.scope === "customer");
   const adminProviders = (providers || []).filter((p) => p.scope === "admin");
+  const studioProviders = (providers || []).filter((p) => p.scope === "product_studio");
 
   const applyPreset = (name: string) => {
     const p = PRESETS.find((x) => x.name === name);
@@ -322,6 +323,7 @@ const AIProviderSettings = () => {
                 <SelectContent>
                   <SelectItem value="customer">Customer Chatbot</SelectItem>
                   <SelectItem value="admin">Admin AI Agent</SelectItem>
+                  <SelectItem value="product_studio">AI Product Studio (Vision)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -438,6 +440,14 @@ const AIProviderSettings = () => {
                 <p className="text-sm text-muted-foreground">কোনো custom provider নেই — Lovable AI ব্যবহার হচ্ছে।</p>
               ) : (
                 <div className="space-y-2">{adminProviders.map(renderRow)}</div>
+              )}
+            </div>
+            <div className="space-y-3">
+              <h4 className="font-medium">AI Product Studio providers (Vision-capable model প্রয়োজন)</h4>
+              {studioProviders.length === 0 ? (
+                <p className="text-sm text-muted-foreground">কোনো custom provider নেই — Lovable AI (Gemini Vision) ব্যবহার হচ্ছে।</p>
+              ) : (
+                <div className="space-y-2">{studioProviders.map(renderRow)}</div>
               )}
             </div>
           </>

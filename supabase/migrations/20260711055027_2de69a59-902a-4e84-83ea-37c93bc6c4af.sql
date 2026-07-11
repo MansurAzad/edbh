@@ -1,0 +1,2 @@
+ALTER TABLE public.ai_provider_settings DROP CONSTRAINT IF EXISTS ai_provider_settings_scope_check;
+ALTER TABLE public.ai_provider_settings ADD CONSTRAINT ai_provider_settings_scope_check CHECK (scope IN ('customer','admin','product_studio'));
