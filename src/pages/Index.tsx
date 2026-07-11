@@ -114,6 +114,7 @@ const Index = () => {
         <Suspense fallback={<SectionLoader />}>
           <DeliveryReturnStrip />
           <PriceQuickShop />
+          <PremiumDubaiCollection />
           {orderedBodySections.map((section) => {
             const Component = sectionComponents[section.section_key];
             if (!Component) return null;
