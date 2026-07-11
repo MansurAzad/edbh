@@ -2,9 +2,8 @@ import { ReactNode, useState, memo, useCallback, forwardRef, lazy, Suspense, use
 import { Link, useLocation, Navigate } from "react-router-dom";
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Star, Settings,
-  LogOut, ChevronLeft, Tag, Mail, BarChart3, RotateCcw, Truck,
-  FileText, Menu, X, MapPin, Bell, MessageCircle, Shield, Edit3, Route, Gift, ShoppingBag,
-  HardDrive, ScrollText, Cloud, Activity, BookOpen, TrendingUp, Server, Plug, ClipboardCheck,
+  LogOut, ChevronLeft, Tag, BarChart3, RotateCcw, Truck,
+  FileText, Menu, X, ClipboardCheck, Megaphone, Activity,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useAuth } from "@/contexts/AuthContext";
