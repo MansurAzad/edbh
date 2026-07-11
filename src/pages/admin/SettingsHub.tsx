@@ -18,9 +18,6 @@ export default function SettingsHub() {
         { id: "cloudinary", label: "Cloudinary", path: "/admin/cloudinary" },
         { id: "inventory-sync", label: "Inventory Sync", path: "/admin/inventory-sync" },
         { id: "content", label: "Content Editor", path: "/admin/content" },
-        { id: "descriptions", label: "Product Descriptions", path: "/admin/product-descriptions" },
-        { id: "bulk-edit", label: "Bulk Edit", path: "/admin/bulk-edit" },
-        { id: "bulk-add", label: "Bulk Add", path: "/admin/bulk-add" },
       ]}
     />
   );
