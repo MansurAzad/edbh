@@ -201,6 +201,8 @@ export default function AiProductStudio() {
   const [batchStartedAt, setBatchStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const [zoomFor, setZoomFor] = useState<Draft | null>(null);
+  const [auditRunning, setAuditRunning] = useState(false);
+  const [auditResults, setAuditResults] = useState<AuditResult[] | null>(null);
   const dragRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { data: suggestions } = useProductFieldSuggestions();
