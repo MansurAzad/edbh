@@ -120,6 +120,10 @@ interface Draft {
   meta_title: string;
   meta_description: string;
   image_alt_text: string;
+  /** Which provider/model produced the current draft (set after a successful analyze). */
+  providerUsed?: { name: string; model: string };
+  /** Per-attempt trace from the edge function (all providers tried, in order). */
+  providerTrace?: Array<{ name: string; model: string; ok: boolean; status?: number; latency_ms: number; error?: string }>;
 }
 
 async function sha256Hex(file: File): Promise<string> {
@@ -248,12 +252,22 @@ export default function AiProductStudio() {
         body: { imageUrl },
       });
       if (error) throw error;
+      // If the edge function returned a business error with attempts trace, surface it.
+      if (data?.error) {
+        const err: any = new Error(data.error);
+        err.attempts = data.attempts;
+        throw err;
+      }
       const d = data?.draft || {};
+      const trace = Array.isArray(data?.attempts) ? data.attempts : undefined;
+      const used = data?.provider_used || undefined;
       const cat = d.category || "Abaya";
       const applied = applyRule({ category: cat }, rules);
       updateDraft(id, {
         status: "ready",
         analyzeEndedAt: Date.now(),
+        providerUsed: used,
+        providerTrace: trace,
         name: d.name || "",
         category: cat,
         subcategory: d.subcategory || "",
@@ -274,7 +288,8 @@ export default function AiProductStudio() {
       });
     } catch (e: any) {
       const msg = e?.message || String(e);
-      updateDraft(id, { status: "error", error: msg, analyzeEndedAt: Date.now() });
+      const trace = Array.isArray(e?.attempts) ? e.attempts : undefined;
+      updateDraft(id, { status: "error", error: msg, analyzeEndedAt: Date.now(), providerTrace: trace });
       toast.error(`AI বিশ্লেষণে ব্যর্থ: ${msg}`);
     }
   }, [updateDraft, rules]);
@@ -905,6 +920,49 @@ function DraftCard({
                 </span>
               )}
             </div>
+          )}
+
+          {/* Provider used (green pill when a successful analysis produced this draft). */}
+          {d.providerUsed && (
+            <div
+              className="flex items-center gap-1 text-[10px] text-muted-foreground"
+              data-testid="provider-used"
+            >
+              <Sparkles className="w-3 h-3 text-primary" />
+              <span>
+                Provider: <strong className="text-foreground">{d.providerUsed.name}</strong>
+                {" · "}
+                <span className="font-mono">{d.providerUsed.model}</span>
+              </span>
+            </div>
+          )}
+
+          {/* Fallback trace — shows every provider tried in order with ok/fail + latency. */}
+          {d.providerTrace && d.providerTrace.length > 0 && (
+            <details className="text-[11px] text-muted-foreground" data-testid="fallback-trace">
+              <summary className="cursor-pointer flex items-center gap-1">
+                <History className="w-3 h-3" />
+                Fallback trace ({d.providerTrace.length})
+              </summary>
+              <ol className="mt-1 space-y-1 pl-2 border-l">
+                {d.providerTrace.map((a, i) => (
+                  <li key={i} className="pl-2">
+                    <span className={a.ok ? "text-green-700" : "text-destructive"}>
+                      {a.ok ? "✓" : "✗"}
+                    </span>{" "}
+                    <strong className="text-foreground">{a.name}</strong>
+                    {" · "}
+                    <span className="font-mono">{a.model}</span>
+                    {" · "}
+                    <span>{a.latency_ms}ms</span>
+                    {a.status ? ` · HTTP ${a.status}` : ""}
+                    {a.error && (
+                      <div className="text-destructive break-all pl-4">↳ {a.error}</div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </details>
           )}
 
           {/* Current failure banner */}

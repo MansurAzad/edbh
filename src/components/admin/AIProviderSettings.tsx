@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Bot, Loader2, CheckCircle2, XCircle, Pencil, Save, X, Trash2, Play, Shield, AlertTriangle, RefreshCw,
+  Bot, Loader2, CheckCircle2, XCircle, Pencil, Save, X, Trash2, Play, Shield, AlertTriangle, RefreshCw, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,9 +92,17 @@ const AIProviderSettings = () => {
     }
   }, [loadError, toast]);
 
-  const customerProviders = (providers || []).filter((p) => p.scope === "customer");
-  const adminProviders = (providers || []).filter((p) => p.scope === "admin");
-  const studioProviders = (providers || []).filter((p) => p.scope === "product_studio");
+  // Runtime fallback order used by the edge functions: is_active DESC, is_fallback DESC, priority ASC.
+  // Sort here so the on-screen list ALWAYS matches the order requests will actually be tried in.
+  const sortByRuntimeOrder = (rows: ProviderRow[]) =>
+    [...rows].sort((a, b) => {
+      if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+      if (a.is_fallback !== b.is_fallback) return a.is_fallback ? -1 : 1;
+      return (a.priority ?? 100) - (b.priority ?? 100);
+    });
+  const customerProviders = sortByRuntimeOrder((providers || []).filter((p) => p.scope === "customer"));
+  const adminProviders = sortByRuntimeOrder((providers || []).filter((p) => p.scope === "admin"));
+  const studioProviders = sortByRuntimeOrder((providers || []).filter((p) => p.scope === "product_studio"));
 
   const applyPreset = (name: string) => {
     const p = PRESETS.find((x) => x.name === name);
@@ -240,10 +248,33 @@ const AIProviderSettings = () => {
     }
   };
 
-  const renderRow = (row: ProviderRow) => (
+  /**
+   * Reorder providers within a scope by swapping the `priority` value with the
+   * neighbouring row. Lower priority = tried first by the edge function. This
+   * gives admins an intuitive "up/down" reorder for the runtime fallback chain.
+   */
+  const reorder = async (list: ProviderRow[], index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= list.length) return;
+    const a = list[index];
+    const b = list[target];
+    try {
+      // Ensure distinct priorities before swap (if they're equal, bump the other side by 1).
+      const aPriority = a.priority ?? 100;
+      const bPriority = b.priority === a.priority ? (a.priority ?? 100) + (direction === -1 ? 1 : -1) : (b.priority ?? 100);
+      await supabase.from("ai_provider_settings" as any).update({ priority: bPriority }).eq("id", a.id);
+      await supabase.from("ai_provider_settings" as any).update({ priority: aPriority }).eq("id", b.id);
+      qc.invalidateQueries({ queryKey: ["ai-providers"] });
+    } catch (e: any) {
+      toast({ title: "Reorder failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const renderRow = (row: ProviderRow, index: number, list: ProviderRow[]) => (
     <div key={row.id} className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground font-mono w-5 shrink-0">#{index + 1}</span>
           <span className="font-medium">{row.provider_name}</span>
           {row.is_active && (
             <Badge className="bg-green-600 hover:bg-green-700">
@@ -274,6 +305,30 @@ const AIProviderSettings = () => {
         )}
       </div>
       <div className="flex items-center gap-1 shrink-0 flex-wrap">
+        <div className="flex flex-col mr-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => reorder(list, index, -1)}
+            disabled={index === 0}
+            title="Move up (try earlier)"
+            aria-label="Move up"
+          >
+            <ArrowUp className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => reorder(list, index, 1)}
+            disabled={index === list.length - 1}
+            title="Move down (try later)"
+            aria-label="Move down"
+          >
+            <ArrowDown className="w-3.5 h-3.5" />
+          </Button>
+        </div>
         <div className="flex items-center gap-1 mr-2">
           <Label className="text-xs">Active</Label>
           <Switch checked={row.is_active} onCheckedChange={(c) => toggleActive(row, c)} />
@@ -282,8 +337,19 @@ const AIProviderSettings = () => {
           <Label className="text-xs">Fallback</Label>
           <Switch checked={row.is_fallback} onCheckedChange={(c) => toggleFallback(row, c)} />
         </div>
-        <Button variant="ghost" size="icon" onClick={() => testConnection(row.id)} disabled={testingId === row.id} title="Test connection">
-          {testingId === row.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => testConnection(row.id)}
+          disabled={testingId === row.id}
+          title="Send a probe request to this provider/model"
+        >
+          {testingId === row.id ? (
+            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+          ) : (
+            <Play className="w-4 h-4 mr-1" />
+          )}
+          Test
         </Button>
         <Button variant="ghost" size="icon" onClick={() => startEdit(row)}><Pencil className="w-4 h-4" /></Button>
         <Button variant="ghost" size="icon" onClick={() => remove(row.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
@@ -431,7 +497,7 @@ const AIProviderSettings = () => {
               {customerProviders.length === 0 ? (
                 <p className="text-sm text-muted-foreground">কোনো custom provider নেই — Lovable AI ব্যবহার হচ্ছে।</p>
               ) : (
-                <div className="space-y-2">{customerProviders.map(renderRow)}</div>
+                <div className="space-y-2">{customerProviders.map((r, i, l) => renderRow(r, i, l))}</div>
               )}
             </div>
             <div className="space-y-3">
@@ -439,7 +505,7 @@ const AIProviderSettings = () => {
               {adminProviders.length === 0 ? (
                 <p className="text-sm text-muted-foreground">কোনো custom provider নেই — Lovable AI ব্যবহার হচ্ছে।</p>
               ) : (
-                <div className="space-y-2">{adminProviders.map(renderRow)}</div>
+                <div className="space-y-2">{adminProviders.map((r, i, l) => renderRow(r, i, l))}</div>
               )}
             </div>
             <div className="space-y-3">
@@ -447,7 +513,7 @@ const AIProviderSettings = () => {
               {studioProviders.length === 0 ? (
                 <p className="text-sm text-muted-foreground">কোনো custom provider নেই — Lovable AI (Gemini Vision) ব্যবহার হচ্ছে।</p>
               ) : (
-                <div className="space-y-2">{studioProviders.map(renderRow)}</div>
+                <div className="space-y-2">{studioProviders.map((r, i, l) => renderRow(r, i, l))}</div>
               )}
             </div>
           </>

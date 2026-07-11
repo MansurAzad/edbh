@@ -103,7 +103,16 @@ async function buildCandidates(supabase: any): Promise<Candidate[]> {
   return candidates;
 }
 
-async function analyze(supabase: any, imageUrl: string, hint?: string): Promise<any> {
+export type ProviderAttempt = {
+  name: string;
+  model: string;
+  ok: boolean;
+  status?: number;
+  latency_ms: number;
+  error?: string;
+};
+
+async function analyze(supabase: any, imageUrl: string, hint?: string): Promise<{ draft: any; provider_used: { name: string; model: string } | null; attempts: ProviderAttempt[] }> {
   const userContent: any[] = [
     { type: "text", text: hint ? `Hint: ${hint}\n\nAnalyse this product image and return the JSON.` : "Analyse this product image and return the JSON." },
     { type: "image_url", image_url: { url: imageUrl } },
@@ -113,8 +122,10 @@ async function analyze(supabase: any, imageUrl: string, hint?: string): Promise<
   if (candidates.length === 0) throw new Error("No AI provider configured");
   console.log(`[AI] product_studio candidates: ${candidates.map(c => c.name).join(" -> ")}`);
 
+  const attempts: ProviderAttempt[] = [];
   let lastErr: any = null;
   for (const c of candidates) {
+    const started = Date.now();
     try {
       const res = await fetch(c.url, {
         method: "POST",
@@ -128,21 +139,31 @@ async function analyze(supabase: any, imageUrl: string, hint?: string): Promise<
           response_format: { type: "json_object" },
         }),
       });
+      const latency_ms = Date.now() - started;
       if (!res.ok) {
         const body = await res.text();
-        lastErr = new Error(`${c.name} HTTP ${res.status}: ${body.slice(0, 200)}`);
+        const errMsg = `HTTP ${res.status}: ${body.slice(0, 200)}`;
+        attempts.push({ name: c.name, model: c.model, ok: false, status: res.status, latency_ms, error: errMsg });
+        lastErr = new Error(`${c.name} ${errMsg}`);
         console.warn(`[AI] ${c.name} failed: ${res.status}`);
         continue;
       }
       const data = await res.json();
       const content = data?.choices?.[0]?.message?.content ?? "{}";
-      return JSON.parse(content);
+      const draft = JSON.parse(content);
+      attempts.push({ name: c.name, model: c.model, ok: true, status: res.status, latency_ms });
+      return { draft, provider_used: { name: c.name, model: c.model }, attempts };
     } catch (e: any) {
+      const latency_ms = Date.now() - started;
+      const msg = e?.message || String(e);
+      attempts.push({ name: c.name, model: c.model, ok: false, latency_ms, error: msg });
       lastErr = e;
-      console.warn(`[AI] ${c.name} error: ${e?.message || e}`);
+      console.warn(`[AI] ${c.name} error: ${msg}`);
     }
   }
-  throw lastErr || new Error("All AI providers failed");
+  const err: any = lastErr || new Error("All AI providers failed");
+  err.attempts = attempts;
+  throw err;
 }
 
 Deno.serve(async (req) => {
@@ -166,8 +187,12 @@ Deno.serve(async (req) => {
       return errorResponse("imageUrl is required", 400);
     }
 
-    const draft = await analyze(svc, imageUrl, hint);
-    return jsonResponse({ draft });
+    try {
+      const result = await analyze(svc, imageUrl, hint);
+      return jsonResponse(result);
+    } catch (e: any) {
+      return jsonResponse({ error: e?.message || String(e), attempts: e?.attempts || [] }, 502);
+    }
   } catch (e) {
     return errorResponse((e as Error).message, 500);
   }
