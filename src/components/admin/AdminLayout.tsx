@@ -13,6 +13,7 @@ import { findHubGroupByPath } from "@/lib/admin/hubGroups";
 import { prefetchAdminRoute } from "@/lib/admin/routePrefetch";
 import HubTabsBar from "@/components/admin/HubTabsBar";
 import ActiveStateSummary from "@/components/admin/ActiveStateSummary";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 
 const AdminAIChat = lazy(() => import("@/components/admin/AdminAIChat"));
 
