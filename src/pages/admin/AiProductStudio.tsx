@@ -53,6 +53,8 @@ import {
   FileJson,
   Gauge,
   Copy,
+  ShieldCheck,
+  Activity,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProductFieldSuggestions } from "@/hooks/admin/useProductFieldSuggestions";
@@ -69,6 +71,7 @@ import {
   download,
 } from "@/lib/admin/aiStudio/exportDrafts";
 import { validateSchema, type FieldError } from "@/lib/admin/aiStudio/validator";
+import { runStudioAudit, type AuditResult } from "@/lib/admin/aiStudio/audit";
 
 const DEFAULT_SIZES = ["52", "54", "56", "58"];
 const SIZE_POOL = ["50", "52", "54", "56", "58", "60", "62"];
@@ -198,6 +201,8 @@ export default function AiProductStudio() {
   const [batchStartedAt, setBatchStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const [zoomFor, setZoomFor] = useState<Draft | null>(null);
+  const [auditRunning, setAuditRunning] = useState(false);
+  const [auditResults, setAuditResults] = useState<AuditResult[] | null>(null);
   const dragRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { data: suggestions } = useProductFieldSuggestions();
@@ -524,6 +529,56 @@ export default function AiProductStudio() {
     }
   }, [batchStartedAt, inFlight]);
 
+  /**
+   * Per-provider runtime metrics aggregated from every draft's providerTrace:
+   * total attempts, success/fail counts, average latency. Powers the header
+   * badges during batch runs so admins can see which provider is carrying
+   * the load and which is falling back.
+   */
+  const providerMetrics = useMemo(() => {
+    const map = new Map<
+      string,
+      { name: string; attempts: number; ok: number; fail: number; totalLatency: number }
+    >();
+    for (const d of drafts) {
+      for (const a of d.providerTrace ?? []) {
+        const key = `${a.name}::${a.model}`;
+        const entry = map.get(key) ?? { name: `${a.name} · ${a.model}`, attempts: 0, ok: 0, fail: 0, totalLatency: 0 };
+        entry.attempts += 1;
+        entry.totalLatency += a.latency_ms || 0;
+        if (a.ok) entry.ok += 1;
+        else entry.fail += 1;
+        map.set(key, entry);
+      }
+    }
+    return Array.from(map.values())
+      .map((e) => ({ ...e, avgLatency: e.attempts ? Math.round(e.totalLatency / e.attempts) : 0 }))
+      .sort((a, b) => b.attempts - a.attempts);
+  }, [drafts]);
+
+  const totalAttempts = providerMetrics.reduce((s, p) => s + p.attempts, 0);
+  const lastProviderUsed = useMemo(() => {
+    for (let i = drafts.length - 1; i >= 0; i--) {
+      if (drafts[i].providerUsed) return drafts[i].providerUsed!;
+    }
+    return null;
+  }, [drafts]);
+
+  const runAudit = useCallback(async () => {
+    setAuditRunning(true);
+    try {
+      const results = await runStudioAudit();
+      setAuditResults(results);
+      const failed = results.filter((r) => !r.ok).length;
+      if (failed === 0) toast.success(`Audit passed: ${results.length}/${results.length} checks green`);
+      else toast.error(`Audit: ${results.length - failed}/${results.length} passed, ${failed} failed`);
+    } catch (e: any) {
+      toast.error(`Audit runner crashed: ${e?.message}`);
+    } finally {
+      setAuditRunning(false);
+    }
+  }, []);
+
   const applyRulesToAll = useCallback(() => {
     setDrafts((prev) =>
       prev.map((d) => {
@@ -587,6 +642,16 @@ export default function AiProductStudio() {
                 <StopCircle className="w-4 h-4 mr-2" /> Cancel
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={runAudit}
+              disabled={auditRunning}
+              data-testid="run-audit-btn"
+              title="Run built-in audit + test suite for AI Product Studio"
+            >
+              {auditRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
+              Run Audit
+            </Button>
             <Button variant="outline" onClick={exportCsv} disabled={!drafts.length} data-testid="export-csv">
               <Download className="w-4 h-4 mr-2" /> CSV
             </Button>
@@ -632,6 +697,81 @@ export default function AiProductStudio() {
               )}
             </div>
             <Progress value={total ? (processed / total) * 100 : 0} className="h-1.5" />
+
+            {/* Per-provider runtime metrics (attempts + avg latency) — surfaced during batch runs */}
+            {providerMetrics.length > 0 && (
+              <div
+                className="flex flex-wrap items-center gap-2 text-[11px] pt-1 border-t border-border/40"
+                data-testid="provider-metrics"
+              >
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Activity className="w-3 h-3" /> Providers ({totalAttempts} attempts):
+                </span>
+                {lastProviderUsed && (
+                  <Badge className="bg-primary/10 text-primary" data-testid="last-provider-used">
+                    Last used: {lastProviderUsed.name} · {lastProviderUsed.model}
+                  </Badge>
+                )}
+                {providerMetrics.map((p) => (
+                  <Badge
+                    key={p.name}
+                    variant="outline"
+                    className={p.fail === 0 ? "border-green-500/40" : "border-yellow-500/40"}
+                    data-testid="provider-metric"
+                    title={`${p.ok} success / ${p.fail} fail · avg ${p.avgLatency}ms`}
+                  >
+                    {p.name} · {p.attempts}× · {p.avgLatency}ms
+                    {p.fail > 0 && <span className="text-destructive"> · ✗{p.fail}</span>}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Audit report — summarised pass/fail from the built-in test suite */}
+        {auditResults && (
+          <Card
+            className={`p-3 space-y-2 ${
+              auditResults.every((r) => r.ok)
+                ? "border-green-500/40 bg-green-500/5"
+                : "border-destructive/40 bg-destructive/5"
+            }`}
+            role="status"
+            data-testid="audit-report"
+          >
+            <div className="flex items-center gap-2 text-sm">
+              <ShieldCheck
+                className={`w-4 h-4 ${auditResults.every((r) => r.ok) ? "text-green-700" : "text-destructive"}`}
+              />
+              <strong data-testid="audit-summary">
+                Audit: {auditResults.filter((r) => r.ok).length}/{auditResults.length} passed
+              </strong>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto h-6"
+                onClick={() => setAuditResults(null)}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+            <ul className="text-xs space-y-1">
+              {auditResults.map((r, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2"
+                  data-testid={r.ok ? "audit-pass" : "audit-fail"}
+                >
+                  <span className={r.ok ? "text-green-700" : "text-destructive"}>
+                    {r.ok ? "✓" : "✗"}
+                  </span>
+                  <span className="text-muted-foreground">[{r.group}]</span>
+                  <span className={r.ok ? "" : "text-destructive"}>{r.name}</span>
+                  {r.message && <span className="text-destructive break-all">— {r.message}</span>}
+                </li>
+              ))}
+            </ul>
           </Card>
         )}
 
