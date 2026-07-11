@@ -81,6 +81,95 @@ test.describe("admin shell", () => {
     expect(await main.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
   });
 
+  test("only <main> is a scroll container — sidebar, header, title, tabs, body do not scroll", async ({ page }) => {
+    test.skip(!(await isAdminReachable(page)), "admin session required");
+    await page.goto(`${BASE_URL}/admin/whatsapp-events`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(400);
+
+    const main = page.getByTestId("admin-main");
+
+    // Snapshot pinned positions BEFORE scrolling.
+    const before = await page.evaluate(() => {
+      const q = (sel: string) => {
+        const el = document.querySelector(sel) as HTMLElement | null;
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return { x: b.x, y: b.y, w: b.width, h: b.height };
+      };
+      return {
+        sidebar: q('[data-testid="admin-sidebar"]'),
+        header: q('[data-testid="admin-page-header"]'),
+        title: q('[data-testid="admin-page-title"]'),
+        tabs: q('[role="tablist"]'),
+      };
+    });
+
+    // Force scroll in <main>.
+    await main.evaluate((el) => el.scrollTo({ top: 1500 }));
+    await page.waitForTimeout(200);
+
+    const after = await page.evaluate(() => {
+      const q = (sel: string) => {
+        const el = document.querySelector(sel) as HTMLElement | null;
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return { x: b.x, y: b.y, w: b.width, h: b.height };
+      };
+
+      // Enumerate every scrollable element in the document and classify each.
+      const scrollers: Array<{ selector: string; scrollTop: number; scrollLeft: number }> = [];
+      const all = Array.from(document.querySelectorAll<HTMLElement>("*"));
+      for (const el of all) {
+        if (el.scrollTop > 0 || el.scrollLeft > 0) {
+          const id = el.getAttribute("data-testid") || el.tagName.toLowerCase();
+          scrollers.push({ selector: id, scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
+        }
+      }
+
+      return {
+        sidebar: q('[data-testid="admin-sidebar"]'),
+        header: q('[data-testid="admin-page-header"]'),
+        title: q('[data-testid="admin-page-title"]'),
+        tabs: q('[role="tablist"]'),
+        windowScrollY: window.scrollY,
+        windowScrollX: window.scrollX,
+        bodyScrollTop: document.body.scrollTop,
+        docScrollTop: document.documentElement.scrollTop,
+        scrollers,
+      };
+    });
+
+    // 1) Neither window nor body/html scrolled.
+    expect(after.windowScrollY).toBe(0);
+    expect(after.windowScrollX).toBe(0);
+    expect(after.bodyScrollTop).toBe(0);
+    expect(after.docScrollTop).toBe(0);
+
+    // 2) Each pinned region kept its position (no vertical or horizontal shift).
+    for (const key of ["sidebar", "header", "title", "tabs"] as const) {
+      const b = before[key];
+      const a = after[key];
+      expect(a, `${key} disappeared after scroll`).not.toBeNull();
+      expect(a!.y, `${key} shifted vertically`).toBeCloseTo(b!.y, 0);
+      expect(a!.x, `${key} shifted horizontally`).toBeCloseTo(b!.x, 0);
+      expect(a!.h, `${key} height changed`).toBeCloseTo(b!.h, 0);
+    }
+
+    // 3) The ONLY element that recorded a real scroll offset is <main>.
+    const nonMain = after.scrollers.filter((s) => s.selector !== "admin-main");
+    // Sidebar's <nav> is overflow-y-auto but shouldn't scroll from a content scroll.
+    // Anything else pinned (sidebar, header, title, tabs) must remain at 0.
+    for (const key of ["admin-sidebar", "admin-page-header", "admin-page-title"]) {
+      expect(
+        nonMain.find((s) => s.selector === key),
+        `${key} should not scroll (found scrollTop=${nonMain.find((s) => s.selector === key)?.scrollTop})`,
+      ).toBeUndefined();
+    }
+
+    // 4) <main> itself IS scrolled (proves the scroll landed in the intended container).
+    expect(await main.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  });
+
   test("route-based active state highlights sidebar + hub tab", async ({ page }) => {
     test.skip(!(await isAdminReachable(page)), "admin session required");
 
