@@ -89,6 +89,10 @@ const SecurityCenter = lazy(() => import("./pages/admin/SecurityCenter"));
 const WhatsAppShareEventsAdmin = lazy(() => import("./pages/admin/WhatsAppShareEvents"));
 const BusinessAudit = lazy(() => import("./pages/admin/BusinessAudit"));
 const CustomerInsights = lazy(() => import("./pages/admin/CustomerInsights"));
+const ShippingHub = lazy(() => import("./pages/admin/ShippingHub"));
+const MarketingHub = lazy(() => import("./pages/admin/MarketingHub"));
+const TrackingHub = lazy(() => import("./pages/admin/TrackingHub"));
+const SettingsHub = lazy(() => import("./pages/admin/SettingsHub"));
 
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
@@ -153,7 +157,12 @@ const App = () => (
                     <Route path="/admin/orders" element={<PermissionGuard><AdminOrders /></PermissionGuard>} />
                     <Route path="/admin/customers" element={<PermissionGuard><AdminCustomers /></PermissionGuard>} />
                     <Route path="/admin/reviews" element={<PermissionGuard><AdminReviews /></PermissionGuard>} />
-                    <Route path="/admin/settings" element={<PermissionGuard><AdminSettings /></PermissionGuard>} />
+                    <Route path="/admin/settings" element={<PermissionGuard><SettingsHub /></PermissionGuard>} />
+                    <Route path="/admin/settings-page" element={<PermissionGuard><AdminSettings /></PermissionGuard>} />
+                    <Route path="/admin/shipping-hub" element={<PermissionGuard><ShippingHub /></PermissionGuard>} />
+                    <Route path="/admin/marketing-hub" element={<PermissionGuard><MarketingHub /></PermissionGuard>} />
+                    <Route path="/admin/tracking-hub" element={<PermissionGuard><TrackingHub /></PermissionGuard>} />
+
                     <Route path="/admin/coupons" element={<PermissionGuard><AdminCoupons /></PermissionGuard>} />
                     <Route path="/admin/email-campaigns" element={<PermissionGuard><EmailCampaigns /></PermissionGuard>} />
                     <Route path="/admin/reports" element={<PermissionGuard><AdvancedReports /></PermissionGuard>} />

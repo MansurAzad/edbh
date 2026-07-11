@@ -2,9 +2,8 @@ import { ReactNode, useState, memo, useCallback, forwardRef, lazy, Suspense, use
 import { Link, useLocation, Navigate } from "react-router-dom";
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Star, Settings,
-  LogOut, ChevronLeft, Tag, Mail, BarChart3, RotateCcw, Truck,
-  FileText, Menu, X, MapPin, Bell, MessageCircle, Shield, Edit3, Route, Gift, ShoppingBag,
-  HardDrive, ScrollText, Cloud, Activity, BookOpen, TrendingUp, Server, Plug, ClipboardCheck,
+  LogOut, ChevronLeft, Tag, BarChart3, RotateCcw, Truck,
+  FileText, Menu, X, ClipboardCheck, Megaphone, Activity,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,40 +23,17 @@ const navItems = [
   { path: "/admin/categories", icon: Tag, label: "Categories" },
   { path: "/admin/blog", icon: FileText, label: "Blog Posts" },
   { path: "/admin/products", icon: Package, label: "Products" },
-  { path: "/admin/product-descriptions", icon: Edit3, label: "Product Descriptions" },
   { path: "/admin/orders", icon: ShoppingCart, label: "Orders" },
   { path: "/admin/customers", icon: Users, label: "Customers" },
   { path: "/admin/reviews", icon: Star, label: "Reviews" },
   { path: "/admin/coupons", icon: Tag, label: "Coupons" },
-  { path: "/admin/email-campaigns", icon: Mail, label: "Email Campaigns" },
   { path: "/admin/reports", icon: BarChart3, label: "Advanced Reports" },
   { path: "/admin/returns", icon: RotateCcw, label: "Returns" },
-  { path: "/admin/shipping", icon: Truck, label: "Shipping" },
-  { path: "/admin/delivery-zones", icon: MapPin, label: "Delivery Zones" },
-  { path: "/admin/content", icon: FileText, label: "Content Editor" },
-  { path: "/admin/segments", icon: Users, label: "Customer Segments" },
-  { path: "/admin/notifications", icon: Bell, label: "Notifications" },
-  { path: "/admin/chat-histories", icon: MessageCircle, label: "Chat Histories" },
-  { path: "/admin/whatsapp-events", icon: MessageCircle, label: "WhatsApp Events" },
-  { path: "/admin/bulk-edit", icon: Edit3, label: "Bulk Edit" },
-  { path: "/admin/bulk-add", icon: Package, label: "Bulk Add Products" },
-  { path: "/admin/staff-permissions", icon: Shield, label: "Staff Permissions" },
-  { path: "/admin/courier-integration", icon: Route, label: "Courier Integration" },
-  { path: "/admin/steadfast", icon: Truck, label: "Steadfast Courier" },
-  { path: "/admin/courier-audit", icon: ScrollText, label: "Courier Audit Logs" },
-  { path: "/admin/referrals", icon: Gift, label: "Referral Dashboard" },
-  { path: "/admin/social-proof", icon: ShoppingBag, label: "Social Proof" },
-  { path: "/admin/backup", icon: HardDrive, label: "Backup & Reset" },
-  { path: "/admin/cloudinary", icon: Cloud, label: "Cloudinary" },
-  { path: "/admin/meta-pixel", icon: BarChart3, label: "Meta Pixel" },
-  { path: "/admin/google-analytics", icon: BarChart3, label: "Google Analytics" },
-  { path: "/admin/tracking-audit", icon: Activity, label: "Tracking Audit" },
-  { path: "/admin/tracking-funnel", icon: TrendingUp, label: "Conversion Funnel" },
-  { path: "/admin/tracking-guide", icon: BookOpen, label: "Tracking Guide" },
-  { path: "/admin/sgtm-setup", icon: Server, label: "sGTM Setup Guide" },
-  { path: "/admin/inventory-sync", icon: Plug, label: "Inventory Sync API" },
-  { path: "/admin/security", icon: Shield, label: "Security Center" },
-  { path: "/admin/settings", icon: Settings, label: "Settings" },
+  // Grouped hub pages
+  { path: "/admin/shipping-hub", icon: Truck, label: "Shipping & Courier" },
+  { path: "/admin/marketing-hub", icon: Megaphone, label: "Marketing & Comms" },
+  { path: "/admin/tracking-hub", icon: Activity, label: "Tracking & Analytics" },
+  { path: "/admin/settings", icon: Settings, label: "Settings & Tools" },
 ];
 
 const NavItem = memo(forwardRef<HTMLAnchorElement, {
@@ -128,6 +104,19 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
   if (!isStaff) {
     return <Navigate to="/" replace />;
   }
+
+  // Embed mode: when rendered inside a hub-page iframe (?embed=1),
+  // skip the sidebar/topbar chrome so the sub-page fills the frame cleanly.
+  const isEmbed = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("embed") === "1";
+  if (isEmbed) {
+    return (
+      <main className="min-h-screen bg-muted/30">
+        <div className="p-4 md:p-6">{children}</div>
+      </main>
+    );
+  }
+
 
   return (
     <div className="min-h-screen flex bg-muted/30">
