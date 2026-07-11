@@ -3,7 +3,7 @@
  * E2E: admin shell layout invariants + hub navigation.
  *
  * Verifies:
- *  1. Sidebar + top tab bar stay pinned; only <main> scrolls.
+ *  1. Sidebar + header + top tab bar stay pinned; only page content scrolls.
  *  2. Route-based active state highlights sidebar + top tab correctly.
  *  3. Clicking every MarketingHub and SettingsHub tab updates the URL
  *     and re-renders the ActiveStateSummary chip with the right hub /
@@ -47,13 +47,14 @@ test.describe("admin shell", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
   });
 
-  test("sidebar + top tab bar stay pinned while only main scrolls", async ({ page }) => {
+  test("sidebar + header + top tab bar stay pinned while only page content scrolls", async ({ page }) => {
     test.skip(!(await isAdminReachable(page)), "admin session required");
     await page.goto(`${BASE_URL}/admin/whatsapp-events`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(400);
 
     const sidebar = page.getByTestId("admin-sidebar");
     const main = page.getByTestId("admin-main");
+    const content = page.getByTestId("admin-page-content");
     const tabBar = page.locator('[role="tablist"]').first();
     await expect(sidebar).toBeVisible();
     await expect(tabBar).toBeVisible();
@@ -61,7 +62,7 @@ test.describe("admin shell", () => {
     const sidebarBefore = await sidebar.boundingBox();
     const tabBarBefore = await tabBar.boundingBox();
 
-    await main.evaluate((el) => el.scrollTo({ top: 1200 }));
+    await content.evaluate((el) => el.scrollTo({ top: 1200 }));
     await page.waitForTimeout(150);
 
     const sidebarAfter = await sidebar.boundingBox();
@@ -78,15 +79,17 @@ test.describe("admin shell", () => {
 
     // Window itself never scrolls.
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
-    expect(await main.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
+    expect(await content.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
   });
 
-  test("only <main> is a scroll container — sidebar, header, title, tabs, body do not scroll", async ({ page }) => {
+  test("only page content is a scroll container — sidebar, header, title, tabs, body do not scroll", async ({ page }) => {
     test.skip(!(await isAdminReachable(page)), "admin session required");
     await page.goto(`${BASE_URL}/admin/whatsapp-events`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(400);
 
     const main = page.getByTestId("admin-main");
+    const content = page.getByTestId("admin-page-content");
 
     // Snapshot pinned positions BEFORE scrolling.
     const before = await page.evaluate(() => {
@@ -104,8 +107,8 @@ test.describe("admin shell", () => {
       };
     });
 
-    // Force scroll in <main>.
-    await main.evaluate((el) => el.scrollTo({ top: 1500 }));
+    // Force scroll in the page content panel only.
+    await content.evaluate((el) => el.scrollTo({ top: 1500 }));
     await page.waitForTimeout(200);
 
     const after = await page.evaluate(() => {
@@ -155,19 +158,22 @@ test.describe("admin shell", () => {
       expect(a!.h, `${key} height changed`).toBeCloseTo(b!.h, 0);
     }
 
-    // 3) The ONLY element that recorded a real scroll offset is <main>.
-    const nonMain = after.scrollers.filter((s) => s.selector !== "admin-main");
+    // 3) The ONLY element that recorded a real scroll offset is the page content panel.
+    const nonContent = after.scrollers.filter((s) => s.selector !== "admin-page-content");
     // Sidebar's <nav> is overflow-y-auto but shouldn't scroll from a content scroll.
     // Anything else pinned (sidebar, header, title, tabs) must remain at 0.
     for (const key of ["admin-sidebar", "admin-page-header", "admin-page-title"]) {
       expect(
-        nonMain.find((s) => s.selector === key),
-        `${key} should not scroll (found scrollTop=${nonMain.find((s) => s.selector === key)?.scrollTop})`,
+        nonContent.find((s) => s.selector === key),
+        `${key} should not scroll (found scrollTop=${nonContent.find((s) => s.selector === key)?.scrollTop})`,
       ).toBeUndefined();
     }
 
-    // 4) <main> itself IS scrolled (proves the scroll landed in the intended container).
-    expect(await main.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    expect(nonContent.find((s) => s.selector === "admin-main")).toBeUndefined();
+
+    // 4) The content panel itself IS scrolled (proves the scroll landed in the intended container).
+    expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
+    expect(await content.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
   });
 
   test("route-based active state highlights sidebar + hub tab", async ({ page }) => {
@@ -372,7 +378,7 @@ test.describe("admin shell", () => {
     expect((contentBoxInitial?.y ?? 0) + 4).toBeGreaterThanOrEqual(stickyBottomInitial - 2);
 
     // Scroll the main content and confirm neither header shifts.
-    await main.evaluate((el) => el.scrollTo({ top: 900 }));
+    await content.evaluate((el) => el.scrollTo({ top: 900 }));
     await page.waitForTimeout(150);
     const mobAfter = await mobileHeader.boundingBox();
     const hubAfter = await hubHeader.boundingBox();
@@ -381,5 +387,7 @@ test.describe("admin shell", () => {
 
     // Window scroll never leaks.
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
+    expect(await content.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
   });
 });
