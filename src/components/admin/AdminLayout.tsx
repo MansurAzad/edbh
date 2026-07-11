@@ -189,7 +189,7 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto min-w-0">
+      <main data-testid="admin-main" className="flex-1 overflow-auto min-w-0">
         <div className="lg:hidden sticky top-0 z-30 bg-card border-b border-border px-4 py-3 flex items-center gap-3">
           <button onClick={openSidebar} className="p-2 hover:bg-muted rounded-lg">
             <Menu className="w-5 h-5" />
