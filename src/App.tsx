@@ -94,6 +94,7 @@ const ShippingHub = lazy(() => import("./pages/admin/ShippingHub"));
 const MarketingHub = lazy(() => import("./pages/admin/MarketingHub"));
 const TrackingHub = lazy(() => import("./pages/admin/TrackingHub"));
 const SettingsHub = lazy(() => import("./pages/admin/SettingsHub"));
+const CustomersHub = lazy(() => import("./pages/admin/CustomersHub"));
 
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
