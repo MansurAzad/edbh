@@ -965,7 +965,8 @@ function DraftCard({
         >
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
           <div>
-            <strong>বাধ্যতামূলক তথ্য মিসিং:</strong> {missing.join(", ")} — Save All-এ এটি স্কিপ হবে।
+            <strong>বাধ্যতামূলক তথ্য মিসিং:</strong>{" "}
+            {schemaErrors.map((e) => `${e.label} (${e.message})`).join(" · ")}
           </div>
         </div>
       )}
