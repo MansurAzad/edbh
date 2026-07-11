@@ -815,8 +815,11 @@ function DraftCard({
   };
 
   const isFailed = d.status === "error";
-  const missing = d.status === "ready" ? validateDraft(d) : [];
-  const hasMissing = missing.length > 0;
+  const schemaErrors: FieldError[] = d.status === "ready" ? validateSchema(d as any) : [];
+  const hasMissing = schemaErrors.length > 0;
+  const errorFields = new Set(schemaErrors.map((e) => e.field));
+  const fieldClass = (name: string) =>
+    errorFields.has(name as any) ? "ring-2 ring-yellow-500/60 rounded-md" : "";
 
   return (
     <Card
@@ -825,9 +828,22 @@ function DraftCard({
       data-status={d.status}
     >
       <div className="flex gap-3">
-        <div className="w-32 h-32 flex-shrink-0 rounded-md overflow-hidden bg-muted relative">
+        <button
+          type="button"
+          onClick={onZoom}
+          className="w-32 h-32 flex-shrink-0 rounded-md overflow-hidden bg-muted relative group cursor-zoom-in"
+          data-testid="thumb-zoom"
+          disabled={!d.imageUrl}
+        >
           {d.imageUrl ? (
-            <img src={d.imageUrl} alt="" className="w-full h-full object-cover" />
+            <>
+              <img src={d.imageUrl} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+              {d.fileHash && (
+                <span className="absolute bottom-0 left-0 right-0 text-[9px] bg-black/60 text-white font-mono px-1 py-0.5 truncate">
+                  {d.fileHash.slice(0, 10)}…
+                </span>
+              )}
+            </>
           ) : (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
