@@ -697,6 +697,81 @@ export default function AiProductStudio() {
               )}
             </div>
             <Progress value={total ? (processed / total) * 100 : 0} className="h-1.5" />
+
+            {/* Per-provider runtime metrics (attempts + avg latency) — surfaced during batch runs */}
+            {providerMetrics.length > 0 && (
+              <div
+                className="flex flex-wrap items-center gap-2 text-[11px] pt-1 border-t border-border/40"
+                data-testid="provider-metrics"
+              >
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Activity className="w-3 h-3" /> Providers ({totalAttempts} attempts):
+                </span>
+                {lastProviderUsed && (
+                  <Badge className="bg-primary/10 text-primary" data-testid="last-provider-used">
+                    Last used: {lastProviderUsed.name} · {lastProviderUsed.model}
+                  </Badge>
+                )}
+                {providerMetrics.map((p) => (
+                  <Badge
+                    key={p.name}
+                    variant="outline"
+                    className={p.fail === 0 ? "border-green-500/40" : "border-yellow-500/40"}
+                    data-testid="provider-metric"
+                    title={`${p.ok} success / ${p.fail} fail · avg ${p.avgLatency}ms`}
+                  >
+                    {p.name} · {p.attempts}× · {p.avgLatency}ms
+                    {p.fail > 0 && <span className="text-destructive"> · ✗{p.fail}</span>}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Audit report — summarised pass/fail from the built-in test suite */}
+        {auditResults && (
+          <Card
+            className={`p-3 space-y-2 ${
+              auditResults.every((r) => r.ok)
+                ? "border-green-500/40 bg-green-500/5"
+                : "border-destructive/40 bg-destructive/5"
+            }`}
+            role="status"
+            data-testid="audit-report"
+          >
+            <div className="flex items-center gap-2 text-sm">
+              <ShieldCheck
+                className={`w-4 h-4 ${auditResults.every((r) => r.ok) ? "text-green-700" : "text-destructive"}`}
+              />
+              <strong data-testid="audit-summary">
+                Audit: {auditResults.filter((r) => r.ok).length}/{auditResults.length} passed
+              </strong>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto h-6"
+                onClick={() => setAuditResults(null)}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+            <ul className="text-xs space-y-1">
+              {auditResults.map((r, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2"
+                  data-testid={r.ok ? "audit-pass" : "audit-fail"}
+                >
+                  <span className={r.ok ? "text-green-700" : "text-destructive"}>
+                    {r.ok ? "✓" : "✗"}
+                  </span>
+                  <span className="text-muted-foreground">[{r.group}]</span>
+                  <span className={r.ok ? "" : "text-destructive"}>{r.name}</span>
+                  {r.message && <span className="text-destructive break-all">— {r.message}</span>}
+                </li>
+              ))}
+            </ul>
           </Card>
         )}
 
