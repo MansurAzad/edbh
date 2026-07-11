@@ -153,3 +153,20 @@ export function findHubGroupByPath(pathname: string): HubGroup | undefined {
     (g) => g.hubPath === pathname || g.tabs.some((t) => t.path === pathname),
   );
 }
+
+/** Find the specific tab (and its section, if any) that matches a pathname. */
+export function findHubLocation(pathname: string): {
+  group?: HubGroup;
+  section?: HubSectionDef;
+  tab?: HubTabDef;
+} {
+  const group = findHubGroupByPath(pathname);
+  if (!group) return {};
+  const tab = group.tabs.find((t) => t.path === pathname);
+  if (!tab) return { group };
+  const section = group.sections?.find((s) =>
+    s.tabs.some((t) => t.path === pathname),
+  );
+  return { group, section, tab };
+}
+

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { ROUTE_PERMISSIONS } from "@/lib/permissions";
 import { findHubGroupByPath } from "@/lib/admin/hubGroups";
 import HubTabsBar from "@/components/admin/HubTabsBar";
+import ActiveStateSummary from "@/components/admin/ActiveStateSummary";
 
 const AdminAIChat = lazy(() => import("@/components/admin/AdminAIChat"));
 
@@ -156,7 +157,26 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto overscroll-contain">
+        <nav
+          className="flex-1 p-4 space-y-1 overflow-y-auto overscroll-contain"
+          aria-label="Admin sections"
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
+            const items = Array.from(
+              e.currentTarget.querySelectorAll<HTMLAnchorElement>('[data-testid="admin-sidebar-item"]'),
+            );
+            const currentIdx = items.findIndex((el) => el === document.activeElement);
+            if (currentIdx < 0) return;
+            e.preventDefault();
+            const last = items.length - 1;
+            let next = currentIdx;
+            if (e.key === "ArrowDown") next = currentIdx === last ? 0 : currentIdx + 1;
+            else if (e.key === "ArrowUp") next = currentIdx === 0 ? last : currentIdx - 1;
+            else if (e.key === "Home") next = 0;
+            else if (e.key === "End") next = last;
+            items[next]?.focus();
+          }}
+        >
           {visibleNavItems.map((item) => {
             const grp = findHubGroupByPath(item.path);
             const isActive = grp
@@ -173,6 +193,7 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
             );
           })}
         </nav>
+
 
         <div className="p-4 border-t border-border space-y-2">
           <Link
@@ -202,8 +223,10 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
         </div>
         <div key={location.pathname} className="p-4 md:p-8 animate-fade-in" style={{ animationDuration: '150ms' }}>
           {hubGroup && <HubTabsBar group={hubGroup} />}
+          <ActiveStateSummary />
           {children}
         </div>
+
       </main>
 
       <Suspense fallback={null}>
