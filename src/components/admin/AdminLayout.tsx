@@ -243,7 +243,13 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
             <ActiveStateSummary />
           </div>
         )}
-        <div key={location.pathname} className="p-4 md:p-8 animate-fade-in" style={{ animationDuration: '150ms' }}>
+        {/* scroll-mt keeps anchor jumps clear of the sticky header + hub tab bar. */}
+        <div
+          key={location.pathname}
+          data-testid="admin-page-content"
+          className="p-4 md:p-8 pt-6 md:pt-8 scroll-mt-[140px] lg:scroll-mt-[120px] animate-fade-in"
+          style={{ animationDuration: '150ms' }}
+        >
           {children}
         </div>
 
