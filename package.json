@@ -11,6 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:visual": "playwright test -c playwright.visual.config.ts",
+    "test:visual:update": "playwright test -c playwright.visual.config.ts --update-snapshots",
     "perf:budget": "node scripts/check-bundle-budget.mjs",
     "seo:prerender-smoke": "node scripts/prerender-smoke-test.mjs",
     "seo:validate-sitemap": "node scripts/validate-sitemap-robots.mjs"
