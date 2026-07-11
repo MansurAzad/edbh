@@ -62,6 +62,8 @@ function TabLink({
       aria-selected={active}
       tabIndex={active ? 0 : -1}
       onKeyDown={onKeyDown}
+      onPointerEnter={() => prefetchAdminRoute(tab.path)}
+      onFocus={() => prefetchAdminRoute(tab.path)}
       data-active={active ? "true" : "false"}
       data-tab-path={tab.path}
       className={cn(
