@@ -298,7 +298,7 @@ export default function AiProductStudio() {
     );
     const seenThisBatch = new Set<string>();
     const accepted: Array<{ id: string; file: File; fileHash: string }> = [];
-    let skipped = 0;
+    const newlySkipped: SkippedItem[] = [];
     for (const file of imgs) {
       let hash = "";
       try {
@@ -306,15 +306,20 @@ export default function AiProductStudio() {
       } catch {
         hash = `${file.name}:${file.size}:${file.lastModified}`;
       }
-      if (existingHashes.has(hash) || seenThisBatch.has(hash)) {
-        skipped++;
+      if (existingHashes.has(hash)) {
+        newlySkipped.push({ filename: file.name, hash, reason: "existing-session" });
+        continue;
+      }
+      if (seenThisBatch.has(hash)) {
+        newlySkipped.push({ filename: file.name, hash, reason: "duplicate-in-batch" });
         continue;
       }
       seenThisBatch.add(hash);
       accepted.push({ id: newId(), file, fileHash: hash });
     }
-    if (skipped > 0) {
-      toast.warning(`${skipped}টি ডুপ্লিকেট ছবি স্কিপ করা হয়েছে (একই hash আগে থেকেই আছে)`);
+    if (newlySkipped.length > 0) {
+      setSkippedItems((prev) => [...prev, ...newlySkipped]);
+      toast.warning(`${newlySkipped.length}টি ডুপ্লিকেট ছবি স্কিপ করা হয়েছে`);
     }
     if (!accepted.length) return;
     if (drafts.length + accepted.length > MAX_IMAGES) {
@@ -324,6 +329,7 @@ export default function AiProductStudio() {
 
     cancelRef.current = false;
     setGlobalBusy(true);
+    setBatchStartedAt(Date.now());
 
     // Seed as queued so the admin sees the whole list, and so cancel can
     // distinguish untouched jobs from in-flight ones without racing.
