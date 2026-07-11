@@ -72,10 +72,9 @@ test.describe("admin shell", () => {
     expect(sidebarAfter?.y).toBeCloseTo(sidebarBefore?.y ?? 0, 0);
     expect(sidebarAfter?.height).toBeCloseTo(sidebarBefore?.height ?? 0, 0);
 
-    // Top tab bar scrolls with the main region (it lives inside <main>),
-    // so its y should DECREASE after scrolling — proves it isn't fixed
-    // to the viewport but also that main actually scrolled.
-    expect((tabBarAfter?.y ?? 0)).toBeLessThan(tabBarBefore?.y ?? 0);
+    // Top tab bar is now sticky inside <main>, so its y should stay pinned
+    // (equal to before) even as main scrolls. Content below still scrolls.
+    expect(tabBarAfter?.y ?? -1).toBeCloseTo(tabBarBefore?.y ?? 0, 0);
 
     // Window itself never scrolls.
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
