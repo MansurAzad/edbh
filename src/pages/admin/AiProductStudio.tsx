@@ -642,6 +642,16 @@ export default function AiProductStudio() {
                 <StopCircle className="w-4 h-4 mr-2" /> Cancel
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={runAudit}
+              disabled={auditRunning}
+              data-testid="run-audit-btn"
+              title="Run built-in audit + test suite for AI Product Studio"
+            >
+              {auditRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
+              Run Audit
+            </Button>
             <Button variant="outline" onClick={exportCsv} disabled={!drafts.length} data-testid="export-csv">
               <Download className="w-4 h-4 mr-2" /> CSV
             </Button>
