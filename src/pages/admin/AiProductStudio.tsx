@@ -249,11 +249,13 @@ export default function AiProductStudio() {
       });
       if (error) throw error;
       const d = data?.draft || {};
+      const cat = d.category || "Abaya";
+      const applied = applyRule({ category: cat }, rules);
       updateDraft(id, {
         status: "ready",
         analyzeEndedAt: Date.now(),
         name: d.name || "",
-        category: d.category || "Abaya",
+        category: cat,
         subcategory: d.subcategory || "",
         fabric: d.fabric || "",
         work_type: d.work_type || "",
@@ -261,6 +263,8 @@ export default function AiProductStudio() {
         hijab_included: !!d.hijab_included,
         inner_included: !!d.inner_included,
         colors: Array.isArray(d.colors) ? d.colors.join(", ") : "",
+        sizes: applied.sizes,
+        stock: applied.stock,
         price: Number(d.estimated_price_bdt) || 0,
         sale_price: d.sale_price_bdt ? Number(d.sale_price_bdt) : null,
         description: d.description || "",
