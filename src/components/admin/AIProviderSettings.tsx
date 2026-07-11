@@ -17,7 +17,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-type Scope = "customer" | "admin";
+type Scope = "customer" | "admin" | "product_studio";
 
 interface ProviderRow {
   id: string;
