@@ -153,7 +153,8 @@ const App = () => (
                     <Route path="/admin/seo-debug" element={<PermissionGuard><SeoDebug /></PermissionGuard>} />
                     <Route path="/admin/categories" element={<PermissionGuard><AdminCategories /></PermissionGuard>} />
                     <Route path="/admin/blog" element={<PermissionGuard><BlogPosts /></PermissionGuard>} />
-                   <Route path="/admin/products" element={<PermissionGuard><AdminProducts /></PermissionGuard>} />
+                   <Route path="/admin/products" element={<PermissionGuard><ProductsHub /></PermissionGuard>} />
+                   <Route path="/admin/products-catalog" element={<PermissionGuard><AdminProducts /></PermissionGuard>} />
                    <Route path="/admin/product-descriptions" element={<PermissionGuard><AdminProductDescriptions /></PermissionGuard>} />
                     <Route path="/admin/orders" element={<PermissionGuard><AdminOrders /></PermissionGuard>} />
                     <Route path="/admin/customers" element={<PermissionGuard><AdminCustomers /></PermissionGuard>} />
