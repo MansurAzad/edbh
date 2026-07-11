@@ -275,6 +275,13 @@ test.describe("admin shell", () => {
     expect(hubBefore?.x ?? -1).toBeCloseTo(mainBox?.x ?? 0, 0);
     expect(hubBefore?.width ?? -1).toBeCloseTo(mainBox?.width ?? 0, 0);
 
+    // Content is padded so it does not start underneath the sticky headers
+    // BEFORE any scrolling (natural flow with sticky = content sits below).
+    const content = page.getByTestId("admin-page-content");
+    const contentBoxInitial = await content.boundingBox();
+    const stickyBottomInitial = (hubBefore?.y ?? 0) + (hubBefore?.height ?? 0);
+    expect((contentBoxInitial?.y ?? 0) + 4).toBeGreaterThanOrEqual(stickyBottomInitial - 2);
+
     // Scroll the main content and confirm neither header shifts.
     await main.evaluate((el) => el.scrollTo({ top: 900 }));
     await page.waitForTimeout(150);
@@ -282,13 +289,6 @@ test.describe("admin shell", () => {
     const hubAfter = await hubHeader.boundingBox();
     expect(mobAfter?.y ?? -1).toBeCloseTo(mobBefore?.y ?? 0, 0);
     expect(hubAfter?.y ?? -1).toBeCloseTo(hubBefore?.y ?? 0, 0);
-
-    // Content is padded so it does not start underneath the sticky headers.
-    const content = page.getByTestId("admin-page-content");
-    const contentBox = await content.boundingBox();
-    const stickyBottom = (hubAfter?.y ?? 0) + (hubAfter?.height ?? 0);
-    // Content top should not visually overlap the sticky hub header bottom edge.
-    expect((contentBox?.y ?? 0) + 4).toBeGreaterThanOrEqual(stickyBottom - 2);
 
     // Window scroll never leaks.
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
