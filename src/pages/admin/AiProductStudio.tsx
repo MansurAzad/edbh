@@ -250,47 +250,79 @@ export default function AiProductStudio() {
   const handleFiles = useCallback(async (files: File[]) => {
     const imgs = files.filter((f) => f.type.startsWith("image/"));
     if (!imgs.length) return;
-    if (drafts.length + imgs.length > MAX_IMAGES) {
+
+    // ── De-dup: hash every incoming file first and drop any file whose
+    //    hash already exists on a live draft (avoids re-analyse and
+    //    accidental double-save of the same product image).
+    const existingHashes = new Set(
+      drafts.map((d) => d.fileHash).filter(Boolean) as string[],
+    );
+    const seenThisBatch = new Set<string>();
+    const accepted: Array<{ id: string; file: File; fileHash: string }> = [];
+    let skipped = 0;
+    for (const file of imgs) {
+      let hash = "";
+      try {
+        hash = await sha256Hex(file);
+      } catch {
+        hash = `${file.name}:${file.size}:${file.lastModified}`;
+      }
+      if (existingHashes.has(hash) || seenThisBatch.has(hash)) {
+        skipped++;
+        continue;
+      }
+      seenThisBatch.add(hash);
+      accepted.push({ id: newId(), file, fileHash: hash });
+    }
+    if (skipped > 0) {
+      toast.warning(`${skipped}টি ডুপ্লিকেট ছবি স্কিপ করা হয়েছে (একই hash আগে থেকেই আছে)`);
+    }
+    if (!accepted.length) return;
+    if (drafts.length + accepted.length > MAX_IMAGES) {
       toast.error(`একসাথে সর্বোচ্চ ${MAX_IMAGES}টি ছবি`);
       return;
     }
+
     cancelRef.current = false;
     setGlobalBusy(true);
 
-    // Seed drafts in queued state first so admin sees the full list appear
-    // even at concurrency=1.
-    const jobs: Array<{ id: string; file: File }> = imgs.map((file) => ({
-      id: newId(),
-      file,
-    }));
+    // Seed as queued so the admin sees the whole list, and so cancel can
+    // distinguish untouched jobs from in-flight ones without racing.
     setDrafts((prev) => [
       ...prev,
-      ...jobs.map((j) => ({ ...emptyDraft(j.id, "", j.file), status: "uploading" as DraftStatus })),
+      ...accepted.map((j) => ({
+        ...emptyDraft(j.id, "", j.file),
+        fileHash: j.fileHash,
+        status: "queued" as DraftStatus,
+      })),
     ]);
 
-    const queue = [...jobs];
+    const queue = [...accepted];
     const worker = async () => {
       while (queue.length > 0) {
         if (cancelRef.current) break;
         const job = queue.shift()!;
+        const uploadStartedAt = Date.now();
+        updateDraft(job.id, { status: "uploading", uploadStartedAt });
         try {
           const res = await uploadProductImage(job.file, {
             folder: "ai-studio",
             onProgress: (e) => updateDraft(job.id, { progress: e.progress }),
           });
+          const uploadEndedAt = Date.now();
           if (cancelRef.current) {
-            updateDraft(job.id, { status: "error", error: "Cancelled" });
+            updateDraft(job.id, { status: "cancelled", error: "Cancelled after upload", uploadEndedAt });
             continue;
           }
           if (!res.success || !res.url) {
-            updateDraft(job.id, { status: "error", error: res.error || "Upload failed" });
+            updateDraft(job.id, { status: "error", error: res.error || "Upload failed", uploadEndedAt });
             toast.error(`আপলোড ব্যর্থ: ${res.error}`);
             continue;
           }
-          updateDraft(job.id, { imageUrl: res.url, progress: 100 });
+          updateDraft(job.id, { imageUrl: res.url, progress: 100, uploadEndedAt });
           await analyzeOne(job.id, res.url);
         } catch (e: any) {
-          updateDraft(job.id, { status: "error", error: e?.message || "Unexpected error" });
+          updateDraft(job.id, { status: "error", error: e?.message || "Unexpected error", uploadEndedAt: Date.now() });
         }
       }
     };
@@ -298,20 +330,21 @@ export default function AiProductStudio() {
     const workers = Array.from({ length: Math.max(1, concurrency) }, () => worker());
     await Promise.all(workers);
 
-    // Any leftover queued job (only possible if cancelled mid-flight) gets
-    // marked so the UI is honest about what didn't run.
+    // Only mark still-queued jobs as cancelled — never touch drafts that
+    // have already reached ready/saved/error terminal states.
     if (cancelRef.current) {
       setDrafts((prev) =>
         prev.map((d) =>
-          d.status === "uploading" || d.status === "analyzing"
-            ? { ...d, status: "error", error: "Cancelled" }
+          d.status === "queued"
+            ? { ...d, status: "cancelled", error: "Cancelled before start" }
             : d,
         ),
       );
     }
 
     setGlobalBusy(false);
-  }, [drafts.length, analyzeOne, updateDraft, concurrency]);
+  }, [drafts, analyzeOne, updateDraft, concurrency]);
+
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
