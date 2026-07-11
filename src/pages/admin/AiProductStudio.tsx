@@ -781,6 +781,7 @@ function DraftCard({
   onRemove,
   onReanalyze,
   onSave,
+  onZoom,
 }: {
   draft: Draft;
   suggestions?: ReturnType<typeof useProductFieldSuggestions>["data"];
@@ -788,6 +789,7 @@ function DraftCard({
   onRemove: () => void;
   onReanalyze: () => void;
   onSave: () => void;
+  onZoom?: () => void;
 }) {
   const statusColor: Record<DraftStatus, string> = {
     queued: "bg-muted text-muted-foreground",
