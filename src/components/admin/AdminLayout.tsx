@@ -3,7 +3,7 @@ import { Link, useLocation, Navigate } from "react-router-dom";
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Settings,
   LogOut, ChevronLeft, BarChart3, Truck,
-  FileText, Menu, X, ClipboardCheck, Megaphone, Activity,
+  FileText, Menu, X, ClipboardCheck, Megaphone, Activity, Sparkles,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,6 +27,7 @@ const navItems = [
   { path: "/admin/homepage", icon: FileText, label: "Homepage Sections" },
   { path: "/admin/blog", icon: FileText, label: "Blog Posts" },
   { path: "/admin/products", icon: Package, label: "Products" },
+  { path: "/admin/ai-product-studio", icon: Sparkles, label: "AI Product Studio" },
   { path: "/admin/orders", icon: ShoppingCart, label: "Orders" },
   { path: "/admin/customers", icon: Users, label: "Customers" },
   { path: "/admin/reports", icon: BarChart3, label: "Advanced Reports" },
