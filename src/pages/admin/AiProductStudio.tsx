@@ -487,13 +487,52 @@ export default function AiProductStudio() {
   }, [drafts]);
 
   const invalidReadyCount = useMemo(
-    () => drafts.filter((d) => d.status === "ready" && validateDraft(d).length > 0).length,
+    () => drafts.filter((d) => d.status === "ready" && validateSchema(d as any).length > 0).length,
     [drafts],
   );
 
   const total = drafts.length;
   const inFlight = counts.queued + counts.uploading + counts.analyzing + counts.saving;
   const showSummary = total > 0 && inFlight === 0 && (counts.saved > 0 || counts.error > 0 || counts.cancelled > 0);
+
+  // Batch throughput: how many drafts have moved past analysis / were saved.
+  const processed = counts.ready + counts.saved + counts.error + counts.cancelled;
+  const elapsedMs = batchStartedAt ? now - batchStartedAt : 0;
+  const throughput = elapsedMs > 0 && processed > 0
+    ? (processed / (elapsedMs / 1000))
+    : 0;
+
+  // Reset batch timer once everything is idle.
+  useEffect(() => {
+    if (batchStartedAt && inFlight === 0) {
+      // keep the value so the summary shows final throughput; only clear on next batch
+    }
+  }, [batchStartedAt, inFlight]);
+
+  const applyRulesToAll = useCallback(() => {
+    setDrafts((prev) =>
+      prev.map((d) => {
+        if (d.status !== "ready") return d;
+        const { sizes, stock } = applyRule({ category: d.category }, rules);
+        return { ...d, sizes, stock };
+      }),
+    );
+    toast.success("Rules applied to all ready drafts");
+  }, [rules]);
+
+  const exportCsv = useCallback(() => {
+    if (!drafts.length) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    download(`ai-studio-drafts-${stamp}.csv`, draftsToCsv(drafts as any), "text/csv");
+  }, [drafts]);
+
+  const exportJson = useCallback(() => {
+    if (!drafts.length) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    download(`ai-studio-drafts-${stamp}.json`, draftsToJson(drafts as any), "application/json");
+  }, [drafts]);
+
+
 
 
   return (
