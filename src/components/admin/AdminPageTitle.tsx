@@ -15,6 +15,7 @@ const SIDEBAR_LABELS: Record<string, string> = {
   "/admin/homepage": "Homepage Sections",
   "/admin/blog": "Blog Posts",
   "/admin/products": "Products",
+  "/admin/ai-product-studio": "AI Product Studio",
   "/admin/orders": "Orders",
   "/admin/customers": "Customers",
   "/admin/reports": "Advanced Reports",
