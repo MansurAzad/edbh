@@ -34,6 +34,7 @@ const DubaiImportedProof = lazy(() => import("@/components/home/DubaiImportedPro
 const PriceQuickShop = lazy(() => import("@/components/home/PriceQuickShop"));
 const ShowroomLocation = lazy(() => import("@/components/home/ShowroomLocation"));
 const DeliveryReturnStrip = lazy(() => import("@/components/home/DeliveryReturnStrip"));
+const PremiumDubaiCollection = lazy(() => import("@/components/home/PremiumDubaiCollection"));
 
 
 const SectionLoader = () => (
