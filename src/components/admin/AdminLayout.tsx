@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { ROUTE_PERMISSIONS } from "@/lib/permissions";
 import { findHubGroupByPath } from "@/lib/admin/hubGroups";
+import { prefetchAdminRoute } from "@/lib/admin/routePrefetch";
 import HubTabsBar from "@/components/admin/HubTabsBar";
 import ActiveStateSummary from "@/components/admin/ActiveStateSummary";
 
