@@ -248,10 +248,33 @@ const AIProviderSettings = () => {
     }
   };
 
-  const renderRow = (row: ProviderRow) => (
+  /**
+   * Reorder providers within a scope by swapping the `priority` value with the
+   * neighbouring row. Lower priority = tried first by the edge function. This
+   * gives admins an intuitive "up/down" reorder for the runtime fallback chain.
+   */
+  const reorder = async (list: ProviderRow[], index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= list.length) return;
+    const a = list[index];
+    const b = list[target];
+    try {
+      // Ensure distinct priorities before swap (if they're equal, bump the other side by 1).
+      const aPriority = a.priority ?? 100;
+      const bPriority = b.priority === a.priority ? (a.priority ?? 100) + (direction === -1 ? 1 : -1) : (b.priority ?? 100);
+      await supabase.from("ai_provider_settings" as any).update({ priority: bPriority }).eq("id", a.id);
+      await supabase.from("ai_provider_settings" as any).update({ priority: aPriority }).eq("id", b.id);
+      qc.invalidateQueries({ queryKey: ["ai-providers"] });
+    } catch (e: any) {
+      toast({ title: "Reorder failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const renderRow = (row: ProviderRow, index: number, list: ProviderRow[]) => (
     <div key={row.id} className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground font-mono w-5 shrink-0">#{index + 1}</span>
           <span className="font-medium">{row.provider_name}</span>
           {row.is_active && (
             <Badge className="bg-green-600 hover:bg-green-700">
