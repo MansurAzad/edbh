@@ -529,6 +529,56 @@ export default function AiProductStudio() {
     }
   }, [batchStartedAt, inFlight]);
 
+  /**
+   * Per-provider runtime metrics aggregated from every draft's providerTrace:
+   * total attempts, success/fail counts, average latency. Powers the header
+   * badges during batch runs so admins can see which provider is carrying
+   * the load and which is falling back.
+   */
+  const providerMetrics = useMemo(() => {
+    const map = new Map<
+      string,
+      { name: string; attempts: number; ok: number; fail: number; totalLatency: number }
+    >();
+    for (const d of drafts) {
+      for (const a of d.providerTrace ?? []) {
+        const key = `${a.name}::${a.model}`;
+        const entry = map.get(key) ?? { name: `${a.name} · ${a.model}`, attempts: 0, ok: 0, fail: 0, totalLatency: 0 };
+        entry.attempts += 1;
+        entry.totalLatency += a.latency_ms || 0;
+        if (a.ok) entry.ok += 1;
+        else entry.fail += 1;
+        map.set(key, entry);
+      }
+    }
+    return Array.from(map.values())
+      .map((e) => ({ ...e, avgLatency: e.attempts ? Math.round(e.totalLatency / e.attempts) : 0 }))
+      .sort((a, b) => b.attempts - a.attempts);
+  }, [drafts]);
+
+  const totalAttempts = providerMetrics.reduce((s, p) => s + p.attempts, 0);
+  const lastProviderUsed = useMemo(() => {
+    for (let i = drafts.length - 1; i >= 0; i--) {
+      if (drafts[i].providerUsed) return drafts[i].providerUsed!;
+    }
+    return null;
+  }, [drafts]);
+
+  const runAudit = useCallback(async () => {
+    setAuditRunning(true);
+    try {
+      const results = await runStudioAudit();
+      setAuditResults(results);
+      const failed = results.filter((r) => !r.ok).length;
+      if (failed === 0) toast.success(`Audit passed: ${results.length}/${results.length} checks green`);
+      else toast.error(`Audit: ${results.length - failed}/${results.length} passed, ${failed} failed`);
+    } catch (e: any) {
+      toast.error(`Audit runner crashed: ${e?.message}`);
+    } finally {
+      setAuditRunning(false);
+    }
+  }, []);
+
   const applyRulesToAll = useCallback(() => {
     setDrafts((prev) =>
       prev.map((d) => {
