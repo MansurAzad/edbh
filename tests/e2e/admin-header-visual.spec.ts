@@ -51,7 +51,7 @@ test.describe("admin header — visual + layout invariants", () => {
     });
 
     // After scrolling, header should still look identical (still pinned).
-    await page.getByTestId("admin-main").evaluate((el) => el.scrollTo({ top: 1200 }));
+    await page.getByTestId("admin-page-content").evaluate((el) => el.scrollTo({ top: 1200 }));
     await page.waitForTimeout(200);
     await expect(header).toHaveScreenshot("admin-header-desktop-scrolled.png", {
       maxDiffPixelRatio: 0.02,
@@ -77,7 +77,7 @@ test.describe("admin header — visual + layout invariants", () => {
       animations: "disabled",
     });
 
-    await page.getByTestId("admin-main").evaluate((el) => el.scrollTo({ top: 900 }));
+    await page.getByTestId("admin-page-content").evaluate((el) => el.scrollTo({ top: 900 }));
     await page.waitForTimeout(200);
     await expect(topRegion).toHaveScreenshot("admin-header-mobile-scrolled.png", {
       clip: { x: 0, y: 0, width: 390, height: 200 },
@@ -211,6 +211,7 @@ test.describe("admin header — visual + layout invariants", () => {
       const mobBar = page.locator('main[data-testid="admin-main"] > div').first();
       const hubHeader = page.getByTestId("admin-page-header");
       const main = page.getByTestId("admin-main");
+      const content = page.getByTestId("admin-page-content");
 
       const mobBox = await mobBar.boundingBox();
       const hubBox = await hubHeader.boundingBox();
@@ -229,13 +230,12 @@ test.describe("admin header — visual + layout invariants", () => {
       expect(mobBox?.width ?? -1).toBeCloseTo(mainBox?.width ?? 0, 0);
 
       // Content sits below the stack — no visual overlap at initial paint.
-      const content = page.getByTestId("admin-page-content");
       const contentBox = await content.boundingBox();
       const stickyBottom = (hubBox?.y ?? 0) + (hubBox?.height ?? 0);
       expect((contentBox?.y ?? 0) + 2).toBeGreaterThanOrEqual(stickyBottom - 2);
 
       // After scrolling, pinned bars do not shift (no layout jump).
-      await main.evaluate((el) => el.scrollTo({ top: 900 }));
+      await content.evaluate((el) => el.scrollTo({ top: 900 }));
       await page.waitForTimeout(150);
       const mobAfter = await mobBar.boundingBox();
       const hubAfter = await hubHeader.boundingBox();
@@ -244,6 +244,8 @@ test.describe("admin header — visual + layout invariants", () => {
       expect(hubAfter?.y ?? -1).toBeCloseTo(hubBox?.y ?? 0, 0);
       expect(hubAfter?.height ?? -1).toBeCloseTo(hubBox?.height ?? 0, 0);
       expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
+      expect(await content.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
     });
   }
 });
