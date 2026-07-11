@@ -10,6 +10,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { prefetchAdminRoute } from "@/lib/admin/routePrefetch";
 import type { HubGroup, HubTabDef } from "@/lib/admin/hubGroups";
 
 function useTabKeyboardNav(paths: string[]) {
