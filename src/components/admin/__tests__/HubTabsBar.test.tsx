@@ -105,21 +105,16 @@ describe("HubTabsBar keyboard navigation", () => {
   });
 
   it("roving tabindex follows the active route after tab activation", () => {
-    // Simulate a real navigation: after activation, HubTabsBar re-renders at
-    // the new pathname and the newly-active tab should own tabindex=0 while
-    // all others are -1.
-    const { rerender } = renderAt("/admin/email-campaigns", <HubTabsBar group={marketing} />);
+    // Simulate landing on the newly-active route (what happens after the
+    // browser navigates in response to Enter/click): the newly-active tab
+    // should own tabindex=0 while all others are -1.
+    const { unmount } = renderAt("/admin/email-campaigns", <HubTabsBar group={marketing} />);
     let tabs = screen.getAllByRole("tab") as HTMLAnchorElement[];
     expect(tabs[0].getAttribute("tabindex")).toBe("0");
     expect(tabs.slice(1).every((t) => t.getAttribute("tabindex") === "-1")).toBe(true);
+    unmount();
 
-    rerender(
-      <MemoryRouter initialEntries={["/admin/whatsapp-events"]}>
-        <Routes>
-          <Route path="*" element={<HubTabsBar group={marketing} />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderAt("/admin/whatsapp-events", <HubTabsBar group={marketing} />);
     tabs = screen.getAllByRole("tab") as HTMLAnchorElement[];
     const nowActive = tabs.find((t) => t.getAttribute("aria-selected") === "true")!;
     expect(nowActive).toHaveTextContent(/WhatsApp Events/i);
