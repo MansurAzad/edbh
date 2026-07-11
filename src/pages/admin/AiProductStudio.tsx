@@ -252,12 +252,22 @@ export default function AiProductStudio() {
         body: { imageUrl },
       });
       if (error) throw error;
+      // If the edge function returned a business error with attempts trace, surface it.
+      if (data?.error) {
+        const err: any = new Error(data.error);
+        err.attempts = data.attempts;
+        throw err;
+      }
       const d = data?.draft || {};
+      const trace = Array.isArray(data?.attempts) ? data.attempts : undefined;
+      const used = data?.provider_used || undefined;
       const cat = d.category || "Abaya";
       const applied = applyRule({ category: cat }, rules);
       updateDraft(id, {
         status: "ready",
         analyzeEndedAt: Date.now(),
+        providerUsed: used,
+        providerTrace: trace,
         name: d.name || "",
         category: cat,
         subcategory: d.subcategory || "",
@@ -278,7 +288,8 @@ export default function AiProductStudio() {
       });
     } catch (e: any) {
       const msg = e?.message || String(e);
-      updateDraft(id, { status: "error", error: msg, analyzeEndedAt: Date.now() });
+      const trace = Array.isArray(e?.attempts) ? e.attempts : undefined;
+      updateDraft(id, { status: "error", error: msg, analyzeEndedAt: Date.now(), providerTrace: trace });
       toast.error(`AI বিশ্লেষণে ব্যর্থ: ${msg}`);
     }
   }, [updateDraft, rules]);
