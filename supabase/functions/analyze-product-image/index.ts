@@ -191,7 +191,18 @@ Deno.serve(async (req) => {
       const result = await analyze(svc, imageUrl, hint);
       return jsonResponse(result);
     } catch (e: any) {
-      return jsonResponse({ error: e?.message || String(e), attempts: e?.attempts || [] }, 502);
+      const attempts: ProviderAttempt[] = e?.attempts || [];
+      const statuses = attempts.map((a) => a.status).filter(Boolean) as number[];
+      const allSame = statuses.length > 0 && statuses.every((s) => s === statuses[0]);
+      let httpStatus = 502;
+      let friendly = e?.message || String(e);
+      if (allSame && (statuses[0] === 402 || statuses[0] === 429)) {
+        httpStatus = statuses[0];
+        friendly = statuses[0] === 402
+          ? "AI credit শেষ — Lovable AI Gateway workspace-এ credit যোগ করুন, অথবা Settings → Custom AI Providers-এ নিজস্ব vision-capable provider যোগ করুন।"
+          : "AI provider rate limit — কিছুক্ষণ পর আবার চেষ্টা করুন।";
+      }
+      return jsonResponse({ error: friendly, attempts, upstream_status: statuses[0] || null }, httpStatus);
     }
   } catch (e) {
     return errorResponse((e as Error).message, 500);
