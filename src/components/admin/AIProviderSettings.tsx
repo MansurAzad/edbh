@@ -442,6 +442,14 @@ const AIProviderSettings = () => {
                 <div className="space-y-2">{adminProviders.map(renderRow)}</div>
               )}
             </div>
+            <div className="space-y-3">
+              <h4 className="font-medium">AI Product Studio providers (Vision-capable model প্রয়োজন)</h4>
+              {studioProviders.length === 0 ? (
+                <p className="text-sm text-muted-foreground">কোনো custom provider নেই — Lovable AI (Gemini Vision) ব্যবহার হচ্ছে।</p>
+              ) : (
+                <div className="space-y-2">{studioProviders.map(renderRow)}</div>
+              )}
+            </div>
           </>
         )}
       </CardContent>
