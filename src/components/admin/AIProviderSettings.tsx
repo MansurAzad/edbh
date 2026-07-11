@@ -92,9 +92,17 @@ const AIProviderSettings = () => {
     }
   }, [loadError, toast]);
 
-  const customerProviders = (providers || []).filter((p) => p.scope === "customer");
-  const adminProviders = (providers || []).filter((p) => p.scope === "admin");
-  const studioProviders = (providers || []).filter((p) => p.scope === "product_studio");
+  // Runtime fallback order used by the edge functions: is_active DESC, is_fallback DESC, priority ASC.
+  // Sort here so the on-screen list ALWAYS matches the order requests will actually be tried in.
+  const sortByRuntimeOrder = (rows: ProviderRow[]) =>
+    [...rows].sort((a, b) => {
+      if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+      if (a.is_fallback !== b.is_fallback) return a.is_fallback ? -1 : 1;
+      return (a.priority ?? 100) - (b.priority ?? 100);
+    });
+  const customerProviders = sortByRuntimeOrder((providers || []).filter((p) => p.scope === "customer"));
+  const adminProviders = sortByRuntimeOrder((providers || []).filter((p) => p.scope === "admin"));
+  const studioProviders = sortByRuntimeOrder((providers || []).filter((p) => p.scope === "product_studio"));
 
   const applyPreset = (name: string) => {
     const p = PRESETS.find((x) => x.name === name);
