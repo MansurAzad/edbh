@@ -129,6 +129,19 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
     return <Navigate to="/" replace />;
   }
 
+  // Embed mode: when rendered inside a hub-page iframe (?embed=1),
+  // skip the sidebar/topbar chrome so the sub-page fills the frame cleanly.
+  const isEmbed = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("embed") === "1";
+  if (isEmbed) {
+    return (
+      <main className="min-h-screen bg-muted/30">
+        <div className="p-4 md:p-6">{children}</div>
+      </main>
+    );
+  }
+
+
   return (
     <div className="min-h-screen flex bg-muted/30">
       {sidebarOpen && (
