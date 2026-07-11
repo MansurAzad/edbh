@@ -222,8 +222,10 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
         </div>
         <div key={location.pathname} className="p-4 md:p-8 animate-fade-in" style={{ animationDuration: '150ms' }}>
           {hubGroup && <HubTabsBar group={hubGroup} />}
+          <ActiveStateSummary />
           {children}
         </div>
+
       </main>
 
       <Suspense fallback={null}>
