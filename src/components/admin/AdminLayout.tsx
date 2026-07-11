@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { ROUTE_PERMISSIONS } from "@/lib/permissions";
 import { findHubGroupByPath } from "@/lib/admin/hubGroups";
+import { prefetchAdminRoute } from "@/lib/admin/routePrefetch";
 import HubTabsBar from "@/components/admin/HubTabsBar";
 import ActiveStateSummary from "@/components/admin/ActiveStateSummary";
 
@@ -42,6 +43,8 @@ const NavItem = memo(forwardRef<HTMLAnchorElement, {
     ref={ref}
     to={path}
     onClick={onClick}
+    onPointerEnter={() => prefetchAdminRoute(path)}
+    onFocus={() => prefetchAdminRoute(path)}
     data-testid="admin-sidebar-item"
     data-path={path}
     data-active={isActive ? "true" : "false"}

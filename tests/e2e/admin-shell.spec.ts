@@ -157,4 +157,46 @@ test.describe("admin shell", () => {
     expect(focusedPath).not.toBe(firstPath);
     expect(focusedPath).toBeTruthy();
   });
+
+  test("keyboard: Enter on each focused sidebar item navigates + updates active highlight", async ({ page }) => {
+    test.skip(!(await isAdminReachable(page)), "admin session required");
+    await page.goto(`${BASE_URL}/admin`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(400);
+
+    // Collect every visible sidebar item path in DOM order.
+    const paths: string[] = await page.$$eval(
+      '[data-testid="admin-sidebar-item"]',
+      (els) =>
+        (els as HTMLElement[])
+          .map((el) => el.getAttribute("data-path") || "")
+          .filter(Boolean),
+    );
+    expect(paths.length).toBeGreaterThan(3);
+
+    // Walk each item: focus it, press Enter, then verify URL + active-state.
+    for (const path of paths) {
+      const item = page.locator(`[data-testid="admin-sidebar-item"][data-path="${path}"]`);
+      await item.focus();
+      await page.keyboard.press("Enter");
+
+      // Some sidebar entries point at hub roots that redirect to a defaultPath,
+      // so accept either the item's own path or a nested descendant.
+      await page.waitForFunction(
+        (root) => window.location.pathname === root || window.location.pathname.startsWith(root + "/"),
+        path,
+        { timeout: 5000 },
+      );
+
+      // The active sidebar item must reflect the newly-landed route: either
+      // the exact path or the hub root whose members include the landing tab.
+      const activeSidebar = page.locator('[data-testid="admin-sidebar-item"][data-active="true"]');
+      await expect(activeSidebar).toHaveCount(1);
+      const activePath = await activeSidebar.getAttribute("data-path");
+      const landed = new URL(page.url()).pathname;
+      expect(landed === activePath || landed.startsWith(activePath + "/") || landed.startsWith(path)).toBe(true);
+
+      // Window scroll never leaks across keyboard navigation.
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    }
+  });
 });

@@ -10,6 +10,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { prefetchAdminRoute } from "@/lib/admin/routePrefetch";
 import type { HubGroup, HubTabDef } from "@/lib/admin/hubGroups";
 
 function useTabKeyboardNav(paths: string[]) {
@@ -61,6 +62,8 @@ function TabLink({
       aria-selected={active}
       tabIndex={active ? 0 : -1}
       onKeyDown={onKeyDown}
+      onPointerEnter={() => prefetchAdminRoute(tab.path)}
+      onFocus={() => prefetchAdminRoute(tab.path)}
       data-active={active ? "true" : "false"}
       data-tab-path={tab.path}
       className={cn(
