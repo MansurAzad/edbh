@@ -224,25 +224,20 @@ const AdminLayout = memo(({ children }: AdminLayoutProps) => {
           </button>
           <h1 className="font-display text-lg font-bold text-gradient-gold">{panelTitle}</h1>
         </div>
-        {/* Page header (hub tabs + active-state chip) stays pinned to the top
-            of the scroll container so it never scrolls away with the content. */}
-        {(hubGroup) && (
-          <div
-            data-testid="admin-page-header"
-            className="sticky top-[52px] lg:top-0 z-30 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b border-border px-4 md:px-8 pt-3"
-          >
-            <HubTabsBar group={hubGroup} />
-            <ActiveStateSummary />
+        {/* Page header (title + hub tabs + active-state chip) stays pinned to
+            the top of the scroll container so it never scrolls away with the
+            content. Rendered on every admin route so every page has a fixed
+            title bar, regardless of whether it belongs to a hub. */}
+        <div
+          data-testid="admin-page-header"
+          className="sticky top-[52px] lg:top-0 z-30 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b border-border px-4 md:px-8 pt-3 pb-1"
+        >
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <AdminPageTitle />
           </div>
-        )}
-        {!hubGroup && (
-          <div
-            data-testid="admin-page-header"
-            className="sticky top-[52px] lg:top-0 z-30 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/60 border-b border-border px-4 md:px-8 py-2"
-          >
-            <ActiveStateSummary />
-          </div>
-        )}
+          {hubGroup && <HubTabsBar group={hubGroup} />}
+          <ActiveStateSummary />
+        </div>
         {/* scroll-mt keeps anchor jumps clear of the sticky header + hub tab bar. */}
         <div
           key={location.pathname}
