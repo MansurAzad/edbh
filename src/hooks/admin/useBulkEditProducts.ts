@@ -276,11 +276,11 @@ export function useBulkEditProducts() {
       const { error } = await supabase.from("products").update({
         name: p.name.trim(), category: p.category.trim(), price: p.price,
         sale_price: p.sale_price || null, stock: p.stock,
-        description: p.description || null, material: p.material || null,
+        description: p.description?.trim() || null, material: p.material?.trim() || null,
         // Explode comma strings back to string[] for DB storage.
         sizes: p.sizes ? p.sizes.split(",").map(s => s.trim()).filter(Boolean) : [],
         colors: p.colors ? p.colors.split(",").map(c => c.trim()).filter(Boolean) : [],
-        featured: p.featured, image_url: p.image_url || null,
+        featured: p.featured, image_url: p.image_url?.trim() || null,
       }).eq("id", p._dbId!);
       if (error) { toast.error(`${p.name}: ${error.message}`); continue; }
       savedCount++;
@@ -288,9 +288,9 @@ export function useBulkEditProducts() {
       // Full replace: delete all existing variants then re-insert current set.
       await supabase.from("product_variants").delete().eq("product_id", p._dbId!);
       const newVariants = p.variants.filter(v => v.size || v.color).map(v => ({
-        product_id: p._dbId!, size: v.size || null, color: v.color || null, stock: v.stock,
-        sku: v.sku || null, price_adjustment: v.price_adjustment || 0,
-        image_url: v.image_url || null,
+        product_id: p._dbId!, size: v.size?.trim() || null, color: v.color?.trim() || null, stock: v.stock,
+        sku: v.sku?.trim() || null, price_adjustment: v.price_adjustment || 0,
+        image_url: v.image_url?.trim() || null,
       }));
       if (newVariants.length > 0) {
         const { data: vData } = await supabase.from("product_variants").insert(newVariants).select();
