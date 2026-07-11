@@ -59,7 +59,7 @@ const DEFAULT_STOCK = 10;
 const MAX_IMAGES = 20;
 const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 6];
 
-type DraftStatus = "uploading" | "analyzing" | "ready" | "saving" | "saved" | "error";
+type DraftStatus = "queued" | "uploading" | "analyzing" | "ready" | "saving" | "saved" | "error" | "cancelled";
 
 interface Draft {
   id: string;
@@ -72,6 +72,13 @@ interface Draft {
   /** Number of times AI analysis has been attempted (0 before first run). */
   attempts: number;
   progress: number;
+  /** SHA-256 hex of the file bytes — used for de-dup across the current session. */
+  fileHash?: string;
+  /** Wall-clock timings (ms since epoch) for per-image duration metrics. */
+  uploadStartedAt?: number;
+  uploadEndedAt?: number;
+  analyzeStartedAt?: number;
+  analyzeEndedAt?: number;
   // AI fields
   name: string;
   category: string;
@@ -91,6 +98,21 @@ interface Draft {
   meta_description: string;
   image_alt_text: string;
 }
+
+async function sha256Hex(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function fmtMs(ms?: number): string {
+  if (!ms || ms < 0) return "—";
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
 
 function newId() {
   return Math.random().toString(36).slice(2, 10);
@@ -165,9 +187,7 @@ export default function AiProductStudio() {
    * the DraftCard can show a chronological list of what failed and why.
    */
   const analyzeOne = useCallback(async (id: string, imageUrl: string) => {
-    // Bump attempts + capture the previous error into history before we
-    // clear it, so a Retry click never overwrites what the admin was
-    // reading a moment ago.
+    const startedAt = Date.now();
     setDrafts((prev) =>
       prev.map((d) => {
         if (d.id !== id) return d;
@@ -178,12 +198,14 @@ export default function AiProductStudio() {
           error: undefined,
           errorHistory: nextHistory,
           attempts: d.attempts + 1,
+          analyzeStartedAt: startedAt,
+          analyzeEndedAt: undefined,
         };
       }),
     );
 
     if (cancelRef.current) {
-      updateDraft(id, { status: "error", error: "Cancelled before analysis started" });
+      updateDraft(id, { status: "cancelled", error: "Cancelled before analysis started", analyzeEndedAt: Date.now() });
       return;
     }
     try {
@@ -194,6 +216,7 @@ export default function AiProductStudio() {
       const d = data?.draft || {};
       updateDraft(id, {
         status: "ready",
+        analyzeEndedAt: Date.now(),
         name: d.name || "",
         category: d.category || "Abaya",
         subcategory: d.subcategory || "",
@@ -212,10 +235,11 @@ export default function AiProductStudio() {
       });
     } catch (e: any) {
       const msg = e?.message || String(e);
-      updateDraft(id, { status: "error", error: msg });
+      updateDraft(id, { status: "error", error: msg, analyzeEndedAt: Date.now() });
       toast.error(`AI বিশ্লেষণে ব্যর্থ: ${msg}`);
     }
   }, [updateDraft]);
+
 
   /**
    * Worker-pool driven bulk upload. `concurrency` decides how many files
@@ -226,47 +250,79 @@ export default function AiProductStudio() {
   const handleFiles = useCallback(async (files: File[]) => {
     const imgs = files.filter((f) => f.type.startsWith("image/"));
     if (!imgs.length) return;
-    if (drafts.length + imgs.length > MAX_IMAGES) {
+
+    // ── De-dup: hash every incoming file first and drop any file whose
+    //    hash already exists on a live draft (avoids re-analyse and
+    //    accidental double-save of the same product image).
+    const existingHashes = new Set(
+      drafts.map((d) => d.fileHash).filter(Boolean) as string[],
+    );
+    const seenThisBatch = new Set<string>();
+    const accepted: Array<{ id: string; file: File; fileHash: string }> = [];
+    let skipped = 0;
+    for (const file of imgs) {
+      let hash = "";
+      try {
+        hash = await sha256Hex(file);
+      } catch {
+        hash = `${file.name}:${file.size}:${file.lastModified}`;
+      }
+      if (existingHashes.has(hash) || seenThisBatch.has(hash)) {
+        skipped++;
+        continue;
+      }
+      seenThisBatch.add(hash);
+      accepted.push({ id: newId(), file, fileHash: hash });
+    }
+    if (skipped > 0) {
+      toast.warning(`${skipped}টি ডুপ্লিকেট ছবি স্কিপ করা হয়েছে (একই hash আগে থেকেই আছে)`);
+    }
+    if (!accepted.length) return;
+    if (drafts.length + accepted.length > MAX_IMAGES) {
       toast.error(`একসাথে সর্বোচ্চ ${MAX_IMAGES}টি ছবি`);
       return;
     }
+
     cancelRef.current = false;
     setGlobalBusy(true);
 
-    // Seed drafts in queued state first so admin sees the full list appear
-    // even at concurrency=1.
-    const jobs: Array<{ id: string; file: File }> = imgs.map((file) => ({
-      id: newId(),
-      file,
-    }));
+    // Seed as queued so the admin sees the whole list, and so cancel can
+    // distinguish untouched jobs from in-flight ones without racing.
     setDrafts((prev) => [
       ...prev,
-      ...jobs.map((j) => ({ ...emptyDraft(j.id, "", j.file), status: "uploading" as DraftStatus })),
+      ...accepted.map((j) => ({
+        ...emptyDraft(j.id, "", j.file),
+        fileHash: j.fileHash,
+        status: "queued" as DraftStatus,
+      })),
     ]);
 
-    const queue = [...jobs];
+    const queue = [...accepted];
     const worker = async () => {
       while (queue.length > 0) {
         if (cancelRef.current) break;
         const job = queue.shift()!;
+        const uploadStartedAt = Date.now();
+        updateDraft(job.id, { status: "uploading", uploadStartedAt });
         try {
           const res = await uploadProductImage(job.file, {
             folder: "ai-studio",
             onProgress: (e) => updateDraft(job.id, { progress: e.progress }),
           });
+          const uploadEndedAt = Date.now();
           if (cancelRef.current) {
-            updateDraft(job.id, { status: "error", error: "Cancelled" });
+            updateDraft(job.id, { status: "cancelled", error: "Cancelled after upload", uploadEndedAt });
             continue;
           }
           if (!res.success || !res.url) {
-            updateDraft(job.id, { status: "error", error: res.error || "Upload failed" });
+            updateDraft(job.id, { status: "error", error: res.error || "Upload failed", uploadEndedAt });
             toast.error(`আপলোড ব্যর্থ: ${res.error}`);
             continue;
           }
-          updateDraft(job.id, { imageUrl: res.url, progress: 100 });
+          updateDraft(job.id, { imageUrl: res.url, progress: 100, uploadEndedAt });
           await analyzeOne(job.id, res.url);
         } catch (e: any) {
-          updateDraft(job.id, { status: "error", error: e?.message || "Unexpected error" });
+          updateDraft(job.id, { status: "error", error: e?.message || "Unexpected error", uploadEndedAt: Date.now() });
         }
       }
     };
@@ -274,20 +330,21 @@ export default function AiProductStudio() {
     const workers = Array.from({ length: Math.max(1, concurrency) }, () => worker());
     await Promise.all(workers);
 
-    // Any leftover queued job (only possible if cancelled mid-flight) gets
-    // marked so the UI is honest about what didn't run.
+    // Only mark still-queued jobs as cancelled — never touch drafts that
+    // have already reached ready/saved/error terminal states.
     if (cancelRef.current) {
       setDrafts((prev) =>
         prev.map((d) =>
-          d.status === "uploading" || d.status === "analyzing"
-            ? { ...d, status: "error", error: "Cancelled" }
+          d.status === "queued"
+            ? { ...d, status: "cancelled", error: "Cancelled before start" }
             : d,
         ),
       );
     }
 
     setGlobalBusy(false);
-  }, [drafts.length, analyzeOne, updateDraft, concurrency]);
+  }, [drafts, analyzeOne, updateDraft, concurrency]);
+
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -379,7 +436,7 @@ export default function AiProductStudio() {
   }, [drafts, saveOne, queryClient]);
 
   const counts = useMemo(() => {
-    const c = { uploading: 0, analyzing: 0, ready: 0, saving: 0, saved: 0, error: 0 };
+    const c = { queued: 0, uploading: 0, analyzing: 0, ready: 0, saving: 0, saved: 0, error: 0, cancelled: 0 };
     for (const d of drafts) c[d.status]++;
     return c;
   }, [drafts]);
@@ -390,8 +447,9 @@ export default function AiProductStudio() {
   );
 
   const total = drafts.length;
-  const inFlight = counts.uploading + counts.analyzing + counts.saving;
-  const showSummary = total > 0 && inFlight === 0 && (counts.saved > 0 || counts.error > 0);
+  const inFlight = counts.queued + counts.uploading + counts.analyzing + counts.saving;
+  const showSummary = total > 0 && inFlight === 0 && (counts.saved > 0 || counts.error > 0 || counts.cancelled > 0);
+
 
   return (
     <AdminLayout>
@@ -442,6 +500,7 @@ export default function AiProductStudio() {
           <Card className="p-3" aria-live="polite" data-testid="status-strip">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="secondary">Total: {total}</Badge>
+              {counts.queued > 0 && <Badge className="bg-muted">Queued: {counts.queued}</Badge>}
               {counts.uploading > 0 && <Badge className="bg-muted">Uploading: {counts.uploading}</Badge>}
               {counts.analyzing > 0 && (
                 <Badge className="bg-blue-500/10 text-blue-700">
@@ -453,6 +512,9 @@ export default function AiProductStudio() {
               <Badge className="bg-primary/10 text-primary">Saved: {counts.saved}</Badge>
               {counts.error > 0 && (
                 <Badge className="bg-destructive/10 text-destructive">Failed: {counts.error}</Badge>
+              )}
+              {counts.cancelled > 0 && (
+                <Badge className="bg-muted text-muted-foreground">Cancelled: {counts.cancelled}</Badge>
               )}
             </div>
           </Card>
@@ -587,12 +649,14 @@ function DraftCard({
   onSave: () => void;
 }) {
   const statusColor: Record<DraftStatus, string> = {
+    queued: "bg-muted text-muted-foreground",
     uploading: "bg-muted",
     analyzing: "bg-blue-500/10 text-blue-600",
     ready: "bg-green-500/10 text-green-700",
     saving: "bg-yellow-500/10 text-yellow-700",
     saved: "bg-primary/10 text-primary",
     error: "bg-destructive/10 text-destructive",
+    cancelled: "bg-muted text-muted-foreground",
   };
 
   const categoryOptions = suggestions?.categories ?? [];
@@ -659,6 +723,30 @@ function DraftCard({
             </div>
           </div>
           {d.status === "uploading" && <Progress value={d.progress} className="h-2" />}
+
+          {/* Per-image timing metrics — visible once a phase has started. */}
+          {(d.uploadStartedAt || d.analyzeStartedAt) && (
+            <div
+              className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground"
+              data-testid="timing-metrics"
+            >
+              {d.uploadStartedAt && (
+                <span title="Upload duration">
+                  ⬆ upload: {fmtMs((d.uploadEndedAt ?? Date.now()) - d.uploadStartedAt)}
+                </span>
+              )}
+              {d.analyzeStartedAt && (
+                <span title="AI analyse duration">
+                  🤖 analyse: {fmtMs((d.analyzeEndedAt ?? Date.now()) - d.analyzeStartedAt)}
+                </span>
+              )}
+              {d.uploadStartedAt && (d.analyzeEndedAt || d.uploadEndedAt) && (
+                <span title="Total wall time">
+                  Σ total: {fmtMs((d.analyzeEndedAt ?? d.uploadEndedAt ?? Date.now()) - d.uploadStartedAt)}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Current failure banner */}
           {isFailed && (
