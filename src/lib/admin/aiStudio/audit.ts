@@ -15,6 +15,10 @@ export interface AuditResult {
   group: "sizeRules" | "validator" | "exportDrafts" | "edgeFunction";
   ok: boolean;
   message?: string;
+  /** requestId echoed by the edge function (present on edgeFunction probe). */
+  requestId?: string;
+  /** Fields the user must fix in the UI to make this check pass. */
+  fixFields?: string[];
 }
 
 const validDraft: DraftSchemaInput = {
