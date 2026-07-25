@@ -1,8 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { DEFAULT_RULES, resolveRule, applyRule } from "../sizeRules";
 import { validateSchema, type DraftSchemaInput } from "../validator";
 import { draftsToCsv, draftsToJson, type ExportableDraft } from "../exportDrafts";
-import { extractEdgeFunctionAuditMessage } from "../audit";
+import { extractEdgeFunctionAuditMessage, extractEdgeFunctionAudit } from "../audit";
+
+// Mock the supabase client BEFORE importing runStudioAudit so the module picks
+// up the mocked functions.invoke when the integration test exercises it.
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { functions: { invoke: vi.fn() } },
+}));
+import { runStudioAudit } from "../audit";
+import { supabase } from "@/integrations/supabase/client";
 
 const validDraft: DraftSchemaInput = {
   name: "Premium Dubai Abaya",
@@ -137,5 +145,54 @@ describe("audit edge-function probe", () => {
   it("extracts validation error from successful data payload", async () => {
     const msg = await extractEdgeFunctionAuditMessage({ error: "imageUrl is required" }, null);
     expect(msg).toContain("imageurl is required");
+  });
+
+  it("extracts requestId from non-2xx JSON body via error.context", async () => {
+    const response = new Response(
+      JSON.stringify({ error: "imageUrl is required", requestId: "req_abc12345" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+    const out = await extractEdgeFunctionAudit(null, {
+      message: "Edge Function returned a non-2xx status code",
+      context: response,
+    });
+    expect(out.message).toContain("imageurl is required");
+    expect(out.requestId).toBe("req_abc12345");
+  });
+});
+
+describe("runStudioAudit — edge-function integration", () => {
+  it("passes edgeFunction check when non-2xx Response body says imageUrl is required", async () => {
+    const response = new Response(
+      JSON.stringify({ error: "imageUrl is required", requestId: "req_intgr01" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+    (supabase.functions.invoke as any).mockResolvedValueOnce({
+      data: null,
+      error: { message: "Edge Function returned a non-2xx status code", context: response },
+    });
+
+    const results = await runStudioAudit();
+    const ef = results.find((r) => r.group === "edgeFunction")!;
+    expect(ef).toBeDefined();
+    expect(ef.ok).toBe(true);
+    expect(ef.requestId).toBe("req_intgr01");
+  });
+
+  it("fails edgeFunction check with fixFields when body is unexpected", async () => {
+    const response = new Response(JSON.stringify({ error: "internal boom" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+    (supabase.functions.invoke as any).mockResolvedValueOnce({
+      data: null,
+      error: { message: "Edge Function returned a non-2xx status code", context: response },
+    });
+
+    const results = await runStudioAudit();
+    const ef = results.find((r) => r.group === "edgeFunction")!;
+    expect(ef.ok).toBe(false);
+    expect(ef.message).toContain("unexpected response");
+    expect(ef.fixFields).toContain("imageUrl");
   });
 });

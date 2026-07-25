@@ -206,28 +206,52 @@ async function analyze(supabase: any, imageUrl: string, hint?: string): Promise<
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflight();
+  // Per-request correlation id — surfaced in every log line AND in every
+  // non-2xx response body so admins can grep server logs from a UI error.
+  const requestId =
+    req.headers.get("x-request-id") ||
+    (globalThis.crypto?.randomUUID?.() ?? `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+  const startedAt = Date.now();
+  const log = (level: "info" | "warn" | "error", msg: string, extra: Record<string, unknown> = {}) => {
+    const line = JSON.stringify({ requestId, level, msg, elapsed_ms: Date.now() - startedAt, ...extra });
+    if (level === "error") console.error(line);
+    else if (level === "warn") console.warn(line);
+    else console.log(line);
+  };
+  const fail = (message: string, status: number, extra: Record<string, unknown> = {}) => {
+    log(status >= 500 ? "error" : "warn", "non_2xx", { status, message, ...extra });
+    return jsonResponse({ error: message, requestId, ...extra }, status);
+  };
+
   try {
+    log("info", "start", { method: req.method, ua: req.headers.get("user-agent") || null });
     const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.replace(/^Bearer\s+/i, "");
-    if (!token) return errorResponse("Missing auth token", 401);
+    if (!token) return fail("Missing auth token", 401, { reason: "no_bearer" });
 
     const svc = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: userData } = await svc.auth.getUser(token);
     const uid = userData?.user?.id;
-    if (!uid) return errorResponse("Invalid session", 401);
+    if (!uid) return fail("Invalid session", 401, { reason: "getUser_failed" });
     const { data: isAdmin } = await svc.rpc("has_role", { _user_id: uid, _role: "admin" });
-    if (!isAdmin) return errorResponse("Admin role required", 403);
+    if (!isAdmin) return fail("Admin role required", 403, { reason: "not_admin", uid });
 
     const body = await req.json().catch(() => ({}));
     const imageUrl: string = body.imageUrl;
     const hint: string | undefined = body.hint;
     if (!imageUrl || typeof imageUrl !== "string") {
-      return errorResponse("imageUrl is required", 400);
+      return fail("imageUrl is required", 400, { reason: "missing_imageUrl", body_keys: Object.keys(body || {}) });
     }
+    log("info", "input_ok", { imageHost: (() => { try { return new URL(imageUrl).host; } catch { return null; } })(), hasHint: !!hint });
 
     try {
       const result = await analyze(svc, imageUrl, hint);
-      return jsonResponse(result);
+      log("info", "analyze_ok", {
+        provider: result.provider_used?.name || null,
+        model: result.provider_used?.model || null,
+        attempts: result.attempts?.length ?? 0,
+      });
+      return jsonResponse({ ...result, requestId });
     } catch (e: any) {
       const attempts: ProviderAttempt[] = e?.attempts || [];
       const statuses = attempts.map((a) => a.status).filter(Boolean) as number[];
@@ -240,9 +264,15 @@ Deno.serve(async (req) => {
           ? "AI credit শেষ — Lovable AI Gateway workspace-এ credit যোগ করুন, অথবা Settings → Custom AI Providers-এ নিজস্ব vision-capable provider যোগ করুন।"
           : "AI provider rate limit — কিছুক্ষণ পর আবার চেষ্টা করুন।";
       }
-      return jsonResponse({ error: friendly, attempts, upstream_status: statuses[0] || null }, httpStatus);
+      log("error", "analyze_failed", {
+        status: httpStatus,
+        upstream_status: statuses[0] || null,
+        message: friendly,
+        attempts: attempts.map((a) => ({ name: a.name, model: a.model, ok: a.ok, status: a.status, latency_ms: a.latency_ms, error: a.error })),
+      });
+      return jsonResponse({ error: friendly, attempts, upstream_status: statuses[0] || null, requestId }, httpStatus);
     }
   } catch (e) {
-    return errorResponse((e as Error).message, 500);
+    return fail((e as Error).message, 500, { reason: "unhandled" });
   }
 });
