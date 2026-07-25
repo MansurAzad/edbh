@@ -1,8 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { DEFAULT_RULES, resolveRule, applyRule } from "../sizeRules";
 import { validateSchema, type DraftSchemaInput } from "../validator";
 import { draftsToCsv, draftsToJson, type ExportableDraft } from "../exportDrafts";
-import { extractEdgeFunctionAuditMessage } from "../audit";
+import { extractEdgeFunctionAuditMessage, extractEdgeFunctionAudit } from "../audit";
+
+// Mock the supabase client BEFORE importing runStudioAudit so the module picks
+// up the mocked functions.invoke when the integration test exercises it.
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { functions: { invoke: vi.fn() } },
+}));
+import { runStudioAudit } from "../audit";
+import { supabase } from "@/integrations/supabase/client";
 
 const validDraft: DraftSchemaInput = {
   name: "Premium Dubai Abaya",
