@@ -202,15 +202,17 @@ export async function runStudioAudit(): Promise<AuditResult[]> {
       // We expect a 400 "imageUrl is required". Supabase wraps non-2xx
       // responses as FunctionsHttpError, so read the response body from
       // error.context instead of relying on the generic error.message.
-      const msg = await extractEdgeFunctionAuditMessage(data, error);
-      if (msg.includes("imageurl")) {
-        return { name: "edge function reachable + validates input", group: "edgeFunction", ok: true };
+      const { message, requestId } = await extractEdgeFunctionAudit(data, error);
+      if (message.includes("imageurl")) {
+        return { name: "edge function reachable + validates input", group: "edgeFunction", ok: true, requestId };
       }
       return {
         name: "edge function reachable + validates input",
         group: "edgeFunction",
         ok: false,
-        message: `unexpected response: ${msg || JSON.stringify(data)}`,
+        message: `unexpected response: ${message || JSON.stringify(data)}`,
+        requestId,
+        fixFields: ["imageUrl"],
       };
     } catch (e: any) {
       return { name: "edge function reachable + validates input", group: "edgeFunction", ok: false, message: e?.message };
