@@ -730,50 +730,117 @@ export default function AiProductStudio() {
         )}
 
         {/* Audit report — summarised pass/fail from the built-in test suite */}
-        {auditResults && (
-          <Card
-            className={`p-3 space-y-2 ${
-              auditResults.every((r) => r.ok)
-                ? "border-green-500/40 bg-green-500/5"
-                : "border-destructive/40 bg-destructive/5"
-            }`}
-            role="status"
-            data-testid="audit-report"
-          >
-            <div className="flex items-center gap-2 text-sm">
-              <ShieldCheck
-                className={`w-4 h-4 ${auditResults.every((r) => r.ok) ? "text-green-700" : "text-destructive"}`}
-              />
-              <strong data-testid="audit-summary">
-                Audit: {auditResults.filter((r) => r.ok).length}/{auditResults.length} passed
-              </strong>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="ml-auto h-6"
-                onClick={() => setAuditResults(null)}
-              >
-                <X className="w-3 h-3" />
-              </Button>
-            </div>
-            <ul className="text-xs space-y-1">
-              {auditResults.map((r, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-2"
-                  data-testid={r.ok ? "audit-pass" : "audit-fail"}
+        {auditResults && (() => {
+          const allOk = auditResults.every((r) => r.ok);
+          const failed = auditResults.filter((r) => !r.ok);
+          const efResult = auditResults.find((r) => r.group === "edgeFunction");
+          // Aggregate live draft validation errors so admins see which fields
+          // need fixing across the current batch, not just the abstract audit.
+          const draftFieldMap = new Map<string, { label: string; drafts: string[] }>();
+          for (const d of drafts) {
+            if (d.status !== "ready") continue;
+            for (const err of validateSchema(d as any)) {
+              const key = String(err.field);
+              const entry = draftFieldMap.get(key) ?? { label: err.label, drafts: [] };
+              entry.drafts.push(d.name || d.file?.name || d.id);
+              draftFieldMap.set(key, entry);
+            }
+          }
+          const fieldFixes = Array.from(draftFieldMap.entries());
+          return (
+            <Card
+              className={`p-3 space-y-3 ${
+                allOk && fieldFixes.length === 0
+                  ? "border-green-500/40 bg-green-500/5"
+                  : "border-destructive/40 bg-destructive/5"
+              }`}
+              role="status"
+              data-testid="audit-report"
+            >
+              <div className="flex items-center gap-2 text-sm">
+                <ShieldCheck
+                  className={`w-4 h-4 ${allOk ? "text-green-700" : "text-destructive"}`}
+                />
+                <strong data-testid="audit-summary">
+                  Audit: {auditResults.filter((r) => r.ok).length}/{auditResults.length} passed
+                </strong>
+                {efResult?.requestId && (
+                  <Badge variant="outline" className="font-mono text-[10px]" data-testid="audit-request-id"
+                         title="Server-side requestId — search edge function logs with this id">
+                    reqId: {efResult.requestId.slice(0, 8)}…
+                  </Badge>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto h-6"
+                  onClick={() => setAuditResults(null)}
                 >
-                  <span className={r.ok ? "text-green-700" : "text-destructive"}>
-                    {r.ok ? "✓" : "✗"}
-                  </span>
-                  <span className="text-muted-foreground">[{r.group}]</span>
-                  <span className={r.ok ? "" : "text-destructive"}>{r.name}</span>
-                  {r.message && <span className="text-destructive break-all">— {r.message}</span>}
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+              <ul className="text-xs space-y-1">
+                {auditResults.map((r, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-2"
+                    data-testid={r.ok ? "audit-pass" : "audit-fail"}
+                  >
+                    <span className={r.ok ? "text-green-700" : "text-destructive"}>
+                      {r.ok ? "✓" : "✗"}
+                    </span>
+                    <span className="text-muted-foreground">[{r.group}]</span>
+                    <span className={r.ok ? "" : "text-destructive"}>{r.name}</span>
+                    {r.message && <span className="text-destructive break-all">— {r.message}</span>}
+                    {r.requestId && (
+                      <span className="ml-auto text-[10px] font-mono text-muted-foreground">
+                        {r.requestId.slice(0, 8)}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+
+              {/* Fields-to-fix panel: what the user must edit to make drafts valid */}
+              {(fieldFixes.length > 0 || failed.some((r) => r.fixFields?.length)) && (
+                <div className="rounded-md border border-destructive/30 bg-background/60 p-2 space-y-1.5"
+                     data-testid="fields-to-fix-panel">
+                  <div className="flex items-center gap-2 text-xs font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5 text-destructive" />
+                    ঠিক করতে হবে এমন ফিল্ড
+                  </div>
+                  <ul className="text-[11px] space-y-1">
+                    {fieldFixes.map(([field, info]) => (
+                      <li key={field} className="flex flex-wrap items-center gap-1"
+                          data-testid="field-fix-row">
+                        <Badge variant="outline" className="border-destructive/40 text-destructive">
+                          {info.label}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          {info.drafts.length}টি draft-এ অনুপস্থিত
+                        </span>
+                        <span className="text-muted-foreground truncate max-w-[420px]" title={info.drafts.join(", ")}>
+                          — {info.drafts.slice(0, 3).join(", ")}
+                          {info.drafts.length > 3 ? ` +${info.drafts.length - 3}` : ""}
+                        </span>
+                      </li>
+                    ))}
+                    {failed
+                      .filter((r) => r.fixFields?.length)
+                      .map((r, i) => (
+                        <li key={`ef-${i}`} className="flex items-center gap-1">
+                          <Badge variant="outline" className="border-destructive/40 text-destructive">
+                            {r.fixFields!.join(", ")}
+                          </Badge>
+                          <span className="text-muted-foreground">— {r.name}</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+            </Card>
+          );
+        })()}
 
         {/* Skipped duplicates */}
         {skippedItems.length > 0 && (
