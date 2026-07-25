@@ -92,10 +92,35 @@ async function readResponseError(response: Response): Promise<string> {
   }
 }
 
-export async function extractEdgeFunctionAuditMessage(data: unknown, error: unknown): Promise<string> {
+export interface EdgeErrorExtraction {
+  message: string;
+  requestId?: string;
+}
+
+async function readResponseErrorFull(response: Response): Promise<EdgeErrorExtraction> {
+  try {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const json: any = await response.clone().json();
+      const message = getErrorField(json) || JSON.stringify(json);
+      const requestId = typeof json?.requestId === "string" ? json.requestId : undefined;
+      return { message, requestId };
+    }
+    return { message: await response.clone().text() };
+  } catch {
+    return { message: "" };
+  }
+}
+
+export async function extractEdgeFunctionAudit(data: unknown, error: unknown): Promise<EdgeErrorExtraction> {
   const parts: string[] = [];
+  let requestId: string | undefined;
+
   const dataMessage = getErrorField(data);
   if (dataMessage) parts.push(dataMessage);
+  if (data && typeof data === "object" && typeof (data as any).requestId === "string") {
+    requestId = (data as any).requestId;
+  }
 
   if (error && typeof error === "object") {
     const errorMessage = (error as { message?: unknown }).message;
@@ -103,14 +128,20 @@ export async function extractEdgeFunctionAuditMessage(data: unknown, error: unkn
 
     const context = (error as { context?: unknown }).context;
     if (context instanceof Response) {
-      const responseMessage = await readResponseError(context);
-      if (responseMessage) parts.push(responseMessage);
+      const extracted = await readResponseErrorFull(context);
+      if (extracted.message) parts.push(extracted.message);
+      if (!requestId && extracted.requestId) requestId = extracted.requestId;
     }
   } else if (typeof error === "string" && error.trim()) {
     parts.push(error);
   }
 
-  return parts.join(" ").toLowerCase();
+  return { message: parts.join(" ").toLowerCase(), requestId };
+}
+
+/** Back-compat wrapper — returns only the message string. */
+export async function extractEdgeFunctionAuditMessage(data: unknown, error: unknown): Promise<string> {
+  return (await extractEdgeFunctionAudit(data, error)).message;
 }
 
 export async function runStudioAudit(): Promise<AuditResult[]> {
