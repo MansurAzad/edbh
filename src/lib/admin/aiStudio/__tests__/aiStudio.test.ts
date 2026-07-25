@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { DEFAULT_RULES, resolveRule, applyRule } from "../sizeRules";
 import { validateSchema, type DraftSchemaInput } from "../validator";
 import { draftsToCsv, draftsToJson, type ExportableDraft } from "../exportDrafts";
+import { extractEdgeFunctionAuditMessage } from "../audit";
 
 const validDraft: DraftSchemaInput = {
   name: "Premium Dubai Abaya",
@@ -115,5 +116,26 @@ describe("exportDrafts", () => {
   it("sale_price null exports as empty string in row", () => {
     const json = JSON.parse(draftsToJson([{ ...exportDraft, sale_price: null }]));
     expect(json[0].sale_price).toBe("");
+  });
+});
+
+describe("audit edge-function probe", () => {
+  it("extracts validation error from non-2xx function response body", async () => {
+    const response = new Response(JSON.stringify({ error: "imageUrl is required", code: null }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const msg = await extractEdgeFunctionAuditMessage(null, {
+      message: "Edge Function returned a non-2xx status code",
+      context: response,
+    });
+
+    expect(msg).toContain("imageurl is required");
+  });
+
+  it("extracts validation error from successful data payload", async () => {
+    const msg = await extractEdgeFunctionAuditMessage({ error: "imageUrl is required" }, null);
+    expect(msg).toContain("imageurl is required");
   });
 });
