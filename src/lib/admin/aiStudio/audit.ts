@@ -66,6 +66,49 @@ function assert(cond: unknown, msg: string) {
   if (!cond) throw new Error(msg);
 }
 
+function getErrorField(value: unknown): string {
+  if (!value || typeof value !== "object") return "";
+  const maybeError = (value as { error?: unknown; message?: unknown }).error;
+  const maybeMessage = (value as { error?: unknown; message?: unknown }).message;
+  return [maybeError, maybeMessage]
+    .filter((item) => typeof item === "string" && item.trim().length > 0)
+    .join(" ");
+}
+
+async function readResponseError(response: Response): Promise<string> {
+  try {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const json = await response.clone().json();
+      return getErrorField(json) || JSON.stringify(json);
+    }
+    return await response.clone().text();
+  } catch {
+    return "";
+  }
+}
+
+export async function extractEdgeFunctionAuditMessage(data: unknown, error: unknown): Promise<string> {
+  const parts: string[] = [];
+  const dataMessage = getErrorField(data);
+  if (dataMessage) parts.push(dataMessage);
+
+  if (error && typeof error === "object") {
+    const errorMessage = (error as { message?: unknown }).message;
+    if (typeof errorMessage === "string" && errorMessage.trim()) parts.push(errorMessage);
+
+    const context = (error as { context?: unknown }).context;
+    if (context instanceof Response) {
+      const responseMessage = await readResponseError(context);
+      if (responseMessage) parts.push(responseMessage);
+    }
+  } else if (typeof error === "string" && error.trim()) {
+    parts.push(error);
+  }
+
+  return parts.join(" ").toLowerCase();
+}
+
 export async function runStudioAudit(): Promise<AuditResult[]> {
   const results: AuditResult[] = [];
 
@@ -121,8 +164,10 @@ export async function runStudioAudit(): Promise<AuditResult[]> {
   const efResult = await (async (): Promise<AuditResult> => {
     try {
       const { data, error } = await supabase.functions.invoke("analyze-product-image", { body: {} });
-      // We expect a 400 "imageUrl is required" — surfaces either via error or data.error
-      const msg = (error?.message || data?.error || "").toString().toLowerCase();
+      // We expect a 400 "imageUrl is required". Supabase wraps non-2xx
+      // responses as FunctionsHttpError, so read the response body from
+      // error.context instead of relying on the generic error.message.
+      const msg = await extractEdgeFunctionAuditMessage(data, error);
       if (msg.includes("imageurl")) {
         return { name: "edge function reachable + validates input", group: "edgeFunction", ok: true };
       }
