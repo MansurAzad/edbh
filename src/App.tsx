@@ -36,6 +36,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
 const Blog = lazy(() => import("./pages/Blog"));
+const AbayaStylingGuide = lazy(() => import("./pages/AbayaStylingGuide"));
 const OrderTracking = lazy(() => import("./pages/OrderTracking"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ReturnPolicy = lazy(() => import("./pages/ReturnPolicy"));
@@ -145,6 +146,7 @@ const App = () => (
                     <Route path="/p/:id" element={<ProductDetail />} />
                     <Route path="/wishlist" element={<Wishlist />} />
                     <Route path="/blog" element={<Blog />} />
+                    <Route path="/blog/abaya-styling-guide" element={<AbayaStylingGuide />} />
                     <Route path="/help" element={<HelpCenter />} />
                     <Route path="/developers" element={<DeveloperDocs />} />
                     <Route path="/track/:id?" element={<OrderTracking />} />
