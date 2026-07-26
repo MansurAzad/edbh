@@ -136,6 +136,7 @@ export const HUB_GROUPS: HubGroup[] = [
       { label: "sGTM Setup", path: "/admin/sgtm-setup" },
       { label: "Tracking Guide", path: "/admin/tracking-guide" },
       { label: "SEO Debug", path: "/admin/seo-debug" },
+      { label: "Indexing Issues", path: "/admin/indexing-issues" },
     ],
   },
   {

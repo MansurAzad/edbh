@@ -3,6 +3,18 @@ import { ArrowRight, Star, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import heroBanner from "@/assets/hero-banner.jpg";
 
+// Preload the hero image ASAP for a faster LCP. Runs at module-parse time,
+// before React renders, so the browser starts fetching in parallel with the JS.
+if (typeof document !== "undefined" && !document.querySelector('link[data-hero-preload]')) {
+  const link = document.createElement("link");
+  link.rel = "preload";
+  link.as = "image";
+  link.href = heroBanner;
+  (link as HTMLLinkElement & { fetchPriority?: string }).fetchPriority = "high";
+  link.setAttribute("data-hero-preload", "true");
+  document.head.appendChild(link);
+}
+
 const HeroSection = () => {
   return (
     <section className="relative min-h-[100svh] flex items-center overflow-hidden">
