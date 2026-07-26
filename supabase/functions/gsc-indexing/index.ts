@@ -6,14 +6,21 @@
  *  - POST { action:"errors" }          -> searchAnalytics summary + inspection of top URLs
  *
  * Auth: requires the caller to be a signed-in admin (checked via user_roles).
+ *
+ * Reliability: every upstream call goes through `fetchWithRetry` which retries
+ * transient 429/5xx/network errors with exponential backoff and emits a
+ * structured log line for every attempt so the admin panel never shows an
+ * empty result because of a single blip.
  */
 // @ts-nocheck
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflight, jsonResponse, errorResponse } from "../_shared/cors.ts";
+import { log } from "../_shared/log.ts";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/google_search_console";
 const SITE_URL = "https://edbh.lovable.app/";
+const FN = "gsc-indexing";
 
 function headers() {
   return {
@@ -21,6 +28,51 @@ function headers() {
     "X-Connection-Api-Key": Deno.env.get("GOOGLE_SEARCH_CONSOLE_API_KEY") ?? "",
     "Content-Type": "application/json",
   };
+}
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * fetchWithRetry — wraps fetch with exponential backoff on 429/5xx/network errors.
+ * Logs every attempt so we can trace stale/empty results in Supabase logs.
+ */
+async function fetchWithRetry(
+  label: string,
+  url: string,
+  init: RequestInit,
+  maxAttempts = 3,
+): Promise<{ status: number; body: any; ok: boolean; attempts: number }> {
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const started = Date.now();
+    try {
+      const r = await fetch(url, init);
+      const text = await r.text();
+      let body: any = null;
+      try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text }; }
+      const durationMs = Date.now() - started;
+      const transient = r.status === 429 || r.status >= 500;
+      log(transient && attempt < maxAttempts ? "warn" : "info", FN, "upstream_call", {
+        label, url, attempt, status: r.status, ok: r.ok, durationMs,
+      });
+      if (r.ok || !transient || attempt === maxAttempts) {
+        return { status: r.status, body, ok: r.ok, attempts: attempt };
+      }
+    } catch (e) {
+      lastErr = e;
+      log("warn", FN, "upstream_network_error", {
+        label, url, attempt, error: String((e as Error)?.message ?? e),
+        durationMs: Date.now() - started,
+      });
+      if (attempt === maxAttempts) break;
+    }
+    // Exponential backoff: 400ms, 800ms, 1600ms…
+    await sleep(400 * 2 ** (attempt - 1));
+  }
+  log("error", FN, "upstream_exhausted", { label, url, maxAttempts, lastErr: String(lastErr) });
+  return { status: 0, body: { error: String(lastErr ?? "exhausted") }, ok: false, attempts: maxAttempts };
 }
 
 async function requireAdmin(req: Request) {
@@ -41,11 +93,12 @@ async function requireAdmin(req: Request) {
     .eq("role", "admin")
     .maybeSingle();
   if (!role) return { ok: false, status: 403, error: "admin only" };
-  return { ok: true };
+  return { ok: true, userId: u.user.id };
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflight();
+  const requestId = crypto.randomUUID();
   try {
     const guard = await requireAdmin(req);
     if (!guard.ok) return errorResponse(guard.error, guard.status);
@@ -58,78 +111,95 @@ Deno.serve(async (req) => {
       action = body.action ?? action;
     }
 
+    log("info", FN, "request", { requestId, action, userId: guard.userId });
+
     if (!Deno.env.get("LOVABLE_API_KEY") || !Deno.env.get("GOOGLE_SEARCH_CONSOLE_API_KEY")) {
+      log("warn", FN, "connector_not_linked", { requestId });
       return jsonResponse({
         connected: false,
+        requestId,
         message: "Google Search Console connector not linked yet.",
       });
     }
 
-    if (action === "sites") {
-      const r = await fetch(`${GATEWAY}/webmasters/v3/sites`, { headers: headers() });
-      const j = await r.json();
-      return jsonResponse({ connected: true, status: r.status, ...j });
+    if (action === "sites" || (!action && req.method === "GET")) {
+      const r = await fetchWithRetry("sites", `${GATEWAY}/webmasters/v3/sites`, { headers: headers() });
+      return jsonResponse({ connected: true, requestId, status: r.status, attempts: r.attempts, ...(r.body ?? {}) });
     }
 
     if (action === "inspect") {
       const target = String(body.url ?? SITE_URL);
-      const r = await fetch(`${GATEWAY}/v1/urlInspection/index:inspect`, {
+      const r = await fetchWithRetry("inspect", `${GATEWAY}/v1/urlInspection/index:inspect`, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({ inspectionUrl: target, siteUrl: SITE_URL }),
       });
-      const j = await r.json();
-      return jsonResponse({ connected: true, status: r.status, url: target, result: j });
+      return jsonResponse({
+        connected: true, requestId, status: r.status, attempts: r.attempts, url: target, result: r.body,
+      });
     }
 
     if (action === "errors" || action === "summary") {
-      // Fetch analytics (top 25 pages by clicks last 28 days) then inspect each
       const end = new Date().toISOString().slice(0, 10);
       const start = new Date(Date.now() - 28 * 86400_000).toISOString().slice(0, 10);
       const encodedSite = encodeURIComponent(SITE_URL);
-      const analyticsRes = await fetch(
+      const analytics = await fetchWithRetry(
+        "searchAnalytics",
         `${GATEWAY}/webmasters/v3/sites/${encodedSite}/searchAnalytics/query`,
         {
           method: "POST",
           headers: headers(),
-          body: JSON.stringify({
-            startDate: start,
-            endDate: end,
-            dimensions: ["page"],
-            rowLimit: 25,
-          }),
+          body: JSON.stringify({ startDate: start, endDate: end, dimensions: ["page"], rowLimit: 25 }),
         },
       );
-      const analytics = await analyticsRes.json();
-      const rows = Array.isArray(analytics.rows) ? analytics.rows : [];
+      const rows = Array.isArray(analytics.body?.rows) ? analytics.body.rows : [];
+
+      // Always include the site root so the panel is never empty even before rows land.
+      const targets = new Set<string>();
+      targets.add(SITE_URL);
+      for (const row of rows.slice(0, 10)) {
+        const t = row.keys?.[0];
+        if (t) targets.add(t);
+      }
 
       const inspections = await Promise.all(
-        rows.slice(0, 10).map(async (row: any) => {
-          const target = row.keys?.[0];
-          if (!target) return null;
-          const r = await fetch(`${GATEWAY}/v1/urlInspection/index:inspect`, {
+        Array.from(targets).map(async (target) => {
+          const row = rows.find((r: any) => r.keys?.[0] === target);
+          const r = await fetchWithRetry("inspect", `${GATEWAY}/v1/urlInspection/index:inspect`, {
             method: "POST",
             headers: headers(),
             body: JSON.stringify({ inspectionUrl: target, siteUrl: SITE_URL }),
           });
-          const j = await r.json();
-          return { url: target, clicks: row.clicks, impressions: row.impressions, result: j };
+          return {
+            url: target,
+            clicks: row?.clicks,
+            impressions: row?.impressions,
+            attempts: r.attempts,
+            result: r.body,
+          };
         }),
       );
 
+      log("info", FN, "summary_ready", {
+        requestId, totalRows: rows.length, inspected: inspections.length,
+        analyticsOk: analytics.ok, analyticsStatus: analytics.status,
+      });
+
       return jsonResponse({
         connected: true,
-        analyticsStatus: analyticsRes.status,
+        requestId,
+        analyticsStatus: analytics.status,
+        analyticsAttempts: analytics.attempts,
         siteUrl: SITE_URL,
         totalRows: rows.length,
-        inspections: inspections.filter(Boolean),
-        analyticsError: analyticsRes.ok ? null : analytics,
+        inspections,
+        analyticsError: analytics.ok ? null : analytics.body,
       });
     }
 
     return errorResponse("unknown action", 400);
   } catch (e) {
-    console.error("gsc-indexing error", e);
+    log("error", FN, "unhandled_error", { requestId, error: String((e as Error).message ?? e) });
     return errorResponse(String((e as Error).message ?? e), 500);
   }
 });

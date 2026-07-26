@@ -4,14 +4,22 @@
  *  - Connection status
  *  - Verified sites list
  *  - Per-URL coverage/index verdict, last crawled, referring page, and errors/warnings
+ *  - CSV export of the current report
+ *  - Per-URL drilldown with recommended fixes
+ *
+ * The edge function itself retries transient upstream failures; this panel adds
+ * one client-side re-fetch when a response comes back empty/disconnected so
+ * admins never see a stale blank state after a transient glitch.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle2, RefreshCw, XCircle, ExternalLink } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RefreshCw, XCircle, ExternalLink, Download } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 type Inspection = {
   url: string;
@@ -33,42 +41,72 @@ function fmt(ts?: string) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
 }
 
+function csvEscape(v: unknown): string {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 export default function IndexingIssues() {
   const [loading, setLoading] = useState(false);
   const [inspectLoading, setInspectLoading] = useState(false);
   const [sites, setSites] = useState<any[] | null>(null);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [lastFetched, setLastFetched] = useState<Date | null>(null);
   const [summary, setSummary] = useState<{
     inspections: Inspection[];
     analyticsError?: any;
     siteUrl?: string;
+    requestId?: string;
+    analyticsAttempts?: number;
   } | null>(null);
   const [singleUrl, setSingleUrl] = useState("https://edbh.lovable.app/");
   const [singleResult, setSingleResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const retriedRef = useRef(false);
 
   async function loadSites() {
     setLoading(true); setError(null);
     const { data, error } = await supabase.functions.invoke("gsc-indexing", {
-      method: "GET" as any,
-      body: undefined,
-      headers: {} as any,
-    } as any);
+      body: { action: "sites" },
+    });
     if (error) { setError(error.message); setLoading(false); return; }
     setConnected(data?.connected ?? false);
     setSites(data?.siteEntry ?? []);
     setLoading(false);
   }
 
-  async function loadSummary() {
+  async function loadSummary(isRetry = false) {
     setLoading(true); setError(null);
     const { data, error } = await supabase.functions.invoke("gsc-indexing", {
       body: { action: "errors" },
     });
-    if (error) { setError(error.message); setLoading(false); return; }
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      // eslint-disable-next-line no-console
+      console.error("[indexing-issues] summary error", { error: error.message });
+      return;
+    }
     setConnected(data?.connected ?? false);
     setSummary(data);
+    setLastFetched(new Date());
+    // eslint-disable-next-line no-console
+    console.info("[indexing-issues] summary loaded", {
+      requestId: data?.requestId, inspections: data?.inspections?.length ?? 0,
+      analyticsAttempts: data?.analyticsAttempts, connected: data?.connected,
+    });
     setLoading(false);
+
+    // Client-side auto-retry once if we got an empty payload from a "connected" state
+    const empty = (data?.inspections?.length ?? 0) === 0;
+    if (!isRetry && (empty || data?.analyticsError) && data?.connected !== false) {
+      if (!retriedRef.current) {
+        retriedRef.current = true;
+        setTimeout(() => loadSummary(true), 1200);
+      }
+    } else if (isRetry) {
+      retriedRef.current = false;
+    }
   }
 
   async function inspectOne() {
@@ -82,7 +120,6 @@ export default function IndexingIssues() {
   }
 
   useEffect(() => {
-    // load sites+summary via GET+POST in parallel
     (async () => {
       await loadSites();
       await loadSummary();
@@ -103,20 +140,58 @@ export default function IndexingIssues() {
     return { errors, warnings, ok };
   }, [summary]);
 
+  function exportCsv() {
+    const rows = summary?.inspections ?? [];
+    if (!rows.length) {
+      toast({ title: "Nothing to export", description: "No inspections loaded yet." });
+      return;
+    }
+    const header = [
+      "URL", "Bucket", "Verdict", "Coverage", "Robots", "Indexing",
+      "PageFetch", "LastCrawled", "GoogleCanonical", "UserCanonical",
+      "ReferringPage", "Clicks", "Impressions",
+    ];
+    const lines = [header.join(",")];
+    for (const it of rows) {
+      const idx = it.result?.inspectionResult?.indexStatusResult ?? {};
+      const v = idx.verdict;
+      const bucket = v === "FAIL" ? "Error" : v === "PARTIAL" || v === "NEUTRAL" ? "Warning" : "OK";
+      lines.push([
+        it.url, bucket, v ?? "",
+        idx.coverageState ?? "", idx.robotsTxtState ?? "", idx.indexingState ?? "",
+        idx.pageFetchState ?? "", idx.lastCrawlTime ?? "",
+        idx.googleCanonical ?? "", idx.userCanonical ?? "",
+        idx.referringUrls?.[0] ?? "",
+        it.clicks ?? "", it.impressions ?? "",
+      ].map(csvEscape).join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `indexing-issues-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast({ title: "Export ready", description: `${rows.length} URLs exported as CSV.` });
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div>
         <h2 className="text-xl font-semibold">Indexing Issues</h2>
         <p className="text-sm text-muted-foreground">
           Google Search Console coverage, last crawled time, and URLs affected by errors or warnings.
+          {lastFetched && <> · Last refreshed {fmt(lastFetched.toISOString())}</>}
         </p>
       </div>
 
-
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={() => { loadSites(); loadSummary(); }} disabled={loading}>
+        <Button size="sm" variant="outline" onClick={() => { retriedRef.current = false; loadSites(); loadSummary(); }} disabled={loading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Refresh
+        </Button>
+        <Button size="sm" variant="outline" onClick={exportCsv} disabled={!(summary?.inspections?.length)}>
+          <Download className="w-4 h-4 mr-2" /> Export CSV
         </Button>
       </div>
 
@@ -171,6 +246,9 @@ export default function IndexingIssues() {
             <Button size="sm" onClick={inspectOne} disabled={inspectLoading}>
               {inspectLoading ? "Inspecting…" : "Inspect"}
             </Button>
+            <Link to={`/admin/indexing-issues/${encodeURIComponent(singleUrl)}`}>
+              <Button size="sm" variant="secondary">Details</Button>
+            </Link>
           </div>
           {singleResult && (
             <div className="text-sm space-y-1">
@@ -184,7 +262,7 @@ export default function IndexingIssues() {
         </CardContent>
       </Card>
 
-      {(["errors","warnings","ok"] as const).map((key) => {
+      {(["errors", "warnings", "ok"] as const).map((key) => {
         const items = buckets[key];
         const title = key === "errors" ? "Errors" : key === "warnings" ? "Warnings" : "Indexed OK";
         const Icon = key === "errors" ? XCircle : key === "warnings" ? AlertTriangle : CheckCircle2;
@@ -209,7 +287,12 @@ export default function IndexingIssues() {
                           <a href={it.url} target="_blank" rel="noreferrer" className="font-mono text-xs md:text-sm truncate max-w-full inline-flex items-center gap-1 hover:underline">
                             {it.url} <ExternalLink className="w-3 h-3" />
                           </a>
-                          {verdictBadge(idx.verdict)}
+                          <div className="flex items-center gap-2">
+                            {verdictBadge(idx.verdict)}
+                            <Link to={`/admin/indexing-issues/${encodeURIComponent(it.url)}`}>
+                              <Button size="sm" variant="ghost">View details</Button>
+                            </Link>
+                          </div>
                         </div>
                         <div className="text-muted-foreground mt-1 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
                           <span>Coverage: <code>{idx.coverageState ?? "—"}</code></span>
