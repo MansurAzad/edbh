@@ -7,7 +7,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import AdminPageTitle from "@/components/admin/AdminPageTitle";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,10 +105,13 @@ export default function IndexingIssues() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <AdminPageTitle
-        title="Indexing Issues"
-        description="Google Search Console coverage, last crawled time, and URLs affected by errors or warnings."
-      />
+      <div>
+        <h2 className="text-xl font-semibold">Indexing Issues</h2>
+        <p className="text-sm text-muted-foreground">
+          Google Search Console coverage, last crawled time, and URLs affected by errors or warnings.
+        </p>
+      </div>
+
 
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={() => { loadSites(); loadSummary(); }} disabled={loading}>
