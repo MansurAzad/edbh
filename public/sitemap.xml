@@ -1,62 +1,68 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Static sitemap of evergreen routes. Dynamic content (products + blog posts)
-  is served by the `dynamic-sitemap` edge function and registered as a second
-  Sitemap: entry in /robots.txt so crawlers index both.
+  Static sitemap of evergreen routes. Host aligned with the Lovable preview/
+  publish domain so SEO scanners can validate consistently. Dynamic content
+  (products + blog posts) is served by the `dynamic-sitemap` edge function
+  and registered as a second Sitemap: entry in /robots.txt.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://dubaiborkahouse.com/</loc>
+    <loc>https://edbh.lovable.app/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://dubaiborkahouse.com/shop</loc>
+    <loc>https://edbh.lovable.app/shop</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://dubaiborkahouse.com/categories</loc>
+    <loc>https://edbh.lovable.app/categories</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://dubaiborkahouse.com/about</loc>
+    <loc>https://edbh.lovable.app/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://dubaiborkahouse.com/contact</loc>
+    <loc>https://edbh.lovable.app/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://dubaiborkahouse.com/blog</loc>
+    <loc>https://edbh.lovable.app/blog</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://dubaiborkahouse.com/help</loc>
+    <loc>https://edbh.lovable.app/blog/abaya-styling-guide</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://edbh.lovable.app/help</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://dubaiborkahouse.com/faq</loc>
+    <loc>https://edbh.lovable.app/faq</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://dubaiborkahouse.com/developers</loc>
+    <loc>https://edbh.lovable.app/developers</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://dubaiborkahouse.com/return-policy</loc>
+    <loc>https://edbh.lovable.app/return-policy</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://dubaiborkahouse.com/order-tracking</loc>
+    <loc>https://edbh.lovable.app/order-tracking</loc>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>
