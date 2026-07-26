@@ -206,6 +206,7 @@ const App = () => (
                     <Route path="/admin/business-audit" element={<PermissionGuard><BusinessAudit /></PermissionGuard>} />
                     <Route path="/admin/customer-insights" element={<PermissionGuard><CustomerInsights /></PermissionGuard>} />
                     <Route path="/admin/indexing-issues" element={<PermissionGuard><IndexingIssues /></PermissionGuard>} />
+                    <Route path="/admin/indexing-issues/:encodedUrl" element={<PermissionGuard><IndexingIssueDetail /></PermissionGuard>} />
 
 
                     <Route path="/return-policy" element={<ReturnPolicy />} />
