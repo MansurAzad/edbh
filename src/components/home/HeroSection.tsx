@@ -11,6 +11,8 @@ const HeroSection = () => {
           <img
           src={heroBanner}
           alt="Dubai Borka House Fashion"
+          width={1920}
+          height={1080}
           className="w-full h-full object-cover"
           fetchPriority="high"
           decoding="sync"
