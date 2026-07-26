@@ -98,6 +98,7 @@ const SettingsHub = lazy(() => import("./pages/admin/SettingsHub"));
 const CustomersHub = lazy(() => import("./pages/admin/CustomersHub"));
 const AiProductStudio = lazy(() => import("./pages/admin/AiProductStudio"));
 const IndexingIssues = lazy(() => import("./pages/admin/IndexingIssues"));
+const IndexingIssueDetail = lazy(() => import("./pages/admin/IndexingIssueDetail"));
 
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
