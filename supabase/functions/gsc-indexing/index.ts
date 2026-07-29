@@ -19,7 +19,7 @@ import { corsPreflight, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { log } from "../_shared/log.ts";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/google_search_console";
-const SITE_URL = "https://edbh.lovable.app/";
+const SITE_URL = "https://dubaiborkahouse.com/";
 const FN = "gsc-indexing";
 
 function headers() {
