@@ -120,6 +120,6 @@ Disallow: /cart
 Disallow: /*?*utm_
 Disallow: /*?*ref=
 
-Sitemap: https://edbh.lovable.app/sitemap.xml
+Sitemap: https://dubaiborkahouse.com/sitemap.xml
 Sitemap: https://izeabmhtxtrelfqgkuua.supabase.co/functions/v1/dynamic-sitemap
-Host: https://edbh.lovable.app
+Host: https://dubaiborkahouse.com
