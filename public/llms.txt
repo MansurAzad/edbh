@@ -6,15 +6,15 @@
 Dubai Borka House is a Chattogram-based Islamic fashion retailer specializing in premium imported borka, abaya, hijab, kaftan, and modest wear. We serve customers across Bangladesh with Cash on Delivery, fast nationwide shipping, and a 7-day return guarantee.
 
 ## Key Pages
-- [Home](https://edbh.lovable.app/): Featured products, categories, deals, and hero collections
-- [Shop](https://edbh.lovable.app/shop): Full product catalog with filters
-- [Categories](https://edbh.lovable.app/categories): All product categories
-- [About](https://edbh.lovable.app/about): Company story, mission, sourcing, and quality standards
-- [Contact](https://edbh.lovable.app/contact): Address, phone, WhatsApp, email, store hours
-- [Blog](https://edbh.lovable.app/blog): Articles on Islamic fashion, hijab styling, fabric care
-- [FAQ](https://edbh.lovable.app/faq): Sizing, payment, shipping, returns, and product care
-- [Return Policy](https://edbh.lovable.app/return-policy): 7-day return and exchange policy
-- [Order Tracking](https://edbh.lovable.app/track): Track orders by phone number or order ID
+- [Home](https://dubaiborkahouse.com/): Featured products, categories, deals, and hero collections
+- [Shop](https://dubaiborkahouse.com/shop): Full product catalog with filters
+- [Categories](https://dubaiborkahouse.com/categories): All product categories
+- [About](https://dubaiborkahouse.com/about): Company story, mission, sourcing, and quality standards
+- [Contact](https://dubaiborkahouse.com/contact): Address, phone, WhatsApp, email, store hours
+- [Blog](https://dubaiborkahouse.com/blog): Articles on Islamic fashion, hijab styling, fabric care
+- [FAQ](https://dubaiborkahouse.com/faq): Sizing, payment, shipping, returns, and product care
+- [Return Policy](https://dubaiborkahouse.com/return-policy): 7-day return and exchange policy
+- [Order Tracking](https://dubaiborkahouse.com/track): Track orders by phone number or order ID
 
 ## Products
 - Premium Dubai-imported abaya and borka

@@ -913,6 +913,39 @@ export type Database = {
         }
         Relationships: []
       }
+      indexing_fix_status: {
+        Row: {
+          action_title: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+          url: string
+        }
+        Insert: {
+          action_title?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          url: string
+        }
+        Update: {
+          action_title?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
       injection_block_log: {
         Row: {
           actor: string | null
