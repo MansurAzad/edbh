@@ -9,7 +9,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ExternalLink, RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
+import { ArrowLeft, ExternalLink, RefreshCw, Save } from "lucide-react";
+
+type FixStatus = "unresolved" | "in_progress" | "applied";
 
 function verdictBadge(v?: string) {
   if (v === "PASS") return <Badge className="bg-emerald-600">Pass</Badge>;
