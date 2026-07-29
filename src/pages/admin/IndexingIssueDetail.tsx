@@ -130,6 +130,13 @@ export default function IndexingIssueDetail() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Fix-status workflow state
+  const [fixStatus, setFixStatus] = useState<FixStatus>("unresolved");
+  const [fixTitle, setFixTitle] = useState("");
+  const [fixNotes, setFixNotes] = useState("");
+  const [fixSavedAt, setFixSavedAt] = useState<string | null>(null);
+  const [savingFix, setSavingFix] = useState(false);
+
   async function load() {
     if (!target) return;
     setLoading(true); setError(null);
@@ -141,7 +148,47 @@ export default function IndexingIssueDetail() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [target]);
+  async function loadFix() {
+    if (!target) return;
+    const { data } = await supabase
+      .from("indexing_fix_status")
+      .select("status,action_title,notes,updated_at")
+      .eq("url", target)
+      .maybeSingle();
+    if (data) {
+      setFixStatus(data.status as FixStatus);
+      setFixTitle(data.action_title ?? "");
+      setFixNotes(data.notes ?? "");
+      setFixSavedAt(data.updated_at ?? null);
+    }
+  }
+
+  useEffect(() => { load(); loadFix(); /* eslint-disable-next-line */ }, [target]);
+
+  async function saveFix() {
+    if (!target) return;
+    setSavingFix(true);
+    const { data: userData } = await supabase.auth.getUser();
+    const payload = {
+      url: target,
+      status: fixStatus,
+      action_title: fixTitle || null,
+      notes: fixNotes || null,
+      updated_by: userData?.user?.id ?? null,
+    };
+    const { data, error } = await supabase
+      .from("indexing_fix_status")
+      .upsert(payload, { onConflict: "url" })
+      .select("updated_at")
+      .maybeSingle();
+    setSavingFix(false);
+    if (error) {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setFixSavedAt(data?.updated_at ?? new Date().toISOString());
+    toast({ title: "Fix status saved" });
+  }
 
   const idx = result?.inspectionResult?.indexStatusResult ?? {};
   const mobile = result?.inspectionResult?.mobileUsabilityResult ?? {};
@@ -155,7 +202,7 @@ export default function IndexingIssueDetail() {
           <Button size="sm" variant="ghost"><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
         </Link>
         <Button size="sm" variant="outline" onClick={load} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Recheck now
         </Button>
       </div>
 
@@ -197,6 +244,57 @@ export default function IndexingIssueDetail() {
       </Card>
 
       <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between gap-2">
+            <span>Fix status</span>
+            <Badge variant={fixStatus === "applied" ? "default" : fixStatus === "in_progress" ? "secondary" : "destructive"}>
+              {fixStatus === "applied" ? "Applied" : fixStatus === "in_progress" ? "In progress" : "Unresolved"}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="text-xs text-muted-foreground">Status</label>
+              <Select value={fixStatus} onValueChange={(v) => setFixStatus(v as FixStatus)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unresolved">Unresolved</SelectItem>
+                  <SelectItem value="in_progress">In progress</SelectItem>
+                  <SelectItem value="applied">Applied</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Action title</label>
+              <Input
+                value={fixTitle}
+                onChange={(e) => setFixTitle(e.target.value)}
+                placeholder={fix.title}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Notes</label>
+            <Textarea
+              rows={4}
+              value={fixNotes}
+              onChange={(e) => setFixNotes(e.target.value)}
+              placeholder="What did you change? Which file/route? Any follow-up?"
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {fixSavedAt ? `Last saved: ${fmt(fixSavedAt)}` : "Not saved yet"}
+            </span>
+            <Button size="sm" onClick={saveFix} disabled={savingFix}>
+              <Save className="w-4 h-4 mr-1" /> {savingFix ? "Saving…" : "Save fix status"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader><CardTitle>Raw inspection payload</CardTitle></CardHeader>
         <CardContent>
           <pre className="text-xs whitespace-pre-wrap bg-muted rounded p-3 overflow-auto max-h-96">
@@ -207,3 +305,4 @@ export default function IndexingIssueDetail() {
     </div>
   );
 }
+
