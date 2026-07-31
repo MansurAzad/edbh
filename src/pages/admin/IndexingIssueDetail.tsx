@@ -17,6 +17,16 @@ import { ArrowLeft, ExternalLink, RefreshCw, Save } from "lucide-react";
 
 type FixStatus = "unresolved" | "in_progress" | "applied";
 
+type HistoryRow = {
+  id: string;
+  status: string;
+  action_title: string | null;
+  notes: string | null;
+  changed_by_email: string | null;
+  created_at: string;
+};
+
+
 function verdictBadge(v?: string) {
   if (v === "PASS") return <Badge className="bg-emerald-600">Pass</Badge>;
   if (v === "PARTIAL") return <Badge className="bg-amber-600">Warning</Badge>;
@@ -136,6 +146,7 @@ export default function IndexingIssueDetail() {
   const [fixNotes, setFixNotes] = useState("");
   const [fixSavedAt, setFixSavedAt] = useState<string | null>(null);
   const [savingFix, setSavingFix] = useState(false);
+  const [history, setHistory] = useState<HistoryRow[]>([]);
 
   async function load() {
     if (!target) return;
@@ -163,7 +174,18 @@ export default function IndexingIssueDetail() {
     }
   }
 
-  useEffect(() => { load(); loadFix(); /* eslint-disable-next-line */ }, [target]);
+  async function loadHistory() {
+    if (!target) return;
+    const { data } = await supabase
+      .from("indexing_fix_history")
+      .select("id,status,action_title,notes,changed_by_email,created_at")
+      .eq("url", target)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (data) setHistory(data as HistoryRow[]);
+  }
+
+  useEffect(() => { load(); loadFix(); loadHistory(); /* eslint-disable-next-line */ }, [target]);
 
   async function saveFix() {
     if (!target) return;
@@ -187,8 +209,10 @@ export default function IndexingIssueDetail() {
       return;
     }
     setFixSavedAt(data?.updated_at ?? new Date().toISOString());
+    await loadHistory();
     toast({ title: "Fix status saved" });
   }
+
 
   const idx = result?.inspectionResult?.indexStatusResult ?? {};
   const mobile = result?.inspectionResult?.mobileUsabilityResult ?? {};
@@ -293,6 +317,34 @@ export default function IndexingIssueDetail() {
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Fix history ({history.length})</CardTitle></CardHeader>
+        <CardContent className="text-sm">
+          {history.length === 0 ? (
+            <div className="text-muted-foreground">No changes recorded yet.</div>
+          ) : (
+            <ol className="relative border-l border-border ml-2 space-y-4">
+              {history.map((h, i) => (
+                <li key={h.id} className="ml-4">
+                  <span className="absolute -left-1.5 w-3 h-3 rounded-full bg-primary" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={h.status === "applied" ? "default" : h.status === "in_progress" ? "secondary" : "destructive"}>
+                      {h.status === "applied" ? "Applied" : h.status === "in_progress" ? "In progress" : "Unresolved"}
+                    </Badge>
+                    {i === 0 && <Badge variant="outline">Latest</Badge>}
+                    <span className="text-xs text-muted-foreground">{fmt(h.created_at)}</span>
+                    <span className="text-xs text-muted-foreground">· {h.changed_by_email ?? "unknown"}</span>
+                  </div>
+                  {h.action_title && <div className="mt-1 font-medium">{h.action_title}</div>}
+                  {h.notes && <div className="text-muted-foreground whitespace-pre-wrap">{h.notes}</div>}
+                </li>
+              ))}
+            </ol>
+          )}
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardHeader><CardTitle>Raw inspection payload</CardTitle></CardHeader>

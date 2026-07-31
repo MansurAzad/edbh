@@ -913,6 +913,39 @@ export type Database = {
         }
         Relationships: []
       }
+      indexing_fix_history: {
+        Row: {
+          action_title: string | null
+          changed_by: string | null
+          changed_by_email: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          status: string
+          url: string
+        }
+        Insert: {
+          action_title?: string | null
+          changed_by?: string | null
+          changed_by_email?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status: string
+          url: string
+        }
+        Update: {
+          action_title?: string | null
+          changed_by?: string | null
+          changed_by_email?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          url?: string
+        }
+        Relationships: []
+      }
       indexing_fix_status: {
         Row: {
           action_title: string | null

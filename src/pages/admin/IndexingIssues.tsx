@@ -7,6 +7,9 @@
  *  - Auto-refresh every AUTO_REFRESH_MS with a visible "last updated" stamp
  *    and a stale-data warning after STALE_HOURS.
  *  - Unresolved fixes list sourced from public.indexing_fix_status.
+ *  - Bulk "Mark selected as Applied" with a shared note.
+ *  - Unresolved-only toggle + URL search box for narrowing affected pages.
+ *  - Optional notifications when Errors/Warnings counts change on refresh.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -15,11 +18,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle2, RefreshCw, XCircle, ExternalLink, Download, Clock, ListChecks } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { AlertTriangle, Bell, CheckCircle2, RefreshCw, XCircle, ExternalLink, Download, Clock, ListChecks, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const AUTO_REFRESH_MS = 15 * 60 * 1000; // 15 minutes
 const STALE_HOURS = 6;
+const NOTIFY_KEY = "indexing-issues-notify";
 
 type Inspection = {
   url: string;
@@ -90,6 +99,23 @@ export default function IndexingIssues() {
   const [fixRows, setFixRows] = useState<FixRow[]>([]);
   const retriedRef = useRef(false);
 
+  // Filters
+  const [search, setSearch] = useState("");
+  const [unresolvedOnly, setUnresolvedOnly] = useState(false);
+
+  // Bulk selection
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkNote, setBulkNote] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  // Notifications
+  const [notifyEnabled, setNotifyEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem(NOTIFY_KEY) === "1"; } catch { return false; }
+  });
+  const prevCountsRef = useRef<{ errors: number; warnings: number } | null>(null);
+  const notifyEnabledRef = useRef(notifyEnabled);
+  notifyEnabledRef.current = notifyEnabled;
+
   async function loadSites() {
     setError(null);
     const { data, error } = await supabase.functions.invoke("gsc-indexing", { body: { action: "sites" } });
@@ -118,13 +144,13 @@ export default function IndexingIssues() {
     }
   }, []);
 
-  async function loadFixRows() {
+  const loadFixRows = useCallback(async () => {
     const { data, error } = await supabase
       .from("indexing_fix_status")
       .select("url,status,action_title,notes,updated_at")
       .order("updated_at", { ascending: false });
     if (!error && data) setFixRows(data as FixRow[]);
-  }
+  }, []);
 
   async function recheckRow(url: string) {
     setRowLoading((s) => ({ ...s, [url]: true }));
@@ -161,13 +187,13 @@ export default function IndexingIssues() {
 
   useEffect(() => {
     (async () => { await loadSites(); await loadSummary(); await loadFixRows(); })();
-  }, [loadSummary]);
+  }, [loadSummary, loadFixRows]);
 
   // Auto-refresh every AUTO_REFRESH_MS
   useEffect(() => {
     const t = setInterval(() => { loadSummary(); loadFixRows(); }, AUTO_REFRESH_MS);
     return () => clearInterval(t);
-  }, [loadSummary]);
+  }, [loadSummary, loadFixRows]);
 
   const buckets = useMemo(() => {
     const errors: Inspection[] = [];
@@ -182,8 +208,85 @@ export default function IndexingIssues() {
     return { errors, warnings, ok };
   }, [summary]);
 
+  const fixByUrl = useMemo(() => {
+    const m = new Map<string, FixRow>();
+    for (const r of fixRows) if (!m.has(r.url)) m.set(r.url, r);
+    return m;
+  }, [fixRows]);
+
+  // Apply search + unresolved-only filters to each bucket.
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const apply = (items: Inspection[]) =>
+      items.filter((it) => {
+        if (q && !it.url.toLowerCase().includes(q)) return false;
+        if (unresolvedOnly && fixByUrl.get(it.url)?.status === "applied") return false;
+        return true;
+      });
+    return { errors: apply(buckets.errors), warnings: apply(buckets.warnings), ok: apply(buckets.ok) };
+  }, [buckets, search, unresolvedOnly, fixByUrl]);
+
+  // Notify when Errors/Warnings counts change after a refresh.
+  useEffect(() => {
+    if (!summary) return;
+    const next = { errors: buckets.errors.length, warnings: buckets.warnings.length };
+    const prev = prevCountsRef.current;
+    prevCountsRef.current = next;
+    if (!prev || !notifyEnabledRef.current) return;
+    if (prev.errors === next.errors && prev.warnings === next.warnings) return;
+
+    const body = `Errors ${prev.errors} → ${next.errors}, Warnings ${prev.warnings} → ${next.warnings}`;
+    toast({ title: "Indexing counts changed", description: body });
+    try {
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        new Notification("Indexing counts changed", { body });
+      }
+    } catch { /* notifications unavailable */ }
+  }, [summary, buckets]);
+
+  async function toggleNotify(on: boolean) {
+    setNotifyEnabled(on);
+    try { localStorage.setItem(NOTIFY_KEY, on ? "1" : "0"); } catch { /* ignore */ }
+    if (on && typeof Notification !== "undefined" && Notification.permission === "default") {
+      try { await Notification.requestPermission(); } catch { /* ignore */ }
+    }
+  }
+
   const stale = lastFetched ? (Date.now() - lastFetched.getTime()) / 3600000 >= STALE_HOURS : false;
   const unresolved = fixRows.filter((r) => r.status !== "applied");
+
+  function toggleSelected(url: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(url)) next.delete(url); else next.add(url);
+      return next;
+    });
+  }
+
+  async function bulkMarkApplied() {
+    const urls = Array.from(selected);
+    if (!urls.length) return;
+    setBulkSaving(true);
+    const { data: userData } = await supabase.auth.getUser();
+    const payload = urls.map((url) => ({
+      url,
+      status: "applied" as const,
+      notes: bulkNote.trim() || null,
+      updated_by: userData?.user?.id ?? null,
+    }));
+    const { error } = await supabase
+      .from("indexing_fix_status")
+      .upsert(payload, { onConflict: "url" });
+    setBulkSaving(false);
+    if (error) {
+      toast({ title: "Bulk update failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setSelected(new Set());
+    setBulkNote("");
+    await loadFixRows();
+    toast({ title: `Marked ${urls.length} URL${urls.length > 1 ? "s" : ""} as Applied` });
+  }
 
   function exportCsv() {
     const rows = summary?.inspections ?? [];
@@ -222,7 +325,7 @@ export default function IndexingIssues() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="outline" onClick={() => { retriedRef.current = false; loadSites(); loadSummary(); loadFixRows(); }} disabled={loading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Refresh
@@ -230,7 +333,59 @@ export default function IndexingIssues() {
         <Button size="sm" variant="outline" onClick={exportCsv} disabled={!(summary?.inspections?.length)}>
           <Download className="w-4 h-4 mr-2" /> Export CSV
         </Button>
+        <div className="flex items-center gap-2 ml-auto">
+          <Bell className="w-4 h-4 text-muted-foreground" />
+          <Label htmlFor="notify-toggle" className="text-xs text-muted-foreground">Alert on count change</Label>
+          <Switch id="notify-toggle" checked={notifyEnabled} onCheckedChange={toggleNotify} />
+        </div>
       </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-4 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search URLs…"
+              aria-label="Search URLs"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch id="unresolved-only" checked={unresolvedOnly} onCheckedChange={setUnresolvedOnly} />
+            <Label htmlFor="unresolved-only" className="text-sm">Unresolved only</Label>
+          </div>
+          {(search || unresolvedOnly) && (
+            <Button size="sm" variant="ghost" onClick={() => { setSearch(""); setUnresolvedOnly(false); }}>Clear</Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Bulk actions */}
+      {selected.size > 0 && (
+        <Card className="border-primary/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">{selected.size} URL{selected.size > 1 ? "s" : ""} selected</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea
+              rows={2}
+              value={bulkNote}
+              onChange={(e) => setBulkNote(e.target.value)}
+              placeholder="Shared note applied to all selected URLs (what did you fix?)"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={bulkMarkApplied} disabled={bulkSaving}>
+                <CheckCircle2 className="w-4 h-4 mr-1" />
+                {bulkSaving ? "Saving…" : "Mark selected as Applied"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear selection</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {connected === false && (
         <Card className="border-amber-500/50">
@@ -256,9 +411,17 @@ export default function IndexingIssues() {
             <div className="divide-y">
               {unresolved.map((r) => (
                 <div key={r.url} className="py-2 text-sm flex flex-wrap items-center gap-2 justify-between">
-                  <div className="min-w-0 flex-1">
-                    <Link to={`/admin/indexing-issues/${encodeURIComponent(r.url)}`} className="font-mono text-xs hover:underline break-all">{r.url}</Link>
-                    {r.action_title && <div className="text-muted-foreground text-xs">{r.action_title}</div>}
+                  <div className="flex items-start gap-2 min-w-0 flex-1">
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={selected.has(r.url)}
+                      onCheckedChange={() => toggleSelected(r.url)}
+                      aria-label={`Select ${r.url}`}
+                    />
+                    <div className="min-w-0">
+                      <Link to={`/admin/indexing-issues/${encodeURIComponent(r.url)}`} className="font-mono text-xs hover:underline break-all">{r.url}</Link>
+                      {r.action_title && <div className="text-muted-foreground text-xs">{r.action_title}</div>}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {fixStatusBadge(r.status)}
@@ -318,7 +481,8 @@ export default function IndexingIssues() {
       </Card>
 
       {(["errors", "warnings", "ok"] as const).map((key) => {
-        const items = buckets[key];
+        const items = filtered[key];
+        const total = buckets[key].length;
         const title = key === "errors" ? "Errors" : key === "warnings" ? "Warnings" : "Indexed OK";
         const Icon = key === "errors" ? XCircle : key === "warnings" ? AlertTriangle : CheckCircle2;
         const color = key === "errors" ? "text-red-600" : key === "warnings" ? "text-amber-600" : "text-emerald-600";
@@ -326,7 +490,7 @@ export default function IndexingIssues() {
           <Card key={key}>
             <CardHeader>
               <CardTitle className={`flex items-center gap-2 ${color}`}>
-                <Icon className="w-4 h-4" /> {title} ({items.length})
+                <Icon className="w-4 h-4" /> {title} ({items.length}{items.length !== total ? ` of ${total}` : ""})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -337,13 +501,22 @@ export default function IndexingIssues() {
                   {items.map((it) => {
                     const idx = it.result?.inspectionResult?.indexStatusResult ?? {};
                     const busy = !!rowLoading[it.url];
+                    const fx = fixByUrl.get(it.url);
                     return (
                       <div key={it.url} className="py-3 text-sm">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <a href={it.url} target="_blank" rel="noreferrer" className="font-mono text-xs md:text-sm truncate max-w-full inline-flex items-center gap-1 hover:underline">
-                            {it.url} <ExternalLink className="w-3 h-3" />
-                          </a>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Checkbox
+                              checked={selected.has(it.url)}
+                              onCheckedChange={() => toggleSelected(it.url)}
+                              aria-label={`Select ${it.url}`}
+                            />
+                            <a href={it.url} target="_blank" rel="noreferrer" className="font-mono text-xs md:text-sm truncate max-w-full inline-flex items-center gap-1 hover:underline">
+                              {it.url} <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
                           <div className="flex items-center gap-2">
+                            {fx && fixStatusBadge(fx.status)}
                             {verdictBadge(idx.verdict)}
                             <Button size="sm" variant="outline" onClick={() => recheckRow(it.url)} disabled={busy}>
                               <RefreshCw className={`w-3.5 h-3.5 mr-1 ${busy ? "animate-spin" : ""}`} />
