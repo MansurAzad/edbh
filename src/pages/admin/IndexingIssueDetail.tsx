@@ -319,6 +319,34 @@ export default function IndexingIssueDetail() {
       </Card>
 
       <Card>
+        <CardHeader><CardTitle>Fix history ({history.length})</CardTitle></CardHeader>
+        <CardContent className="text-sm">
+          {history.length === 0 ? (
+            <div className="text-muted-foreground">No changes recorded yet.</div>
+          ) : (
+            <ol className="relative border-l border-border ml-2 space-y-4">
+              {history.map((h, i) => (
+                <li key={h.id} className="ml-4">
+                  <span className="absolute -left-1.5 w-3 h-3 rounded-full bg-primary" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={h.status === "applied" ? "default" : h.status === "in_progress" ? "secondary" : "destructive"}>
+                      {h.status === "applied" ? "Applied" : h.status === "in_progress" ? "In progress" : "Unresolved"}
+                    </Badge>
+                    {i === 0 && <Badge variant="outline">Latest</Badge>}
+                    <span className="text-xs text-muted-foreground">{fmt(h.created_at)}</span>
+                    <span className="text-xs text-muted-foreground">· {h.changed_by_email ?? "unknown"}</span>
+                  </div>
+                  {h.action_title && <div className="mt-1 font-medium">{h.action_title}</div>}
+                  {h.notes && <div className="text-muted-foreground whitespace-pre-wrap">{h.notes}</div>}
+                </li>
+              ))}
+            </ol>
+          )}
+        </CardContent>
+      </Card>
+
+
+      <Card>
         <CardHeader><CardTitle>Raw inspection payload</CardTitle></CardHeader>
         <CardContent>
           <pre className="text-xs whitespace-pre-wrap bg-muted rounded p-3 overflow-auto max-h-96">
