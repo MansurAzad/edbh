@@ -146,6 +146,7 @@ export default function IndexingIssueDetail() {
   const [fixNotes, setFixNotes] = useState("");
   const [fixSavedAt, setFixSavedAt] = useState<string | null>(null);
   const [savingFix, setSavingFix] = useState(false);
+  const [history, setHistory] = useState<HistoryRow[]>([]);
 
   async function load() {
     if (!target) return;
@@ -173,7 +174,18 @@ export default function IndexingIssueDetail() {
     }
   }
 
-  useEffect(() => { load(); loadFix(); /* eslint-disable-next-line */ }, [target]);
+  async function loadHistory() {
+    if (!target) return;
+    const { data } = await supabase
+      .from("indexing_fix_history")
+      .select("id,status,action_title,notes,changed_by_email,created_at")
+      .eq("url", target)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (data) setHistory(data as HistoryRow[]);
+  }
+
+  useEffect(() => { load(); loadFix(); loadHistory(); /* eslint-disable-next-line */ }, [target]);
 
   async function saveFix() {
     if (!target) return;
@@ -197,8 +209,10 @@ export default function IndexingIssueDetail() {
       return;
     }
     setFixSavedAt(data?.updated_at ?? new Date().toISOString());
+    await loadHistory();
     toast({ title: "Fix status saved" });
   }
+
 
   const idx = result?.inspectionResult?.indexStatusResult ?? {};
   const mobile = result?.inspectionResult?.mobileUsabilityResult ?? {};
