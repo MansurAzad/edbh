@@ -17,6 +17,16 @@ import { ArrowLeft, ExternalLink, RefreshCw, Save } from "lucide-react";
 
 type FixStatus = "unresolved" | "in_progress" | "applied";
 
+type HistoryRow = {
+  id: string;
+  status: string;
+  action_title: string | null;
+  notes: string | null;
+  changed_by_email: string | null;
+  created_at: string;
+};
+
+
 function verdictBadge(v?: string) {
   if (v === "PASS") return <Badge className="bg-emerald-600">Pass</Badge>;
   if (v === "PARTIAL") return <Badge className="bg-amber-600">Warning</Badge>;
