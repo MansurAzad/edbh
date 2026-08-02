@@ -128,7 +128,9 @@ const Index = () => {
           })}
           <DubaiImportedProof />
           <ShowroomLocation />
+          <KeywordLinksBlock title="জনপ্রিয় বোরকা ও আবায়া কালেকশন" />
         </Suspense>
+
       </main>
       <Footer />
       <Suspense fallback={null}>
