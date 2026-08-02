@@ -101,8 +101,10 @@ const KeywordLanding = () => {
       { name: "Collections", url: "/categories" },
       { name: page.primaryKeyword, url: canonicalPath },
     ]);
-    return [collection, crumbs];
+    const faqs = faqSchema(getLandingFaqs(page.primaryKeyword, page.category));
+    return [collection, crumbs, faqs];
   }, [page, products, canonicalPath]);
+
 
   if (!page) return <Navigate to="/shop" replace />;
 
