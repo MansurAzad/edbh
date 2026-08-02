@@ -81,32 +81,142 @@ export function buildCanonicalProposals(
 export async function fetchCanonicalOverrides(): Promise<CanonicalOverride[]> {
   const { data, error } = await supabase
     .from("seo_canonical_overrides")
-    .select("id, path, canonical_path, target_keyword, note, updated_at")
+    .select("id, path, canonical_path, target_keyword, note, updated_at, batch_id")
     .order("path");
   if (error) throw error;
   return (data ?? []) as CanonicalOverride[];
 }
 
-/** Upserts a batch of overrides (one row per path). */
-export async function applyCanonicalOverrides(rows: CanonicalOverride[]) {
-  if (rows.length === 0) return 0;
+export interface CanonicalBatch {
+  batch_id: string;
+  created_at: string;
+  paths: string[];
+  rolled_back: boolean;
+}
+
+/**
+ * Upserts a batch of overrides and records the previous canonical of every
+ * touched path, so the whole batch can be rolled back with one click.
+ * Returns the batch id.
+ */
+export async function applyCanonicalOverrides(rows: CanonicalOverride[]): Promise<{ batchId: string; count: number }> {
+  if (rows.length === 0) return { batchId: "", count: 0 };
+  const batchId = crypto.randomUUID();
+
+  const paths = rows.map((r) => r.path);
+  const { data: before } = await supabase
+    .from("seo_canonical_overrides")
+    .select("path, canonical_path")
+    .in("path", paths);
+  const previous = new Map((before ?? []).map((b) => [b.path, b.canonical_path]));
+
   const payload = rows.map((r) => ({
     path: r.path,
     canonical_path: r.canonical_path,
     target_keyword: r.target_keyword ?? null,
     note: r.note ?? null,
+    batch_id: batchId,
   }));
   const { error } = await supabase
     .from("seo_canonical_overrides")
     .upsert(payload, { onConflict: "path" });
   if (error) throw error;
-  return payload.length;
+
+  const { data: session } = await supabase.auth.getUser();
+  const { error: histError } = await supabase.from("seo_canonical_history").insert(
+    rows.map((r) => ({
+      batch_id: batchId,
+      path: r.path,
+      previous_canonical_path: previous.get(r.path) ?? null,
+      new_canonical_path: r.canonical_path,
+      operation: "apply",
+      changed_by: session?.user?.id ?? null,
+    })),
+  );
+  if (histError) throw histError;
+
+  return { batchId, count: payload.length };
+}
+
+/** Lists applied batches (newest first) for the rollback UI. */
+export async function fetchCanonicalBatches(limit = 20): Promise<CanonicalBatch[]> {
+  const { data, error } = await supabase
+    .from("seo_canonical_history")
+    .select("batch_id, path, created_at, rolled_back, operation")
+    .eq("operation", "apply")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (error) throw error;
+
+  const batches = new Map<string, CanonicalBatch>();
+  for (const row of data ?? []) {
+    const existing = batches.get(row.batch_id);
+    if (existing) {
+      existing.paths.push(row.path);
+      existing.rolled_back = existing.rolled_back && row.rolled_back;
+    } else {
+      batches.set(row.batch_id, {
+        batch_id: row.batch_id,
+        created_at: row.created_at,
+        paths: [row.path],
+        rolled_back: row.rolled_back,
+      });
+    }
+  }
+  return Array.from(batches.values()).slice(0, limit);
+}
+
+/**
+ * One-click rollback: restores each path in the batch to the canonical it had
+ * before the batch was applied (deleting the override when there was none).
+ */
+export async function rollbackCanonicalBatch(batchId: string): Promise<number> {
+  const { data: entries, error } = await supabase
+    .from("seo_canonical_history")
+    .select("id, path, previous_canonical_path, rolled_back")
+    .eq("batch_id", batchId)
+    .eq("operation", "apply");
+  if (error) throw error;
+
+  const rows = (entries ?? []).filter((e) => !e.rolled_back);
+  if (rows.length === 0) return 0;
+
+  const restore = rows.filter((r) => r.previous_canonical_path);
+  const drop = rows.filter((r) => !r.previous_canonical_path).map((r) => r.path);
+
+  if (restore.length > 0) {
+    const { error: upErr } = await supabase.from("seo_canonical_overrides").upsert(
+      restore.map((r) => ({
+        path: r.path,
+        canonical_path: r.previous_canonical_path as string,
+        batch_id: null,
+      })),
+      { onConflict: "path" },
+    );
+    if (upErr) throw upErr;
+  }
+  if (drop.length > 0) {
+    const { error: delErr } = await supabase
+      .from("seo_canonical_overrides")
+      .delete()
+      .in("path", drop);
+    if (delErr) throw delErr;
+  }
+
+  const { error: markErr } = await supabase
+    .from("seo_canonical_history")
+    .update({ rolled_back: true })
+    .eq("batch_id", batchId);
+  if (markErr) throw markErr;
+
+  return rows.length;
 }
 
 export async function removeCanonicalOverride(path: string) {
   const { error } = await supabase.from("seo_canonical_overrides").delete().eq("path", path);
   if (error) throw error;
 }
+
 
 /** Resolves the canonical URL for a path, honouring any stored override. */
 export function resolveCanonical(path: string, overrides: CanonicalOverride[]): string {
