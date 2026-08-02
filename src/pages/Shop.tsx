@@ -201,20 +201,20 @@ const Shop = () => {
   const catEn = selectedCategory;
   // Per-category unique titles to prevent SERP duplicates.
   const categoryTitleMap: Record<string, { title: string; desc: string; kw: string }> = {
-    Abaya:   { title: "Dubai Imported Abaya Collection in Bangladesh",              desc: "Premium Dubai imported abaya collection — embroidery, karchupi, stone work. Cash on Delivery সারা বাংলাদেশে।",           kw: "dubai imported abaya, abaya collection bangladesh, karchupi abaya, embroidery abaya bd" },
-    Borka:   { title: "Premium Dubai Borka Collection – Cash on Delivery in Bangladesh", desc: "প্রিমিয়াম দুবাই বোরকা কালেকশন — ম্যাচিং হিজাবসহ, সেরা দামে, Cash on Delivery বাংলাদেশে।",                          kw: "dubai borka collection, premium borka bangladesh, borka cash on delivery, বোরকা কালেকশন" },
-    Hijab:   { title: "Premium Hijab & Scarf Collection Bangladesh",                  desc: "দুবাই ইম্পোর্টেড হিজাব ও স্কার্ফ — সিল্ক, শিফন, জর্জেট। সেরা দাম, ফ্রি হোম ডেলিভারি।",                          kw: "hijab bangladesh, silk hijab bd, chiffon hijab, dubai hijab collection" },
-    Kaftan:  { title: "Dubai Kaftan & Party Wear Collection Bangladesh",              desc: "প্রিমিয়াম দুবাই কাফতান ও পার্টি ওয়্যার — স্টোন, বিডস, এমব্রয়ডারি ডিটেইল।",                                       kw: "dubai kaftan bangladesh, kaftan party wear, stone work kaftan" },
+    Abaya:   { title: "Dubai Imported Abaya Shop Bangladesh – Premium Abaya",              desc: "Premium abaya Bangladesh — Dubai imported abaya Bangladesh, Farasha abaya Bangladesh, 2 part Farasha abaya, Dubai imported Nida abaya ও Dubai imported black abaya। Cash on Delivery।",           kw: "premium abaya Bangladesh, abaya shop Bangladesh, Dubai imported abaya Bangladesh, Dubai abaya collection Bangladesh, Farasha abaya Bangladesh, 2 part Farasha abaya Bangladesh, Dubai imported Nida abaya Bangladesh, Dubai imported black abaya Bangladesh, আবায়া শপ বাংলাদেশ" },
+    Borka:   { title: "Premium Borka Shop Bangladesh – Dubai Imported Borka", desc: "Premium borka Bangladesh — Karchupi borka Bangladesh, imported borka shop Bangladesh ও Dubai borka price Bangladesh এক জায়গায়। প্রিমিয়াম বোরকা বাংলাদেশ, Cash on Delivery।",                          kw: "premium borka Bangladesh, borka shop Bangladesh, Karchupi borka Bangladesh, Imported borka shop Bangladesh, Dubai borka price Bangladesh, প্রিমিয়াম বোরকা বাংলাদেশ" },
+    Hijab:   { title: "Hijab Shop Bangladesh – Premium Dubai Hijab & Scarf",                  desc: "Hijab shop Bangladesh — দুবাই ইম্পোর্টেড হিজাব ও স্কার্ফ, সিল্ক, শিফন, জর্জেট। সেরা দাম, দ্রুত হোম ডেলিভারি।",                          kw: "hijab shop Bangladesh, premium hijab bangladesh, silk hijab bd, dubai hijab collection" },
+    Kaftan:  { title: "Kaftan Shop Bangladesh – Dubai Kaftan & Party Wear",              desc: "Kaftan shop Bangladesh — প্রিমিয়াম দুবাই কাফতান ও পার্টি ওয়্যার, স্টোন, বিডস ও এমব্রয়ডারি ডিটেইল।",                                       kw: "kaftan shop Bangladesh, dubai kaftan bangladesh, kaftan party wear, stone work kaftan" },
   };
   const isAll = selectedCategory === "All";
   const seoTitle = isAll
-    ? "Shop – Dubai Imported Abaya, Borka & Hijab Collection Bangladesh"
+    ? "Borka & Abaya Shop Bangladesh – Dubai Imported Collection"
     : (categoryTitleMap[catEn]?.title || `${catEn} Collection – Dubai Borka House`);
   const seoDescription = isAll
-    ? "Dubai Borka House shop — সবচেয়ে বড় দুবাই ইম্পোর্টেড আবায়া, বোরকা, হিজাব ও কাফতান কালেকশন। Cash on Delivery, সারা বাংলাদেশে।"
+    ? "Borka shop Bangladesh ও abaya shop Bangladesh — premium borka Bangladesh, Dubai abaya collection Bangladesh, kaftan shop ও hijab shop Bangladesh। Cash on Delivery সারা দেশে।"
     : (categoryTitleMap[catEn]?.desc || `${catBn} অনলাইনে কিনুন — Dubai Borka House।`);
   const seoKeywords = isAll
-    ? "shop dubai borka house, abaya borka hijab collection bd, dubai imported islamic fashion"
+    ? "borka shop Bangladesh, abaya shop Bangladesh, premium borka Bangladesh, premium abaya Bangladesh, Dubai imported abaya Bangladesh, imported borka shop Bangladesh, kaftan shop Bangladesh, hijab shop Bangladesh, প্রিমিয়াম বোরকা বাংলাদেশ, আবায়া শপ বাংলাদেশ"
     : (categoryTitleMap[catEn]?.kw || `${catEn} bangladesh, buy ${catEn.toLowerCase()} online`);
 
   const collectionSchema = {
@@ -240,11 +240,12 @@ const Shop = () => {
           <div className="container mx-auto px-4">
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="text-center">
               <h1 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-2 md:mb-4">
-                <span className="text-foreground">Our </span>
-                <span className="text-gradient-gold">Collection</span>
+                <span className="text-foreground">Borka &amp; Abaya Shop </span>
+                <span className="text-gradient-gold">Bangladesh</span>
               </h1>
-              <p className="text-muted-foreground max-w-xl mx-auto text-sm md:text-base">
-                Premium fashion collection imported directly from Dubai.
+              <p className="text-muted-foreground max-w-2xl mx-auto text-sm md:text-base">
+                Premium borka Bangladesh ও premium abaya Bangladesh — Dubai imported abaya Bangladesh,
+                Farasha abaya, Nida abaya, Karchupi borka, kaftan shop ও hijab shop Bangladesh এক জায়গায়।
               </p>
             </motion.div>
           </div>
