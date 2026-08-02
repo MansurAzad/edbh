@@ -133,7 +133,7 @@ const CATEGORY_SEEDS: MetaSeed[] = [
     titleCore: "Best Borka Shop in Bangladesh – Dubai Borka Price & Abaya",
     description:
       "Best borka shop in Bangladesh — original Dubai borka in Bangladesh, Dubai imported abaya Bangladesh, luxury borka Bangladesh, plus size ও custom size abaya। Online borka shopping in Bangladesh, cash on delivery borka, borka shop in Dhaka।",
-    keywords: PRIMARY_KEYWORDS,
+    keywords: getScopeKeywords("shop", PRIMARY_KEYWORDS),
   },
   {
     key: "category:Abaya",
@@ -150,7 +150,7 @@ const CATEGORY_SEEDS: MetaSeed[] = [
       "Korean Nida Borka Price",
       "Online Borka Shopping in Bangladesh",
       "Cash on Delivery Borka",
-    ],
+    ].concat(getScopeKeywords("category:Abaya")),
   },
   {
     key: "category:Borka",
@@ -170,7 +170,7 @@ const CATEGORY_SEEDS: MetaSeed[] = [
       "Comfortable Borka for Summer",
       "Borka Shop in Dhaka",
       "Wholesale Borka in Bangladesh",
-    ],
+    ].concat(getScopeKeywords("category:Borka")),
   },
   {
     key: "category:Hijab",
@@ -185,7 +185,7 @@ const CATEGORY_SEEDS: MetaSeed[] = [
       "hijab shop Bangladesh",
       "Online Borka Shopping in Bangladesh",
       "Cash on Delivery Borka",
-    ],
+    ].concat(getScopeKeywords("category:Hijab")),
   },
   {
     key: "category:Kaftan",
@@ -200,7 +200,7 @@ const CATEGORY_SEEDS: MetaSeed[] = [
       "kaftan shop Bangladesh",
       "Luxury Borka Bangladesh",
       "Cash on Delivery Borka",
-    ],
+    ].concat(getScopeKeywords("category:Kaftan")),
   },
 ];
 
@@ -213,7 +213,7 @@ const SECTION_SEEDS: MetaSeed[] = [
     titleCore: "Dubai Borka Price in Bangladesh – Best Borka Shop in Bangladesh",
     description:
       "Original Dubai borka in Bangladesh — luxury borka Bangladesh, premium black borka, Dubai imported abaya Bangladesh, two part Farasha borka, plus size ও custom size abaya। Online borka shopping in Bangladesh, cash on delivery borka, borka shop in Dhaka।",
-    keywords: PRIMARY_KEYWORDS,
+    keywords: getScopeKeywords("home", PRIMARY_KEYWORDS),
   },
   {
     key: "section:categories",
@@ -228,7 +228,7 @@ const SECTION_SEEDS: MetaSeed[] = [
       "Best Borka Shop in Bangladesh",
       "Wholesale Borka in Bangladesh",
       "Cash on Delivery Borka",
-    ],
+    ].concat(getScopeKeywords("categories")),
   },
 ];
 
