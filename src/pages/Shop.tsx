@@ -8,6 +8,7 @@ import SEOHead from "@/components/seo/SEOHead";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import StructuredData, { faqSchema, breadcrumbSchema } from "@/components/seo/StructuredData";
 import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
+import { buildPaginationJsonLd } from "@/lib/seo/config";
 import { getCategoryMeta } from "@/lib/seo/metaGenerator";
 import { getCategoryFaqs } from "@/lib/seo/faqs";
 
@@ -93,6 +94,9 @@ const Shop = () => {
     }
   }, [urlMaxPrice]);
 
+  // Crawler-friendly pagination: ?page=N is a real entry point into the list.
+  const initialPage = Math.max(1, Number(searchParams.get("page")) || 1);
+
   const {
     data: productPages,
     fetchNextPage,
@@ -100,8 +104,8 @@ const Shop = () => {
     isFetchingNextPage,
     isLoading: loading,
   } = useInfiniteQuery({
-    queryKey: ["shop-products", selectedCategory, searchQuery, priceRange, sortBy, selectedMaterial],
-    queryFn: async ({ pageParam = 0 }) => {
+    queryKey: ["shop-products", selectedCategory, searchQuery, priceRange, sortBy, selectedMaterial, initialPage],
+    queryFn: async ({ pageParam = initialPage - 1 }) => {
       const { column, ascending } = getSortConfig(sortBy);
       const from = pageParam * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -131,7 +135,7 @@ const Shop = () => {
       if (nextPage * PAGE_SIZE >= lastPage.totalCount) return undefined;
       return nextPage;
     },
-    initialPageParam: 0,
+    initialPageParam: initialPage - 1,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -142,6 +146,28 @@ const Shop = () => {
     return flat.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   }, [productPages]);
   const totalCount = productPages?.pages[0]?.totalCount ?? 0;
+
+  // --- Pagination metadata for canonical / rel=prev|next / JSON-LD ---
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const currentPage = Math.min(
+    totalPages,
+    initialPage + Math.max(0, (productPages?.pages.length ?? 1) - 1)
+  );
+  const pageQuery = useMemo(
+    () => ({ category: urlCategory !== "All" ? urlCategory : undefined }),
+    [urlCategory]
+  );
+  const pageUrl = useCallback(
+    (p: number) => {
+      const params = new URLSearchParams();
+      if (pageQuery.category) params.set("category", pageQuery.category);
+      if (p > 1) params.set("page", String(p));
+      const qs = params.toString();
+      return `/shop${qs ? `?${qs}` : ""}`;
+    },
+    [pageQuery]
+  );
+
 
   // Infinite scroll observer
   const handleObserver = useCallback(
@@ -255,8 +281,27 @@ const Shop = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead title={seoTitle} fullTitle description={seoDescription} canonical="/shop" keywords={seoKeywords} />
+      <SEOHead
+        title={seoTitle}
+        fullTitle
+        description={seoDescription}
+        canonical={pageUrl(currentPage)}
+        keywords={seoKeywords}
+        prevPath={currentPage > 1 ? pageUrl(currentPage - 1) : undefined}
+        nextPath={currentPage < totalPages ? pageUrl(currentPage + 1) : undefined}
+      />
       <StructuredData data={collectionSchema} />
+      <StructuredData
+        data={buildPaginationJsonLd({
+          path: "/shop",
+          query: { category: pageQuery.category },
+          page: currentPage,
+          totalPages,
+          totalItems: totalCount,
+          name: seoTitle,
+        })}
+      />
+
       <StructuredData
         data={breadcrumbSchema(
           isAll
@@ -403,8 +448,28 @@ const Shop = () => {
                   <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
+
+              {/* Crawler-friendly pagination links (also usable without JS) */}
+              {totalPages > 1 && (
+                <nav aria-label="Pagination" className="mt-6 flex items-center justify-between gap-4 text-sm">
+                  {currentPage > 1 ? (
+                    <a href={pageUrl(currentPage - 1)} rel="prev" className="text-primary hover:underline">
+                      ← আগের পৃষ্ঠা
+                    </a>
+                  ) : <span />}
+                  <span className="text-muted-foreground">
+                    পৃষ্ঠা {currentPage} / {totalPages}
+                  </span>
+                  {currentPage < totalPages ? (
+                    <a href={pageUrl(currentPage + 1)} rel="next" className="text-primary hover:underline">
+                      পরের পৃষ্ঠা →
+                    </a>
+                  ) : <span />}
+                </nav>
+              )}
             </>
           )}
+
 
           <RecentlyViewed productIds={recentlyViewed} />
         </div>

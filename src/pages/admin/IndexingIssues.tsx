@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import SitemapSubmitCard from "@/components/admin/seo/SitemapSubmitCard";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -495,7 +496,11 @@ export default function IndexingIssues() {
         </Button>
       </div>
 
+      {/* Sitemap submission + Search Console status */}
+      <SitemapSubmitCard />
+
       {/* Notification settings */}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2"><Bell className="w-4 h-4" /> Notification settings</CardTitle>

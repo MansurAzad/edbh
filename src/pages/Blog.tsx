@@ -6,9 +6,9 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Input } from "@/components/ui/input";
 import SEOHead from "@/components/seo/SEOHead";
-import { buildBlogListSeo } from "@/lib/seo/config";
+import { buildBlogListSeo, buildBlogPostSeo, buildBlogPostJsonLd, extractFaqsFromContent } from "@/lib/seo/config";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
-import StructuredData, { articleSchema } from "@/components/seo/StructuredData";
+import StructuredData, { faqSchema } from "@/components/seo/StructuredData";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 
@@ -78,10 +78,36 @@ const Blog = () => {
     })),
   };
 
+  // When a post is expanded it becomes the "active" document: swap in its
+  // Article meta/OG image and emit Article + FAQ JSON-LD for rich results.
+  const activePost = posts.find((p) => p.id === expandedPost) || null;
+  const activeSeo = activePost
+    ? buildBlogPostSeo({
+        title: activePost.title,
+        excerpt: activePost.excerpt,
+        slug: activePost.slug,
+        image: activePost.image_url,
+      })
+    : buildBlogListSeo();
+  const activeFaqs = activePost ? extractFaqsFromContent(activePost.content) : [];
+
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead {...buildBlogListSeo()} />
+      <SEOHead {...activeSeo} />
       <StructuredData data={blogListSchema} />
+      {activePost && (
+        <StructuredData
+          data={buildBlogPostJsonLd({
+            title: activePost.title,
+            excerpt: activePost.excerpt,
+            slug: activePost.slug,
+            image: activePost.image_url,
+            publishedAt: activePost.published_at || undefined,
+            author: activePost.author_name || undefined,
+          })}
+        />
+      )}
+      {activeFaqs.length > 0 && <StructuredData data={faqSchema(activeFaqs)} />}
       <Header />
       <Breadcrumbs />
       <main className="pt-4 pb-20">
@@ -133,7 +159,16 @@ const Blog = () => {
             <>
               {featuredPost && selectedCategory === "All" && !searchQuery && (
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-12">
-                  <StructuredData data={articleSchema({ title: featuredPost.title, description: featuredPost.excerpt || "", image: featuredPost.image_url || "", date: featuredPost.published_at || "", author: featuredPost.author_name || undefined })} />
+                  <StructuredData
+                    data={buildBlogPostJsonLd({
+                      title: featuredPost.title,
+                      excerpt: featuredPost.excerpt,
+                      slug: featuredPost.slug,
+                      image: featuredPost.image_url,
+                      publishedAt: featuredPost.published_at || undefined,
+                      author: featuredPost.author_name || undefined,
+                    })}
+                  />
                   <div className="relative rounded-2xl overflow-hidden group cursor-pointer" onClick={() => setExpandedPost(expandedPost === featuredPost.id ? null : featuredPost.id)}>
                     <div className="aspect-[21/9] relative">
                       <img src={featuredPost.image_url || "/placeholder.svg"} alt={featuredPost.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />

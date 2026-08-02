@@ -10,6 +10,10 @@ interface SEOHeadProps {
   keywords?: string;
   /** If true, use `title` as-is without appending " | Dubai Borka House". */
   fullTitle?: boolean;
+  /** Site-relative path of the previous paginated page (adds <link rel="prev">). */
+  prevPath?: string;
+  /** Site-relative path of the next paginated page (adds <link rel="next">). */
+  nextPath?: string;
 }
 
 const SITE_NAME = "Dubai Borka House";
@@ -25,6 +29,8 @@ const SEOHead = ({
   noIndex = false,
   keywords,
   fullTitle = false,
+  prevPath,
+  nextPath,
 }: SEOHeadProps) => {
   const fullTitleStr = !title
     ? `${SITE_NAME} – Premium Dubai Imported Borka, Abaya & Hijab in Bangladesh`
@@ -32,6 +38,8 @@ const SEOHead = ({
       ? title
       : `${title} | ${SITE_NAME}`;
   const canonicalUrl = canonical ? `${BASE_URL}${canonical}` : undefined;
+  const prevUrl = prevPath ? `${BASE_URL}${prevPath}` : undefined;
+  const nextUrl = nextPath ? `${BASE_URL}${nextPath}` : undefined;
 
   useEffect(() => {
     document.title = fullTitleStr;
@@ -76,10 +84,30 @@ const SEOHead = ({
       link.remove();
     }
 
+    // rel=prev / rel=next — crawler-friendly paginated navigation
+    const setRel = (rel: "prev" | "next", href?: string) => {
+      let el = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+      if (href) {
+        if (!el) {
+          el = document.createElement("link");
+          el.rel = rel;
+          document.head.appendChild(el);
+        }
+        el.href = href;
+      } else if (el) {
+        el.remove();
+      }
+    };
+    setRel("prev", prevUrl);
+    setRel("next", nextUrl);
+
     return () => {
       document.title = `${SITE_NAME} - প্রিমিয়াম ইসলামিক ফ্যাশন`;
+      setRel("prev", undefined);
+      setRel("next", undefined);
     };
-  }, [fullTitleStr, description, canonicalUrl, ogImage, ogType, noIndex, keywords]);
+  }, [fullTitleStr, description, canonicalUrl, ogImage, ogType, noIndex, keywords, prevUrl, nextUrl]);
+
 
   return null;
 };

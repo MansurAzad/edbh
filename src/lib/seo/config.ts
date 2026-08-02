@@ -293,3 +293,94 @@ export function buildBlogPostJsonLd(post: BlogPostJsonLdInput): Record<string, u
     mainEntityOfPage: { "@type": "WebPage", "@id": `${SITE_URL}/blog/${post.slug}` },
   };
 }
+
+// ---------- Pagination & Review helpers ----------
+
+/**
+ * Build a schema.org CollectionPage JSON-LD fragment describing pagination so
+ * crawlers understand the page series (page N of M).
+ */
+export function buildPaginationJsonLd(opts: {
+  path: string;               // e.g. "/shop" (no query)
+  query?: Record<string, string | undefined>;
+  page: number;               // 1-based current page
+  totalPages: number;
+  totalItems: number;
+  name: string;
+}): Record<string, unknown> {
+  const url = (p: number) => {
+    const params = new URLSearchParams();
+    Object.entries(opts.query || {}).forEach(([k, v]) => { if (v) params.set(k, v); });
+    if (p > 1) params.set("page", String(p));
+    const qs = params.toString();
+    return `${SITE_URL}${opts.path}${qs ? `?${qs}` : ""}`;
+  };
+  return {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: opts.name,
+    url: url(opts.page),
+    isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+    mainEntity: {
+      "@type": "ItemList",
+      numberOfItems: opts.totalItems,
+      itemListOrder: "https://schema.org/ItemListOrderAscending",
+    },
+    ...(opts.page > 1 ? { previousItem: url(opts.page - 1) } : {}),
+    ...(opts.page < opts.totalPages ? { nextItem: url(opts.page + 1) } : {}),
+    pagination: {
+      "@type": "PropertyValue",
+      name: "page",
+      value: `${opts.page} of ${opts.totalPages}`,
+    },
+  };
+}
+
+/** Individual customer reviews → schema.org Review[] for rich snippets. */
+export function buildReviewJsonLd(reviews: Array<{
+  rating: number;
+  title?: string | null;
+  comment?: string | null;
+  author?: string | null;
+  createdAt?: string | null;
+}>): Record<string, unknown>[] {
+  return reviews.slice(0, 10).map((r) => ({
+    "@type": "Review",
+    reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: "5", worstRating: "1" },
+    author: { "@type": "Person", name: r.author?.trim() || "Verified Customer" },
+    ...(r.createdAt ? { datePublished: String(r.createdAt).slice(0, 10) } : {}),
+    ...(r.title ? { name: r.title } : {}),
+    ...(r.comment ? { reviewBody: r.comment } : {}),
+  }));
+}
+
+/**
+ * Extract FAQ pairs from markdown blog content.
+ * Recognises "## Question?" / "### Question?" headings followed by body text.
+ */
+export function extractFaqsFromContent(content?: string | null): Array<{ question: string; answer: string }> {
+  if (!content) return [];
+  const faqs: Array<{ question: string; answer: string }> = [];
+  const lines = content.split("\n");
+  let current: { question: string; answer: string[] } | null = null;
+  for (const line of lines) {
+    const heading = line.match(/^#{2,4}\s+(.*\?)\s*$/);
+    if (heading) {
+      if (current && current.answer.join(" ").trim()) {
+        faqs.push({ question: current.question, answer: current.answer.join(" ").trim() });
+      }
+      current = { question: heading[1].trim(), answer: [] };
+    } else if (current) {
+      if (/^#{1,4}\s+/.test(line)) {
+        if (current.answer.join(" ").trim()) faqs.push({ question: current.question, answer: current.answer.join(" ").trim() });
+        current = null;
+      } else if (line.trim()) {
+        current.answer.push(line.trim().replace(/[*_`>#-]/g, ""));
+      }
+    }
+  }
+  if (current && current.answer.join(" ").trim()) {
+    faqs.push({ question: current.question, answer: current.answer.join(" ").trim() });
+  }
+  return faqs.slice(0, 10);
+}
