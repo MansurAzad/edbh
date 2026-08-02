@@ -335,6 +335,19 @@ const ProductDetail = () => {
     <div className="min-h-screen bg-background">
       <SEOHead {...seoOverrides} />
       <StructuredData data={buildProductJsonLd({ id: product.id, name: product.name, description: product.description, price: product.price, salePrice: product.sale_price, image: getProductImage(), category: product.category, slug: product.slug, stock: product.stock, reviewCount: reviewStats.count, averageRating: reviewStats.avg, sizes: (product as any).sizes, colors: (product as any).colors, material: (product as any).material, sku: (product as any).sku })} />
+      {reviewItems.length > 0 && (
+        <StructuredData
+          data={buildReviewJsonLd(reviewItems).map((r) => ({
+            "@context": "https://schema.org",
+            ...r,
+            itemReviewed: {
+              "@type": "Product",
+              name: product.name,
+              image: getProductImage(),
+            },
+          }))}
+        />
+      )}
       <Header />
       <Breadcrumbs />
       <main className="pt-4 pb-16 md:pb-20">
