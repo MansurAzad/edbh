@@ -5,8 +5,12 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import SEOHead from "@/components/seo/SEOHead";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
-import StructuredData from "@/components/seo/StructuredData";
+import StructuredData, { breadcrumbSchema } from "@/components/seo/StructuredData";
 import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
+import { getMeta } from "@/lib/seo/metaGenerator";
+
+const categoriesMeta = getMeta("section:categories")!;
+
 
 import productAbaya from "@/assets/product-abaya-1.jpg";
 import productHijab from "@/assets/product-hijab-1.jpg";
@@ -42,14 +46,22 @@ const Categories = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead 
-        title="Borka Shop in Dhaka – Online Borka Shopping in Bangladesh" 
-        description="Online borka shopping in Bangladesh — best borka shop in Bangladesh, borka shop in Dhaka, Dubai imported abaya Bangladesh, plus size ও custom size abaya, wholesale borka in Bangladesh। Cash on delivery borka।" 
-        canonical="/categories" 
-        keywords="Online Borka Shopping in Bangladesh, Borka Shop in Dhaka, Best Borka Shop in Bangladesh, Wholesale Borka in Bangladesh, Cash on Delivery Borka, Dubai Imported Abaya Bangladesh, Plus Size Borka Bangladesh, Custom Size Abaya Bangladesh, Borka With Matching Hijab, Hajj Borka With Hijab"
+      <SEOHead
+        title={categoriesMeta.title}
+        fullTitle
+        description={categoriesMeta.description}
+        canonical="/categories"
+        keywords={categoriesMeta.keywords}
       />
 
       <StructuredData data={itemListSchema} />
+      <StructuredData
+        data={breadcrumbSchema([
+          { name: "Home", url: "/" },
+          { name: "Categories", url: "/categories" },
+        ])}
+      />
+
       <Header />
       <Breadcrumbs />
       <main className="pt-4 pb-20">

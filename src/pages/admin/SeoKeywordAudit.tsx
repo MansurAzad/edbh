@@ -16,6 +16,8 @@ import {
   coverageToCsv,
 } from "@/lib/seo/keywordCoverage";
 import { validateKeywordPages } from "@/lib/seo/keywordLandingPages";
+import { ALL_META, validateMeta } from "@/lib/seo/metaGenerator";
+
 
 const strengthMeta = {
   strong: { label: "Strong", cls: "bg-green-500/15 text-green-600 border-green-500/30" },
@@ -30,6 +32,8 @@ const SeoKeywordAudit = () => {
   const rows = useMemo(() => auditKeywordCoverage(), []);
   const summary = useMemo(() => coverageSummary(rows), [rows]);
   const issues = useMemo(() => validateKeywordPages(), []);
+  const metaIssues = useMemo(() => validateMeta(), []);
+
 
   const filtered = rows.filter((r) => {
     if (onlyGaps && r.strength === "strong") return false;
@@ -91,6 +95,59 @@ const SeoKeywordAudit = () => {
             )}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-3 flex-wrap">
+            <CardTitle className="text-base">Auto-generated meta & OpenGraph validation</CardTitle>
+            <Badge variant={metaIssues.length ? "destructive" : "secondary"}>
+              {metaIssues.length ? `${metaIssues.length} issue` : `${ALL_META.length} pages valid`}
+            </Badge>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {metaIssues.length > 0 && (
+              <ul className="text-sm space-y-1">
+                {metaIssues.map((i, idx) => (
+                  <li key={idx} className="text-destructive">
+                    <span className="font-mono">{i.key}</span> — [{i.field}] {i.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Page</TableHead>
+                    <TableHead>Title (len)</TableHead>
+                    <TableHead>Description (len)</TableHead>
+                    <TableHead>OG</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ALL_META.map((m) => (
+                    <TableRow key={m.key}>
+                      <TableCell className="font-mono text-xs">{m.path}</TableCell>
+                      <TableCell className="text-xs">
+                        {m.title} <span className="text-muted-foreground">({m.title.length})</span>
+                      </TableCell>
+                      <TableCell className="text-xs max-w-md">
+                        <span className="line-clamp-2">{m.description}</span>
+                        <span className="text-muted-foreground">({m.description.length})</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {m.ogTitle && m.ogDescription && m.ogImage ? "complete" : "incomplete"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3 flex-wrap">

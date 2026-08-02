@@ -6,7 +6,9 @@ import { Check, ShoppingBag } from "lucide-react";
 
 import SEOHead from "@/components/seo/SEOHead";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
-import StructuredData, { breadcrumbSchema } from "@/components/seo/StructuredData";
+import StructuredData, { breadcrumbSchema, faqSchema } from "@/components/seo/StructuredData";
+import { getLandingFaqs } from "@/lib/seo/faqs";
+
 import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -101,8 +103,10 @@ const KeywordLanding = () => {
       { name: "Collections", url: "/categories" },
       { name: page.primaryKeyword, url: canonicalPath },
     ]);
-    return [collection, crumbs];
+    const faqs = faqSchema(getLandingFaqs(page.primaryKeyword, page.category));
+    return [collection, crumbs, faqs];
   }, [page, products, canonicalPath]);
+
 
   if (!page) return <Navigate to="/shop" replace />;
 
@@ -194,6 +198,25 @@ const KeywordLanding = () => {
             </div>
           )}
         </section>
+
+        {/* Visible FAQ — mirrors the FAQPage JSON-LD above (required for rich results). */}
+        <section className="container mx-auto px-4 mt-12" aria-labelledby="landing-faq-heading">
+          <h2 id="landing-faq-heading" className="font-display text-xl md:text-2xl font-bold mb-4">
+            সাধারণ জিজ্ঞাসা — {page.primaryKeyword}
+          </h2>
+          <div className="divide-y divide-border rounded-lg border border-border bg-card">
+            {getLandingFaqs(page.primaryKeyword, page.category).map((faq) => (
+              <details key={faq.question} className="group p-4">
+                <summary className="cursor-pointer font-medium text-foreground list-none">
+                  {faq.question}
+                </summary>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{faq.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+
 
         <KeywordLinksBlock
           title="সম্পর্কিত কালেকশন"
