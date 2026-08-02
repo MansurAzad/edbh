@@ -12,6 +12,7 @@
  */
 
 import { KEYWORD_LANDING_PAGES } from "./keywordLandingPages";
+import { getScopeKeywords, dedupeKeywords, MAX_META_KEYWORDS } from "./keywordTaxonomy";
 
 export const SITE_NAME = "Dubai Borka House";
 export const SITE_NAME_BN = "দুবাই বোরকা হাউস";
