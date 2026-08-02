@@ -9,7 +9,28 @@ env:
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
 jobs:
+  seo-gate:
+    name: SEO governance gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      # Blocks the deploy job below unless all 33 SEO governance tests pass.
+      - name: Run SEO governance gate
+        run: node scripts/seo-gate.mjs
+
   deploy-preview:
+    needs: seo-gate
     name: Deploy Preview to Vercel
     runs-on: ubuntu-latest
     timeout-minutes: 15

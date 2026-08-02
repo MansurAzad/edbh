@@ -31,6 +31,9 @@ jobs:
         run: bunx eslint . --max-warnings 0
         continue-on-error: true
 
+      - name: SEO governance gate (33 tests must pass)
+        run: node scripts/seo-gate.mjs
+
       - name: Build project
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}

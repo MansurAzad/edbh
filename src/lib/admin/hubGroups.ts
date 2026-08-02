@@ -138,6 +138,7 @@ export const HUB_GROUPS: HubGroup[] = [
       { label: "SEO Debug", path: "/admin/seo-debug" },
       { label: "Indexing Issues", path: "/admin/indexing-issues" },
       { label: "SEO Keyword Coverage", path: "/admin/seo-keywords" },
+      { label: "SEO Preview", path: "/admin/seo-preview" },
 
     ],
   },
