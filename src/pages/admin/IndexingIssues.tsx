@@ -489,12 +489,54 @@ export default function IndexingIssues() {
         <Button size="sm" variant="outline" onClick={exportCsv} disabled={!(summary?.inspections?.length)}>
           <Download className="w-4 h-4 mr-2" /> Export CSV
         </Button>
-        <div className="flex items-center gap-2 ml-auto">
-          <Bell className="w-4 h-4 text-muted-foreground" />
-          <Label htmlFor="notify-toggle" className="text-xs text-muted-foreground">Alert on count change</Label>
-          <Switch id="notify-toggle" checked={notifyEnabled} onCheckedChange={toggleNotify} />
-        </div>
+        <Button size="sm" variant="outline" onClick={exportUnresolvedCsv} disabled={!unresolved.length || exportingUnresolved}>
+          <Download className="w-4 h-4 mr-2" />
+          {exportingUnresolved ? "Exporting…" : `Export unresolved (${unresolved.length})`}
+        </Button>
       </div>
+
+      {/* Notification settings */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2"><Bell className="w-4 h-4" /> Notification settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Switch id="notify-toggle" checked={notify.enabled} onCheckedChange={(v) => updateNotify({ enabled: v })} />
+            <Label htmlFor="notify-toggle" className="text-sm">Alert me when Errors/Warnings change after a refresh</Label>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">Channels</div>
+              <div className="flex items-center gap-2">
+                <Switch id="ch-toast" checked={notify.channelToast} disabled={!notify.enabled}
+                  onCheckedChange={(v) => toggleNotifyChannel("channelToast", v)} />
+                <Label htmlFor="ch-toast" className="text-sm">In-app toast</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="ch-browser" checked={notify.channelBrowser} disabled={!notify.enabled}
+                  onCheckedChange={(v) => toggleNotifyChannel("channelBrowser", v)} />
+                <Label htmlFor="ch-browser" className="text-sm">Browser notification</Label>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">Thresholds (minimum change to alert)</div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="th-err" className="text-sm w-24">Errors ±</Label>
+                <Input id="th-err" type="number" min={1} className="w-24" disabled={!notify.enabled}
+                  value={notify.errorThreshold}
+                  onChange={(e) => updateNotify({ errorThreshold: Math.max(1, Number(e.target.value) || 1) })} />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="th-warn" className="text-sm w-24">Warnings ±</Label>
+                <Input id="th-warn" type="number" min={1} className="w-24" disabled={!notify.enabled}
+                  value={notify.warningThreshold}
+                  onChange={(e) => updateNotify({ warningThreshold: Math.max(1, Number(e.target.value) || 1) })} />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card>
@@ -513,11 +555,30 @@ export default function IndexingIssues() {
             <Switch id="unresolved-only" checked={unresolvedOnly} onCheckedChange={setUnresolvedOnly} />
             <Label htmlFor="unresolved-only" className="text-sm">Unresolved only</Label>
           </div>
-          {(search || unresolvedOnly) && (
-            <Button size="sm" variant="ghost" onClick={() => { setSearch(""); setUnresolvedOnly(false); }}>Clear</Button>
+          <div className="flex items-center gap-2">
+            <Switch id="age-filter" checked={ageFilterOn} onCheckedChange={setAgeFilterOn} />
+            <Label htmlFor="age-filter" className="text-sm whitespace-nowrap">Unresolved older than</Label>
+            <Input
+              type="number"
+              min={1}
+              className="w-20"
+              value={ageDays}
+              aria-label="Unresolved age in days"
+              onChange={(e) => {
+                const n = Math.max(1, Number(e.target.value) || 1);
+                setAgeDays(n);
+                try { localStorage.setItem(AGE_KEY, String(n)); } catch { /* ignore */ }
+              }}
+            />
+            <span className="text-sm text-muted-foreground">days</span>
+            {agingCount > 0 && <Badge variant="destructive">{agingCount} aging</Badge>}
+          </div>
+          {(search || unresolvedOnly || ageFilterOn) && (
+            <Button size="sm" variant="ghost" onClick={() => { setSearch(""); setUnresolvedOnly(false); setAgeFilterOn(false); }}>Clear</Button>
           )}
         </CardContent>
       </Card>
+
 
       {/* Bulk actions */}
       {selected.size > 0 && (
