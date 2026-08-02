@@ -16,6 +16,8 @@ import {
   coverageToCsv,
 } from "@/lib/seo/keywordCoverage";
 import { validateKeywordPages } from "@/lib/seo/keywordLandingPages";
+import { ALL_META, validateMeta } from "@/lib/seo/metaGenerator";
+
 
 const strengthMeta = {
   strong: { label: "Strong", cls: "bg-green-500/15 text-green-600 border-green-500/30" },
