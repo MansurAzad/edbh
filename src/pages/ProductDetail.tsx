@@ -24,7 +24,7 @@ import WhatsAppOrderButton from "@/components/marketing/WhatsAppOrderButton";
 import MessengerOrderButton from "@/components/marketing/MessengerOrderButton";
 import FlashSaleTimer from "@/components/marketing/FlashSaleTimer";
 import SEOHead from "@/components/seo/SEOHead";
-import { buildProductSeo, buildProductJsonLd } from "@/lib/seo/config";
+import { buildProductSeo, buildProductJsonLd, buildReviewJsonLd } from "@/lib/seo/config";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import StructuredData from "@/components/seo/StructuredData";
 import { trackAddToCart, trackViewContent, trackContact } from "@/components/seo/AnalyticsTracker";
@@ -58,6 +58,7 @@ const ProductDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const [showStockAlert, setShowStockAlert] = useState(false);
   const [reviewStats, setReviewStats] = useState<{ count: number; avg: number }>({ count: 0, avg: 0 });
+  const [reviewItems, setReviewItems] = useState<Array<{ rating: number; title?: string | null; comment?: string | null; createdAt?: string | null }>>([]);
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { toast } = useToast();
@@ -78,7 +79,7 @@ const ProductDetail = () => {
           const [imgsRes, variantsRes, reviewsRes] = await Promise.all([
             supabase.from("product_images").select("id, image_url, alt_text").eq("product_id", data.id).order("display_order"),
             supabase.from("product_variants").select("id, size, color, stock, image_url, price_adjustment, sku").eq("product_id", data.id),
-            supabase.from("product_reviews").select("rating").eq("product_id", data.id),
+            supabase.from("product_reviews").select("rating, title, comment, created_at").eq("product_id", data.id).order("created_at", { ascending: false }).limit(20),
           ]);
           setProductImages(imgsRes.data || []);
           setVariants(variantsRes.data || []);
@@ -87,6 +88,14 @@ const ProductDetail = () => {
           if (reviews.length > 0) {
             const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
             setReviewStats({ count: reviews.length, avg });
+            setReviewItems(
+              reviews.map((r: any) => ({
+                rating: r.rating,
+                title: r.title,
+                comment: r.comment,
+                createdAt: r.created_at,
+              })),
+            );
           }
           
           addToRecentlyViewed(data.id);
