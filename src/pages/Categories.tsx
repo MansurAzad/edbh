@@ -5,8 +5,12 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import SEOHead from "@/components/seo/SEOHead";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
-import StructuredData from "@/components/seo/StructuredData";
+import StructuredData, { breadcrumbSchema } from "@/components/seo/StructuredData";
 import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
+import { getMeta } from "@/lib/seo/metaGenerator";
+
+const categoriesMeta = getMeta("section:categories")!;
+
 
 import productAbaya from "@/assets/product-abaya-1.jpg";
 import productHijab from "@/assets/product-hijab-1.jpg";
