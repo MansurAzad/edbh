@@ -22,6 +22,12 @@ const GATEWAY = "https://connector-gateway.lovable.dev/google_search_console";
 const SITE_URL = "https://dubaiborkahouse.com/";
 const FN = "gsc-indexing";
 
+/** Indexing API guard rails: Google allows ~200 publish calls per day. */
+const DAILY_QUOTA = Number(Deno.env.get("INDEXING_DAILY_QUOTA") ?? 180);
+const MAX_URLS_PER_CALL = 50;
+/** Fixed gap between publish calls so a batch never bursts into a 429. */
+const MIN_GAP_MS = 350;
+
 function headers() {
   return {
     Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY") ?? ""}`,
