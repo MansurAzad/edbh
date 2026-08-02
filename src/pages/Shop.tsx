@@ -408,7 +408,22 @@ const Shop = () => {
 
           <RecentlyViewed productIds={recentlyViewed} />
         </div>
+        {/* Visible FAQ backing the FAQPage JSON-LD */}
+        <section className="container mx-auto px-4 mt-12" aria-labelledby="shop-faq-heading">
+          <h2 id="shop-faq-heading" className="font-display text-xl md:text-2xl font-bold mb-4">
+            সাধারণ জিজ্ঞাসা
+          </h2>
+          <div className="divide-y divide-border rounded-lg border border-border bg-card">
+            {getCategoryFaqs(catEn).map((faq) => (
+              <details key={faq.question} className="group p-4">
+                <summary className="cursor-pointer font-medium text-foreground list-none">{faq.question}</summary>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{faq.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
         <KeywordLinksBlock title="কীওয়ার্ড অনুযায়ী কালেকশন" className="mt-10" />
+
       </main>
 
       <Footer />
