@@ -17,6 +17,7 @@ import {
 } from "@/lib/seo/keywordCoverage";
 import { validateKeywordPages } from "@/lib/seo/keywordLandingPages";
 import { ALL_META, validateMeta } from "@/lib/seo/metaGenerator";
+import SeoGovernancePanels from "@/components/admin/seo/SeoGovernancePanels";
 
 
 const strengthMeta = {
@@ -148,6 +149,8 @@ const SeoKeywordAudit = () => {
         </Card>
 
 
+
+        <SeoGovernancePanels />
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3 flex-wrap">
