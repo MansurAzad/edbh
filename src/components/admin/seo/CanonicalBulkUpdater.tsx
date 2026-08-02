@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Link2, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Check, Link2, Loader2, RefreshCw, Trash2, Undo2, History } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,10 @@ import {
   buildCanonicalProposals,
   fetchCanonicalOverrides,
   removeCanonicalOverride,
+  fetchCanonicalBatches,
+  rollbackCanonicalBatch,
   absoluteCanonical,
+  type CanonicalBatch,
   type CanonicalOverride,
   type CanonicalProposal,
 } from "@/lib/seo/canonicalOverrides";
@@ -25,15 +28,22 @@ import {
 const CanonicalBulkUpdater = () => {
   const [existing, setExisting] = useState<CanonicalOverride[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [batches, setBatches] = useState<CanonicalBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [rollingBack, setRollingBack] = useState<string | null>(null);
 
   const rows = useMemo(() => auditCannibalization(), []);
 
   const load = async () => {
     setLoading(true);
     try {
-      setExisting(await fetchCanonicalOverrides());
+      const [overrides, history] = await Promise.all([
+        fetchCanonicalOverrides(),
+        fetchCanonicalBatches(),
+      ]);
+      setExisting(overrides);
+      setBatches(history);
     } catch (e) {
       toast.error("Canonical override লোড করা যায়নি", { description: (e as Error).message });
     } finally {
@@ -63,14 +73,30 @@ const CanonicalBulkUpdater = () => {
     if (selectedProposals.length === 0) return;
     setSaving(true);
     try {
-      const count = await applyCanonicalOverrides(selectedProposals);
-      toast.success(`${count}টি canonical override প্রয়োগ হয়েছে`);
+      const { count } = await applyCanonicalOverrides(selectedProposals);
+      toast.success(`${count}টি canonical override প্রয়োগ হয়েছে`, {
+        description: "ভুল হলে নিচের ব্যাচ তালিকা থেকে এক ক্লিকে rollback করা যাবে।",
+      });
       setSelected({});
       await load();
     } catch (e) {
       toast.error("প্রয়োগ ব্যর্থ", { description: (e as Error).message });
     } finally {
       setSaving(false);
+    }
+  };
+
+  /** One-click rollback of an entire applied batch. */
+  const rollback = async (batchId: string) => {
+    setRollingBack(batchId);
+    try {
+      const count = await rollbackCanonicalBatch(batchId);
+      toast.success(`${count}টি canonical আগের অবস্থায় ফিরিয়ে আনা হয়েছে`);
+      await load();
+    } catch (e) {
+      toast.error("Rollback ব্যর্থ", { description: (e as Error).message });
+    } finally {
+      setRollingBack(null);
     }
   };
 
@@ -171,6 +197,52 @@ const CanonicalBulkUpdater = () => {
                   <Button variant="ghost" size="sm" onClick={() => void remove(o.path)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {/* ── Applied batches / rollback ────────────────────────────── */}
+        <div className="space-y-2">
+          <p className="flex items-center gap-1.5 text-sm font-medium">
+            <History className="w-4 h-4" /> ব্যাচ হিস্ট্রি ও rollback
+            <Badge variant="secondary">{batches.length}</Badge>
+          </p>
+          {batches.length === 0 ? (
+            <p className="text-xs text-muted-foreground">এখনো কোনো bulk ব্যাচ প্রয়োগ হয়নি।</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {batches.map((b) => (
+                <li
+                  key={b.batch_id}
+                  className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-xs"
+                >
+                  <span className="min-w-0">
+                    <span className="block font-medium">
+                      {new Date(b.created_at).toLocaleString("bn-BD")} · {b.paths.length}টি path
+                    </span>
+                    <span className="block truncate font-mono text-muted-foreground">
+                      {b.paths.slice(0, 3).join(", ")}
+                      {b.paths.length > 3 ? ` +${b.paths.length - 3}` : ""}
+                    </span>
+                  </span>
+                  {b.rolled_back ? (
+                    <Badge variant="outline">rolled back</Badge>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={rollingBack === b.batch_id}
+                      onClick={() => void rollback(b.batch_id)}
+                    >
+                      {rollingBack === b.batch_id ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <Undo2 className="w-3.5 h-3.5 mr-1" />
+                      )}
+                      Rollback
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>

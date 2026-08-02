@@ -1901,8 +1901,45 @@ export type Database = {
         }
         Relationships: []
       }
+      seo_canonical_history: {
+        Row: {
+          batch_id: string
+          changed_by: string | null
+          created_at: string
+          id: string
+          new_canonical_path: string | null
+          operation: string
+          path: string
+          previous_canonical_path: string | null
+          rolled_back: boolean
+        }
+        Insert: {
+          batch_id: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_canonical_path?: string | null
+          operation?: string
+          path: string
+          previous_canonical_path?: string | null
+          rolled_back?: boolean
+        }
+        Update: {
+          batch_id?: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_canonical_path?: string | null
+          operation?: string
+          path?: string
+          previous_canonical_path?: string | null
+          rolled_back?: boolean
+        }
+        Relationships: []
+      }
       seo_canonical_overrides: {
         Row: {
+          batch_id: string | null
           canonical_path: string
           created_at: string
           id: string
@@ -1912,6 +1949,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          batch_id?: string | null
           canonical_path: string
           created_at?: string
           id?: string
@@ -1921,12 +1959,43 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          batch_id?: string | null
           canonical_path?: string
           created_at?: string
           id?: string
           note?: string | null
           path?: string
           target_keyword?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      seo_meta_snapshots: {
+        Row: {
+          created_at: string
+          entry_key: string
+          id: string
+          path: string
+          published_by: string | null
+          snapshot: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entry_key: string
+          id?: string
+          path: string
+          published_by?: string | null
+          snapshot: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entry_key?: string
+          id?: string
+          path?: string
+          published_by?: string | null
+          snapshot?: Json
           updated_at?: string
         }
         Relationships: []

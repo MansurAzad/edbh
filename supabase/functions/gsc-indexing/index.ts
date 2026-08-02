@@ -22,6 +22,12 @@ const GATEWAY = "https://connector-gateway.lovable.dev/google_search_console";
 const SITE_URL = "https://dubaiborkahouse.com/";
 const FN = "gsc-indexing";
 
+/** Indexing API guard rails: Google allows ~200 publish calls per day. */
+const DAILY_QUOTA = Number(Deno.env.get("INDEXING_DAILY_QUOTA") ?? 180);
+const MAX_URLS_PER_CALL = 50;
+/** Fixed gap between publish calls so a batch never bursts into a 429. */
+const MIN_GAP_MS = 350;
+
 function headers() {
   return {
     Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY") ?? ""}`,
@@ -165,45 +171,100 @@ Deno.serve(async (req) => {
     }
 
     // ---- Google Indexing API: request (re)indexing for specific URLs -------
-    // Sends urlNotifications:publish through the connector gateway and logs
-    // every attempt (status + upstream body) into public.indexing_requests.
-    if (action === "request-indexing") {
-      const urls: string[] = Array.isArray(body.urls)
-        ? body.urls.map((u: unknown) => String(u)).filter(Boolean).slice(0, 50)
-        : [String(body.url ?? SITE_URL)];
-      const type = body.type === "URL_DELETED" ? "URL_DELETED" : "URL_UPDATED";
-
+    // Reliability layer:
+    //  * retry      — fetchWithRetry does exponential backoff on 429/5xx/network
+    //  * rate limit — DAILY_QUOTA per rolling 24h + a fixed gap between calls
+    //  * tracking   — every attempt is written to public.indexing_requests
+    if (action === "request-indexing" || action === "retry-failed") {
       const admin = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       );
 
-      const results = [];
-      for (const target of urls) {
-        const r = await fetchWithRetry("request-indexing", `${GATEWAY}/v3/urlNotifications:publish`, {
-          method: "POST",
-          headers: headers(),
-          body: JSON.stringify({ url: target, type }),
-        });
-        const row = {
+      const type = body.type === "URL_DELETED" ? "URL_DELETED" : "URL_UPDATED";
+      let urls: string[] = [];
+
+      if (action === "retry-failed") {
+        // Re-send URLs whose most recent attempt failed (last 7 days).
+        const { data: recent } = await admin
+          .from("indexing_requests")
+          .select("url, status, created_at")
+          .gte("created_at", new Date(Date.now() - 7 * 86400_000).toISOString())
+          .order("created_at", { ascending: false })
+          .limit(500);
+        const latest = new Map<string, string>();
+        for (const row of recent ?? []) {
+          if (!latest.has(row.url)) latest.set(row.url, row.status);
+        }
+        urls = Array.from(latest.entries())
+          .filter(([, status]) => status !== "sent")
+          .map(([url]) => url);
+      } else {
+        urls = Array.isArray(body.urls)
+          ? body.urls.map((u: unknown) => String(u).trim()).filter(Boolean)
+          : [String(body.url ?? SITE_URL)];
+      }
+      urls = Array.from(new Set(urls)).slice(0, MAX_URLS_PER_CALL);
+
+      // Rolling 24h quota — Google's Indexing API allows ~200 publishes/day.
+      const { count: usedToday } = await admin
+        .from("indexing_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "sent")
+        .gte("created_at", new Date(Date.now() - 86400_000).toISOString());
+      const remaining = Math.max(DAILY_QUOTA - (usedToday ?? 0), 0);
+
+      const toSend = urls.slice(0, remaining);
+      const skipped = urls.slice(remaining);
+
+      const results: any[] = [];
+      for (let i = 0; i < toSend.length; i++) {
+        const target = toSend[i];
+        // Throttle: keep a steady gap so we never burst into a 429.
+        if (i > 0) await sleep(MIN_GAP_MS);
+
+        const r = await fetchWithRetry(
+          "request-indexing",
+          `${GATEWAY}/v3/urlNotifications:publish`,
+          { method: "POST", headers: headers(), body: JSON.stringify({ url: target, type }) },
+          4,
+        );
+        const status = r.ok ? "sent" : r.status === 429 ? "rate_limited" : "failed";
+        await admin.from("indexing_requests").insert({
           url: target,
           request_type: type,
-          status: r.ok ? "sent" : "failed",
+          status,
           http_status: r.status,
-          response: r.body ?? null,
+          response: { ...(r.body ?? {}), attempts: r.attempts },
           error: r.ok ? null : JSON.stringify(r.body ?? {}).slice(0, 1000),
           requested_by: guard.userId,
-        };
-        await admin.from("indexing_requests").insert(row);
-        log(r.ok ? "info" : "error", FN, "indexing_request", {
-          requestId, url: target, type, status: r.status, ok: r.ok,
         });
-        results.push({ url: target, ok: r.ok, status: r.status, response: r.body });
+        log(r.ok ? "info" : "error", FN, "indexing_request", {
+          requestId, url: target, type, status: r.status, attempts: r.attempts, ok: r.ok,
+        });
+        results.push({ url: target, ok: r.ok, status, httpStatus: r.status, attempts: r.attempts, response: r.body });
+      }
+
+      // Log quota skips so the admin sees exactly which URLs were deferred.
+      for (const target of skipped) {
+        await admin.from("indexing_requests").insert({
+          url: target,
+          request_type: type,
+          status: "quota_skipped",
+          http_status: null,
+          error: `Daily quota (${DAILY_QUOTA}) reached — retry after 24h.`,
+          requested_by: guard.userId,
+        });
+        results.push({ url: target, ok: false, status: "quota_skipped" });
       }
 
       const sent = results.filter((x) => x.ok).length;
       return jsonResponse({
-        connected: true, requestId, type, sent, failed: results.length - sent, results,
+        connected: true, requestId, type, sent,
+        failed: results.length - sent - skipped.length,
+        skipped: skipped.length,
+        quota: { limit: DAILY_QUOTA, usedToday: (usedToday ?? 0) + sent, remaining: Math.max(remaining - sent, 0) },
+        results,
       });
     }
 
@@ -219,8 +280,46 @@ Deno.serve(async (req) => {
         .order("created_at", { ascending: false })
         .limit(Number(body.limit ?? 100));
       if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ connected: true, requestId, rows: data ?? [] });
+
+      // Per-URL rollup: latest status + attempt count, so the panel can show
+      // reliability at a glance instead of a raw event stream.
+      const perUrl = new Map<string, any>();
+      for (const row of data ?? []) {
+        const entry = perUrl.get(row.url);
+        if (!entry) {
+          perUrl.set(row.url, {
+            url: row.url,
+            latestStatus: row.status,
+            httpStatus: row.http_status,
+            lastAttemptAt: row.created_at,
+            attempts: 1,
+            lastError: row.error,
+          });
+        } else {
+          entry.attempts += 1;
+        }
+      }
+
+      const { count: usedToday } = await admin
+        .from("indexing_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "sent")
+        .gte("created_at", new Date(Date.now() - 86400_000).toISOString());
+
+      return jsonResponse({
+        connected: true,
+        requestId,
+        rows: data ?? [],
+        perUrl: Array.from(perUrl.values()),
+        quota: {
+          limit: DAILY_QUOTA,
+          usedToday: usedToday ?? 0,
+          remaining: Math.max(DAILY_QUOTA - (usedToday ?? 0), 0),
+        },
+      });
     }
+
+
 
     if (action === "errors" || action === "summary") {
       const end = new Date().toISOString().slice(0, 10);

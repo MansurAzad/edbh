@@ -24,6 +24,9 @@ import {
 import { fetchCanonicalOverrides, resolveCanonical, type CanonicalOverride } from "@/lib/seo/canonicalOverrides";
 import IndexingRequestCard from "@/components/admin/seo/IndexingRequestCard";
 import CanonicalBulkUpdater from "@/components/admin/seo/CanonicalBulkUpdater";
+import SeoDiffPanel, { type DiffSourceEntry } from "@/components/admin/seo/SeoDiffPanel";
+import JsonLdValidationPanel from "@/components/admin/seo/JsonLdValidationPanel";
+import type { JsonLdPageInput } from "@/lib/seo/jsonLdValidator";
 
 interface PreviewEntry {
   key: string;
@@ -255,6 +258,36 @@ const SeoPreview = () => {
   const filteredPages = pageEntries.filter(match);
   const filteredProducts = productEntries.filter(match);
 
+  const allEntries = useMemo(() => [...pageEntries, ...productEntries], [pageEntries, productEntries]);
+
+  /** Flattened snapshot payloads used by the pre-publish diff. */
+  const diffSources: DiffSourceEntry[] = useMemo(
+    () =>
+      allEntries.map((e) => ({
+        entryKey: e.key,
+        path: e.meta.path,
+        label: e.label,
+        snapshot: {
+          title: e.meta.title,
+          description: e.meta.description,
+          canonical: resolveCanonical(e.meta.path, overrides),
+          ogTitle: e.meta.ogTitle,
+          ogDescription: e.meta.ogDescription,
+          ogImage: e.meta.ogImage,
+          ogType: e.meta.ogType,
+          keywords: e.meta.keywords ?? "",
+          jsonLd: e.jsonLd,
+        },
+      })),
+    [allEntries, overrides],
+  );
+
+  /** Same entries reshaped for the JSON-LD schema validator. */
+  const jsonLdPages: JsonLdPageInput[] = useMemo(
+    () => allEntries.map((e) => ({ path: e.meta.path, label: e.label, nodes: e.jsonLd })),
+    [allEntries],
+  );
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -282,6 +315,8 @@ const SeoPreview = () => {
           <TabsList>
             <TabsTrigger value="pages">পেজ ও ক্যাটাগরি ({filteredPages.length})</TabsTrigger>
             <TabsTrigger value="products">প্রোডাক্ট ({filteredProducts.length})</TabsTrigger>
+            <TabsTrigger value="diff">ডিফ প্রিভিউ</TabsTrigger>
+            <TabsTrigger value="jsonld">JSON-LD ভ্যালিডেশন</TabsTrigger>
             <TabsTrigger value="tools">Indexing ও Canonical</TabsTrigger>
           </TabsList>
 
@@ -301,6 +336,14 @@ const SeoPreview = () => {
                 <EntryCard key={e.key} entry={e} canonical={resolveCanonical(e.meta.path, overrides)} />
               ))
             )}
+          </TabsContent>
+
+          <TabsContent value="diff" className="mt-4">
+            <SeoDiffPanel entries={diffSources} />
+          </TabsContent>
+
+          <TabsContent value="jsonld" className="mt-4">
+            <JsonLdValidationPanel pages={jsonLdPages} />
           </TabsContent>
 
           <TabsContent value="tools" className="mt-4 space-y-4">
