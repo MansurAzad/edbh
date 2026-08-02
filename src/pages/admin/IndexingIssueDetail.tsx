@@ -392,11 +392,66 @@ export default function IndexingIssueDetail() {
                     {i === 0 && <Badge variant="outline">Latest</Badge>}
                     <span className="text-xs text-muted-foreground">{fmt(h.created_at)}</span>
                     <span className="text-xs text-muted-foreground">· {h.changed_by_email ?? "unknown"}</span>
+                    {i === 0 && !editingLatest && (
+                      <span className="flex items-center gap-1 ml-auto">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditStatus(h.status as FixStatus);
+                            setEditTitle(h.action_title ?? "");
+                            setEditNotes(h.notes ?? "");
+                            setEditingLatest(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={undoLatest} disabled={historySaving}>
+                          <Undo2 className="w-4 h-4 mr-1" /> Undo
+                        </Button>
+                      </span>
+                    )}
                   </div>
-                  {h.action_title && <div className="mt-1 font-medium">{h.action_title}</div>}
-                  {h.notes && <div className="text-muted-foreground whitespace-pre-wrap">{h.notes}</div>}
+
+                  {i === 0 && editingLatest ? (
+                    <div className="mt-2 space-y-2 rounded-md border p-3">
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground">Status</label>
+                          <Select value={editStatus} onValueChange={(v) => setEditStatus(v as FixStatus)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unresolved">Unresolved</SelectItem>
+                              <SelectItem value="in_progress">In progress</SelectItem>
+                              <SelectItem value="applied">Applied</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Action title</label>
+                          <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Notes</label>
+                        <Textarea rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={saveHistoryEdit} disabled={historySaving}>
+                          <Save className="w-4 h-4 mr-1" /> {historySaving ? "Saving…" : "Save entry"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingLatest(false)}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {h.action_title && <div className="mt-1 font-medium">{h.action_title}</div>}
+                      {h.notes && <div className="text-muted-foreground whitespace-pre-wrap">{h.notes}</div>}
+                    </>
+                  )}
                 </li>
               ))}
+
             </ol>
           )}
         </CardContent>
