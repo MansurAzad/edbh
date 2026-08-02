@@ -44,6 +44,10 @@ interface CategorySeed {
   fabrics: string[];
   designs: string[];
   occasions: string[];
+  /** Bengali design words — keeps the Bengali block unique per category. */
+  bnDesigns: string;
+  /** Bengali fabric words. */
+  bnFabrics: string;
   priceFrom: number;
   priceTo: number;
   keywords: string[];
@@ -58,6 +62,8 @@ const SEEDS: CategorySeed[] = [
     fabrics: ["Korean Nida", "Dubai Cherry", "Barbie Crepe", "Georgette"],
     designs: ["Two Part Farasha", "Four Part Abaya", "Koti Borka", "Karchupi Borka"],
     occasions: ["daily wear", "office", "party", "Hajj & Umrah", "bridal"],
+    bnDesigns: "দুই পার্ট ফারাশা, ফোর পার্ট আবায়া, কোটি বোরকা ও কারচুপি ডিজাইন",
+    bnFabrics: "কোরিয়ান নিদা, দুবাই চেরি, বার্বি ক্রেপ ও জর্জেট",
     priceFrom: 1800,
     priceTo: 12000,
     keywords: [
@@ -75,6 +81,8 @@ const SEEDS: CategorySeed[] = [
     fabrics: ["Korean Nida", "Dubai Cherry", "Zoom fabric", "Premium Crepe"],
     designs: ["Two Part Farasha Borka", "Koti Borka", "Buk Kuchi Borka", "Karchupi Borka"],
     occasions: ["daily wear", "university", "party", "Hajj", "wedding"],
+    bnDesigns: "দুই পার্ট ফারাশা বোরকা, কোটি বোরকা, বুক কুচি বোরকা ও কারচুপি বোরকা",
+    bnFabrics: "কোরিয়ান নিদা, দুবাই চেরি, জুম ফেব্রিক ও প্রিমিয়াম ক্রেপ",
     priceFrom: 1800,
     priceTo: 9500,
     keywords: [
@@ -93,6 +101,8 @@ const SEEDS: CategorySeed[] = [
     designs: ["Four Part Abaya", "Open Abaya", "Pocket Sleeve Abaya", "Embroidery Abaya"],
     occasions: ["office", "travel", "eid", "party", "bridal"],
     priceTo: 12000,
+    bnDesigns: "ফোর পার্ট আবায়া, ওপেন আবায়া, পকেট স্লিভ আবায়া ও এমব্রয়ডারি আবায়া",
+    bnFabrics: "নিদা, বার্বি ক্রেপ, শিফন ও সিল্ক মিশ্রিত কাপড়",
     priceFrom: 2200,
     keywords: [
       "Dubai Imported Abaya Bangladesh",
@@ -109,6 +119,8 @@ const SEEDS: CategorySeed[] = [
     fabrics: ["Georgette", "Chiffon", "Jersey", "Silk"],
     designs: ["Instant Hijab", "Shawl Hijab", "Printed Hijab", "Stone Work Hijab"],
     occasions: ["daily wear", "office", "party", "Umrah"],
+    bnDesigns: "ইনস্ট্যান্ট হিজাব, শাল হিজাব, প্রিন্টেড হিজাব ও স্টোন ওয়ার্ক হিজাব",
+    bnFabrics: "জর্জেট, শিফন, জার্সি ও সিল্ক",
     priceFrom: 350,
     priceTo: 2500,
     keywords: [
@@ -126,6 +138,8 @@ const SEEDS: CategorySeed[] = [
     fabrics: ["Georgette", "Silk", "Velvet", "Chiffon"],
     designs: ["Embroidery Kaftan", "Stone Work Kaftan", "Printed Kaftan", "Bridal Kaftan"],
     occasions: ["eid", "party", "gift", "home wear"],
+    bnDesigns: "এমব্রয়ডারি কাফতান, স্টোন ওয়ার্ক কাফতান, প্রিন্টেড কাফতান ও ব্রাইডাল কাফতান",
+    bnFabrics: "জর্জেট, সিল্ক, ভেলভেট ও শিফন",
     priceFrom: 1500,
     priceTo: 8500,
     keywords: [
@@ -151,11 +165,11 @@ function englishParagraphs(s: CategorySeed): string[] {
 
 function bengaliParagraphs(s: CategorySeed): string[] {
   return [
-    `দুবাই বোরকা হাউস-এর ${s.bn} সাজানো হয়েছে বাংলাদেশের মডেস্ট ফ্যাশনপ্রেমীদের জন্য। প্রতিটি পণ্য সরাসরি দুবাই থেকে আমদানি করা এবং আমাদের ঢাকার শোরুমে পৌঁছানোর আগে সেলাই, কাপড়ের ওজন ও রঙের স্থায়িত্ব যাচাই করা হয়, তাই অনলাইনে যা দেখছেন হাতে পাবেন ঠিক তেমনটাই।`,
-    `এই ক্যাটাগরিতে পাবেন নানা ডিজাইন — যেমন দুই পার্ট ফারাশা, কোটি বোরকা, বুক কুচি ও কারচুপি ডিজাইন। ব্যবহৃত কাপড়ের মধ্যে রয়েছে কোরিয়ান নিদা, দুবাই চেরি, বার্বি ক্রেপ ও জর্জেট, যা গরমে আরামদায়ক, সহজে কুঁচকে যায় না এবং বারবার ধোয়ার পরেও আকার ঠিক থাকে।`,
-    `দৈনন্দিন ব্যবহার, অফিস, ভার্সিটি, দাওয়াত, ঈদ, হজ-উমরাহ কিংবা বিয়ের অনুষ্ঠান — সব উপলক্ষের জন্য আলাদা আলাদা ডিজাইন সাজানো আছে। দাম শুরু ${s.priceFrom} টাকা থেকে এবং প্রিমিয়াম কালেকশনে সর্বোচ্চ ${s.priceTo} টাকা পর্যন্ত, ফলে বাজেট অনুযায়ী পছন্দ করা সহজ হয়।`,
+    `দুবাই বোরকা হাউস-এর ${s.bn} সাজানো হয়েছে বাংলাদেশের মডেস্ট ফ্যাশনপ্রেমীদের জন্য। ${s.bn}-এর প্রতিটি পণ্য সরাসরি দুবাই থেকে আমদানি করা এবং আমাদের ঢাকার শোরুমে পৌঁছানোর আগে সেলাই, কাপড়ের ওজন ও রঙের স্থায়িত্ব যাচাই করা হয়, তাই অনলাইনে যা দেখছেন হাতে পাবেন ঠিক তেমনটাই।`,
+    `এই ক্যাটাগরিতে পাবেন ${s.bnDesigns} সহ নানা ডিজাইন। ব্যবহৃত কাপড়ের মধ্যে রয়েছে ${s.bnFabrics}, যা বাংলাদেশের আবহাওয়ায় আরামদায়ক, সহজে কুঁচকে যায় না এবং বারবার ধোয়ার পরেও আকার ঠিক থাকে।`,
+    `দৈনন্দিন ব্যবহার, অফিস, ভার্সিটি, দাওয়াত, ঈদ, হজ-উমরাহ কিংবা বিয়ের অনুষ্ঠান — সব উপলক্ষের জন্য ${s.bn}-এ আলাদা ডিজাইন সাজানো আছে। দাম শুরু ${s.priceFrom} টাকা থেকে এবং প্রিমিয়াম কালেকশনে সর্বোচ্চ ${s.priceTo} টাকা পর্যন্ত, ফলে বাজেট অনুযায়ী পছন্দ করা সহজ হয়।`,
     `সাইজ পাওয়া যায় ৫০ থেকে ৬০ ইঞ্চি পর্যন্ত, প্লাস সাইজ ও কাস্টম সাইজের অর্ডারও নেওয়া হয়। অর্ডার করতে কার্টে যোগ করে হোয়াটসঅ্যাপে কনফার্ম করুন; সারা বাংলাদেশে ক্যাশ অন ডেলিভারি সুবিধা রয়েছে। ঢাকার ভিতরে সাধারণত এক থেকে দুই দিন এবং ঢাকার বাইরে দুই থেকে চার দিনে ডেলিভারি সম্পন্ন হয়।`,
-    `সাইজ না মিললে নির্ধারিত সময়ের মধ্যে এক্সচেঞ্জ করার সুযোগ আছে। কোন ডিজাইনটি আপনার উচ্চতা ও শরীরের গড়নের সাথে মানাবে তা জানতে আমাদের শোরুমে আসুন অথবা মেসেজ দিন — লাইভ স্টক ছবি ও কাপড়ের ক্লোজ-আপ দেখে নিশ্চিত হয়ে তবেই অর্ডার করতে পারবেন।`,
+    `সাইজ না মিললে নির্ধারিত সময়ের মধ্যে এক্সচেঞ্জ করার সুযোগ আছে। ${s.bn} থেকে কোন ডিজাইনটি আপনার উচ্চতা ও শরীরের গড়নের সাথে মানাবে তা জানতে আমাদের শোরুমে আসুন অথবা মেসেজ দিন — লাইভ স্টক ছবি ও কাপড়ের ক্লোজ-আপ দেখে নিশ্চিত হয়ে তবেই অর্ডার করতে পারবেন।`,
   ];
 }
 
