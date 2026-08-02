@@ -105,12 +105,15 @@ const dedupe = (list: string[]) => {
 export function buildMeta(seed: MetaSeed): GeneratedMeta {
   const title = seed.titleCore;
   const ogTitle = `${title} | ${SITE_NAME}`;
+  // Page-specific keywords first (capped), then the evergreen brand set so it
+  // can never be trimmed away. Deduped case-insensitively.
+  const focused = dedupeKeywords(seed.keywords).slice(0, MAX_META_KEYWORDS);
   return {
     key: seed.key,
     path: seed.path,
     title,
     description: seed.description,
-    keywords: dedupe([...seed.keywords, ...EVERGREEN_KEYWORDS]).join(", "),
+    keywords: dedupeKeywords([...focused, ...EVERGREEN_KEYWORDS]).join(", "),
     h1: seed.h1,
     ogTitle,
     ogDescription: seed.description,
