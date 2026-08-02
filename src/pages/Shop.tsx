@@ -201,23 +201,14 @@ const Shop = () => {
 
   const catBn = getCategoryBnName(selectedCategory);
   const catEn = selectedCategory;
-  // Per-category unique titles to prevent SERP duplicates.
-  const categoryTitleMap: Record<string, { title: string; desc: string; kw: string }> = {
-    Abaya:   { title: "Dubai Imported Abaya Bangladesh – Custom Size Abaya",              desc: "Dubai imported abaya Bangladesh — Four part abaya Bangladesh, two part Farasha borka, Korean Nida borka price ও custom size abaya Bangladesh। Cash on delivery borka, সারা দেশে ডেলিভারি।",           kw: "Dubai Imported Abaya Bangladesh, Four Part Abaya Bangladesh, Custom Size Abaya Bangladesh, Two Part Farasha Borka, Korean Nida Borka Price, Online Borka Shopping in Bangladesh, Cash on Delivery Borka" },
-    Borka:   { title: "Best Borka Shop in Bangladesh – Dubai Borka Price", desc: "Best borka shop in Bangladesh — original Dubai borka in Bangladesh, luxury borka Bangladesh, premium black borka, plus size borka Bangladesh, bridal borka price in Bangladesh ও party borka under 5000। Cash on delivery borka।",                          kw: "Dubai Borka Price in Bangladesh, Original Dubai Borka in Bangladesh, Best Borka Shop in Bangladesh, Luxury Borka Bangladesh, Premium Black Borka, Dubai Cherry Fabric Borka, Party Borka Under 5000, Bridal Borka Price in Bangladesh, Comfortable Borka for Summer, Plus Size Borka Bangladesh, Borka Shop in Dhaka, Wholesale Borka in Bangladesh" },
-    Hijab:   { title: "Borka With Matching Hijab – Hijab Shop Bangladesh",                  desc: "Borka with matching hijab ও Hajj borka with hijab — দুবাই ইম্পোর্টেড হিজাব ও স্কার্ফ, সিল্ক, শিফন, জর্জেট। Online borka shopping in Bangladesh, cash on delivery।",                          kw: "Borka With Matching Hijab, Hajj Borka With Hijab, Online Borka Shopping in Bangladesh, Cash on Delivery Borka" },
-    Kaftan:  { title: "Party Borka Under 5000 – Kaftan & Party Wear BD",              desc: "Party borka under 5000 ও bridal borka price in Bangladesh — প্রিমিয়াম দুবাই কাফতান ও পার্টি ওয়্যার, স্টোন, বিডস ও এমব্রয়ডারি ডিটেইল।",                                       kw: "Party Borka Under 5000, Bridal Borka Price in Bangladesh, Luxury Borka Bangladesh, Dubai Cherry Fabric Borka" },
-  };
   const isAll = selectedCategory === "All";
-  const seoTitle = isAll
-    ? "Best Borka Shop in Bangladesh – Dubai Borka Price & Abaya"
-    : (categoryTitleMap[catEn]?.title || `${catEn} Collection – Dubai Borka House`);
-  const seoDescription = isAll
-    ? "Best borka shop in Bangladesh — original Dubai borka in Bangladesh, Dubai imported abaya Bangladesh, luxury borka Bangladesh, plus size ও custom size abaya। Online borka shopping in Bangladesh, cash on delivery borka, borka shop in Dhaka ও wholesale borka in Bangladesh।"
-    : (categoryTitleMap[catEn]?.desc || `${catBn} অনলাইনে কিনুন — Dubai Borka House।`);
-  const seoKeywords = isAll
-    ? "Dubai Borka Price in Bangladesh, Original Dubai Borka in Bangladesh, Best Borka Shop in Bangladesh, Luxury Borka Bangladesh, Premium Black Borka, Dubai Imported Abaya Bangladesh, Two Part Farasha Borka, Four Part Abaya Bangladesh, Borka With Matching Hijab, Korean Nida Borka Price, Dubai Cherry Fabric Borka, Party Borka Under 5000, Bridal Borka Price in Bangladesh, Comfortable Borka for Summer, Plus Size Borka Bangladesh, Custom Size Abaya Bangladesh, Hajj Borka With Hijab, Online Borka Shopping in Bangladesh, Cash on Delivery Borka, Borka Shop in Dhaka, Wholesale Borka in Bangladesh"
-    : (categoryTitleMap[catEn]?.kw || `${catEn} bangladesh, buy ${catEn.toLowerCase()} online`);
+  // Titles/descriptions/keywords come from the central generator so every
+  // category stays unique and keeps the evergreen brand keywords.
+  const categoryMeta = getCategoryMeta(catEn);
+  const seoTitle = categoryMeta.title;
+  const seoDescription = categoryMeta.description;
+  const seoKeywords = categoryMeta.keywords;
+
 
 
   const collectionSchema = {
