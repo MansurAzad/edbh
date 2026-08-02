@@ -127,7 +127,32 @@ Deno.serve(async (req) => {
       return jsonResponse({ connected: true, requestId, status: r.status, attempts: r.attempts, ...(r.body ?? {}) });
     }
 
+    // ---- Sitemap management -------------------------------------------------
+    if (action === "sitemaps") {
+      const r = await fetchWithRetry(
+        "sitemaps",
+        `${GATEWAY}/webmasters/v3/sites/${encodeURIComponent(SITE_URL)}/sitemaps`,
+        { headers: headers() },
+      );
+      return jsonResponse({ connected: true, requestId, status: r.status, attempts: r.attempts, siteUrl: SITE_URL, ...(r.body ?? {}) });
+    }
+
+    if (action === "submit-sitemap") {
+      const sitemapUrl = String(body.sitemapUrl ?? `${SITE_URL}sitemap.xml`);
+      const r = await fetchWithRetry(
+        "submit-sitemap",
+        `${GATEWAY}/webmasters/v3/sites/${encodeURIComponent(SITE_URL)}/sitemaps/${encodeURIComponent(sitemapUrl)}`,
+        { method: "PUT", headers: headers() },
+      );
+      log("info", FN, "sitemap_submitted", { requestId, sitemapUrl, status: r.status, ok: r.ok });
+      return jsonResponse({
+        connected: true, requestId, sitemapUrl, status: r.status, attempts: r.attempts,
+        ok: r.ok, error: r.ok ? null : r.body,
+      });
+    }
+
     if (action === "inspect") {
+
       const target = String(body.url ?? SITE_URL);
       const r = await fetchWithRetry("inspect", `${GATEWAY}/v1/urlInspection/index:inspect`, {
         method: "POST",
