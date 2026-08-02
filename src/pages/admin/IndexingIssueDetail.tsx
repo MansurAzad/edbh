@@ -147,6 +147,12 @@ export default function IndexingIssueDetail() {
   const [fixSavedAt, setFixSavedAt] = useState<string | null>(null);
   const [savingFix, setSavingFix] = useState(false);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [editingLatest, setEditingLatest] = useState(false);
+  const [historySaving, setHistorySaving] = useState(false);
+  const [editStatus, setEditStatus] = useState<FixStatus>("unresolved");
+  const [editTitle, setEditTitle] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
 
   async function load() {
     if (!target) return;
