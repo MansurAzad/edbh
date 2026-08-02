@@ -6,7 +6,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 
 import SEOHead from "@/components/seo/SEOHead";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
-import StructuredData from "@/components/seo/StructuredData";
+import StructuredData, { faqSchema, breadcrumbSchema } from "@/components/seo/StructuredData";
 import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
 import { getCategoryMeta } from "@/lib/seo/metaGenerator";
 import { getCategoryFaqs } from "@/lib/seo/faqs";
