@@ -69,10 +69,12 @@ const PremiumDubaiCollection = () => {
               <Crown className="w-4 h-4" /> Premium Dubai Collection
             </div>
             <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
-              আমাদের ফ্ল্যাগশিপ Dubai কালেকশন
+              Dubai abaya collection Bangladesh — প্রিমিয়াম বোরকা বাংলাদেশ
             </h2>
-            <p className="text-muted-foreground mt-1 text-sm md:text-base">
-              বাছাই করা প্রিমিয়াম আবায়া, কাফতান ও ফারাশা — সেরা কাপড়ে, সেরা ফিনিশে।
+            <p className="text-muted-foreground mt-1 text-sm md:text-base max-w-2xl">
+              Dubai imported abaya Bangladesh — Farasha abaya Bangladesh, 2 part Farasha abaya,
+              Dubai imported Nida abaya ও Dubai imported black abaya। Karchupi borka Bangladesh সহ
+              premium abaya Bangladesh কালেকশন।
             </p>
           </div>
           <Link

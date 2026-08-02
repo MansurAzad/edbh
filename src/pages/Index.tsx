@@ -98,11 +98,11 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title="Dubai Borka House – Premium Dubai Imported Borka, Abaya & Hijab in Bangladesh"
+        title="Premium Borka & Abaya Shop Bangladesh – Dubai Imported"
         fullTitle
-        description="Dubai Borka House — Bangladesh-এর সেরা প্রিমিয়াম দুবাই ইম্পোর্টেড বোরকা, আবায়া, হিজাব ও কাফতান শপ। Cash on Delivery, সারা দেশে দ্রুত ডেলিভারি।"
+        description="Premium borka Bangladesh ও premium abaya Bangladesh — Dubai imported abaya Bangladesh, Farasha, Nida ও Karchupi borka। প্রিমিয়াম বোরকা বাংলাদেশ, আবায়া শপ বাংলাদেশ, Cash on Delivery।"
         canonical="/"
-        keywords="dubai borka house, premium dubai abaya bangladesh, dubai imported borka, hijab online shop bd, cash on delivery abaya, বোরকা দাম বাংলাদেশ, আবায়া অনলাইন শপ"
+        keywords="premium borka Bangladesh, premium abaya Bangladesh, borka shop Bangladesh, abaya shop Bangladesh, Dubai imported abaya Bangladesh, Dubai abaya collection Bangladesh, Dubai borka price Bangladesh, imported borka shop Bangladesh, kaftan shop Bangladesh, hijab shop Bangladesh, প্রিমিয়াম বোরকা বাংলাদেশ, আবায়া শপ বাংলাদেশ"
       />
       <StructuredData data={organizationSchema} />
       <StructuredData data={websiteSchema} />
