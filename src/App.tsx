@@ -153,6 +153,8 @@ const App = () => (
                     <Route path="/wishlist" element={<Wishlist />} />
                     <Route path="/blog" element={<Blog />} />
                     <Route path="/blog/abaya-styling-guide" element={<AbayaStylingGuide />} />
+                    <Route path="/collections/:slug" element={<KeywordLanding />} />
+
                     <Route path="/help" element={<HelpCenter />} />
                     <Route path="/developers" element={<DeveloperDocs />} />
                     <Route path="/track/:id?" element={<OrderTracking />} />
