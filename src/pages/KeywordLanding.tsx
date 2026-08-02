@@ -207,8 +207,9 @@ const KeywordLanding = () => {
       <QuickViewModal
         product={quickViewProduct}
         open={quickViewOpen}
-        onClose={() => setQuickViewOpen(false)}
+        onOpenChange={setQuickViewOpen}
       />
+
       <Footer />
     </div>
   );
