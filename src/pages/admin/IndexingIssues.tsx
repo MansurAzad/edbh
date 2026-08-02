@@ -132,19 +132,25 @@ export default function IndexingIssues() {
   // Filters
   const [search, setSearch] = useState("");
   const [unresolvedOnly, setUnresolvedOnly] = useState(false);
+  const [ageFilterOn, setAgeFilterOn] = useState(false);
+  const [ageDays, setAgeDays] = useState<number>(() => {
+    const n = Number(localStorage.getItem(AGE_KEY));
+    return Number.isFinite(n) && n > 0 ? n : 7;
+  });
 
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkNote, setBulkNote] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkRechecking, setBulkRechecking] = useState(false);
+  const [exportingUnresolved, setExportingUnresolved] = useState(false);
 
   // Notifications
-  const [notifyEnabled, setNotifyEnabled] = useState<boolean>(() => {
-    try { return localStorage.getItem(NOTIFY_KEY) === "1"; } catch { return false; }
-  });
+  const [notify, setNotify] = useState<NotifySettings>(loadNotifySettings);
   const prevCountsRef = useRef<{ errors: number; warnings: number } | null>(null);
-  const notifyEnabledRef = useRef(notifyEnabled);
-  notifyEnabledRef.current = notifyEnabled;
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
+
 
   async function loadSites() {
     setError(null);
