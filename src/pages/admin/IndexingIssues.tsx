@@ -598,7 +598,12 @@ export default function IndexingIssues() {
                 <CheckCircle2 className="w-4 h-4 mr-1" />
                 {bulkSaving ? "Saving…" : "Mark selected as Applied"}
               </Button>
+              <Button size="sm" variant="outline" onClick={bulkRecheckSelected} disabled={bulkRechecking}>
+                <RefreshCw className={`w-4 h-4 mr-1 ${bulkRechecking ? "animate-spin" : ""}`} />
+                {bulkRechecking ? "Rechecking…" : "Recheck selected URLs"}
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear selection</Button>
+
             </div>
           </CardContent>
         </Card>
