@@ -6,7 +6,9 @@ import { Check, ShoppingBag } from "lucide-react";
 
 import SEOHead from "@/components/seo/SEOHead";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
-import StructuredData, { breadcrumbSchema } from "@/components/seo/StructuredData";
+import StructuredData, { breadcrumbSchema, faqSchema } from "@/components/seo/StructuredData";
+import { getLandingFaqs } from "@/lib/seo/faqs";
+
 import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
