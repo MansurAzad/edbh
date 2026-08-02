@@ -48,7 +48,7 @@ const SeoKeywordAudit = () => {
   };
 
   return (
-    <AdminLayout title="SEO Keyword Coverage">
+    <AdminLayout>
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
