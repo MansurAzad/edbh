@@ -979,6 +979,42 @@ export type Database = {
         }
         Relationships: []
       }
+      indexing_requests: {
+        Row: {
+          created_at: string
+          error: string | null
+          http_status: number | null
+          id: string
+          request_type: string
+          requested_by: string | null
+          response: Json | null
+          status: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          http_status?: number | null
+          id?: string
+          request_type?: string
+          requested_by?: string | null
+          response?: Json | null
+          status?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          http_status?: number | null
+          id?: string
+          request_type?: string
+          requested_by?: string | null
+          response?: Json | null
+          status?: string
+          url?: string
+        }
+        Relationships: []
+      }
       injection_block_log: {
         Row: {
           actor: string | null
@@ -1862,6 +1898,36 @@ export type Database = {
           schedule?: Json
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      seo_canonical_overrides: {
+        Row: {
+          canonical_path: string
+          created_at: string
+          id: string
+          note: string | null
+          path: string
+          target_keyword: string | null
+          updated_at: string
+        }
+        Insert: {
+          canonical_path: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          path: string
+          target_keyword?: string | null
+          updated_at?: string
+        }
+        Update: {
+          canonical_path?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          path?: string
+          target_keyword?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
