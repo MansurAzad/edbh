@@ -29,6 +29,36 @@ import { toast } from "@/hooks/use-toast";
 const AUTO_REFRESH_MS = 15 * 60 * 1000; // 15 minutes
 const STALE_HOURS = 6;
 const NOTIFY_KEY = "indexing-issues-notify";
+const AGE_KEY = "indexing-issues-age-days";
+
+type NotifySettings = {
+  enabled: boolean;
+  channelToast: boolean;
+  channelBrowser: boolean;
+  errorThreshold: number;
+  warningThreshold: number;
+};
+
+const DEFAULT_NOTIFY: NotifySettings = {
+  enabled: false,
+  channelToast: true,
+  channelBrowser: false,
+  errorThreshold: 1,
+  warningThreshold: 1,
+};
+
+function loadNotifySettings(): NotifySettings {
+  try {
+    const raw = localStorage.getItem(NOTIFY_KEY);
+    if (!raw) return DEFAULT_NOTIFY;
+    if (raw === "1") return { ...DEFAULT_NOTIFY, enabled: true };
+    if (raw === "0") return DEFAULT_NOTIFY;
+    return { ...DEFAULT_NOTIFY, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_NOTIFY;
+  }
+}
+
 
 type Inspection = {
   url: string;
