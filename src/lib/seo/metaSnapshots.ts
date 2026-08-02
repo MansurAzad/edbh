@@ -65,7 +65,7 @@ export async function fetchSnapshots(): Promise<Map<string, StoredSnapshot>> {
     .from("seo_meta_snapshots")
     .select("entry_key, path, snapshot, updated_at");
   if (error) throw error;
-  return new Map((data ?? []).map((r) => [r.entry_key, r as StoredSnapshot]));
+  return new Map((data ?? []).map((r) => [r.entry_key, r as unknown as StoredSnapshot]));
 }
 
 /** Stores the current state as the new published baseline. */
@@ -78,7 +78,7 @@ export async function publishSnapshots(
     entries.map((e) => ({
       entry_key: e.entryKey,
       path: e.path,
-      snapshot: e.snapshot as unknown as Record<string, unknown>,
+      snapshot: e.snapshot as never,
       published_by: session?.user?.id ?? null,
       updated_at: new Date().toISOString(),
     })),
