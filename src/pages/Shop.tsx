@@ -428,8 +428,28 @@ const Shop = () => {
                   <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
+
+              {/* Crawler-friendly pagination links (also usable without JS) */}
+              {totalPages > 1 && (
+                <nav aria-label="Pagination" className="mt-6 flex items-center justify-between gap-4 text-sm">
+                  {currentPage > 1 ? (
+                    <a href={pageUrl(currentPage - 1)} rel="prev" className="text-primary hover:underline">
+                      ← আগের পৃষ্ঠা
+                    </a>
+                  ) : <span />}
+                  <span className="text-muted-foreground">
+                    পৃষ্ঠা {currentPage} / {totalPages}
+                  </span>
+                  {currentPage < totalPages ? (
+                    <a href={pageUrl(currentPage + 1)} rel="next" className="text-primary hover:underline">
+                      পরের পৃষ্ঠা →
+                    </a>
+                  ) : <span />}
+                </nav>
+              )}
             </>
           )}
+
 
           <RecentlyViewed productIds={recentlyViewed} />
         </div>
