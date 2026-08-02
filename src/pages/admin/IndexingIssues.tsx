@@ -745,6 +745,13 @@ export default function IndexingIssues() {
                           </div>
                           <div className="flex items-center gap-2">
                             {fx && fixStatusBadge(fx.status)}
+                            {(() => {
+                              const age = unresolvedAgeDays(it.url);
+                              return age !== null && age >= ageDays
+                                ? <Badge variant="destructive">Aging · {Math.floor(age)}d</Badge>
+                                : null;
+                            })()}
+
                             {verdictBadge(idx.verdict)}
                             <Button size="sm" variant="outline" onClick={() => recheckRow(it.url)} disabled={busy}>
                               <RefreshCw className={`w-3.5 h-3.5 mr-1 ${busy ? "animate-spin" : ""}`} />
