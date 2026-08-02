@@ -41,11 +41,12 @@ const Categories = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead 
-        title="Abaya, Borka, Hijab & Kaftan Shop Bangladesh – Categories" 
-        description="Borka shop Bangladesh, abaya shop Bangladesh, kaftan shop Bangladesh ও hijab shop Bangladesh — Dubai abaya collection Bangladesh এর সব ক্যাটাগরি ব্রাউজ করুন।" 
+        title="Borka Shop in Dhaka – Online Borka Shopping in Bangladesh" 
+        description="Online borka shopping in Bangladesh — best borka shop in Bangladesh, borka shop in Dhaka, Dubai imported abaya Bangladesh, plus size ও custom size abaya, wholesale borka in Bangladesh। Cash on delivery borka।" 
         canonical="/categories" 
-        keywords="borka shop Bangladesh, abaya shop Bangladesh, kaftan shop Bangladesh, hijab shop Bangladesh, Dubai abaya collection Bangladesh, imported borka shop Bangladesh, প্রিমিয়াম বোরকা বাংলাদেশ, আবায়া শপ বাংলাদেশ"
+        keywords="Online Borka Shopping in Bangladesh, Borka Shop in Dhaka, Best Borka Shop in Bangladesh, Wholesale Borka in Bangladesh, Cash on Delivery Borka, Dubai Imported Abaya Bangladesh, Plus Size Borka Bangladesh, Custom Size Abaya Bangladesh, Borka With Matching Hijab, Hajj Borka With Hijab"
       />
+
       <StructuredData data={itemListSchema} />
       <Header />
       <Breadcrumbs />

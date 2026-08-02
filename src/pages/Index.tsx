@@ -98,12 +98,13 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title="Premium Borka & Abaya Shop Bangladesh – Dubai Imported"
+        title="Dubai Borka Price in Bangladesh – Best Borka Shop in Bangladesh"
         fullTitle
-        description="Premium borka Bangladesh ও premium abaya Bangladesh — Dubai imported abaya Bangladesh, Farasha, Nida ও Karchupi borka। প্রিমিয়াম বোরকা বাংলাদেশ, আবায়া শপ বাংলাদেশ, Cash on Delivery।"
+        description="Original Dubai borka in Bangladesh — luxury borka Bangladesh, premium black borka, Dubai imported abaya Bangladesh, two part Farasha borka, plus size ও custom size abaya। Online borka shopping in Bangladesh, cash on delivery borka, borka shop in Dhaka।"
         canonical="/"
-        keywords="premium borka Bangladesh, premium abaya Bangladesh, borka shop Bangladesh, abaya shop Bangladesh, Dubai imported abaya Bangladesh, Dubai abaya collection Bangladesh, Dubai borka price Bangladesh, imported borka shop Bangladesh, kaftan shop Bangladesh, hijab shop Bangladesh, প্রিমিয়াম বোরকা বাংলাদেশ, আবায়া শপ বাংলাদেশ"
+        keywords="Dubai Borka Price in Bangladesh, Original Dubai Borka in Bangladesh, Best Borka Shop in Bangladesh, Luxury Borka Bangladesh, Premium Black Borka, Dubai Imported Abaya Bangladesh, Two Part Farasha Borka, Four Part Abaya Bangladesh, Borka With Matching Hijab, Korean Nida Borka Price, Dubai Cherry Fabric Borka, Party Borka Under 5000, Bridal Borka Price in Bangladesh, Comfortable Borka for Summer, Plus Size Borka Bangladesh, Custom Size Abaya Bangladesh, Hajj Borka With Hijab, Online Borka Shopping in Bangladesh, Cash on Delivery Borka, Borka Shop in Dhaka, Wholesale Borka in Bangladesh"
       />
+
       <StructuredData data={organizationSchema} />
       <StructuredData data={websiteSchema} />
       <StructuredData data={localBusinessSchema} />
