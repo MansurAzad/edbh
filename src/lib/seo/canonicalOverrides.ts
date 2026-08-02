@@ -20,6 +20,8 @@ export interface CanonicalOverride {
   target_keyword?: string | null;
   note?: string | null;
   updated_at?: string;
+  /** Batch this override was applied in (used for one-click rollback). */
+  batch_id?: string | null;
 }
 
 /** A proposed change derived from the cannibalisation report (not yet saved). */
