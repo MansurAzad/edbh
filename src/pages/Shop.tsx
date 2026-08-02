@@ -255,8 +255,21 @@ const Shop = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead title={seoTitle} description={seoDescription} canonical="/shop" keywords={seoKeywords} />
+      <SEOHead title={seoTitle} fullTitle description={seoDescription} canonical="/shop" keywords={seoKeywords} />
       <StructuredData data={collectionSchema} />
+      <StructuredData
+        data={breadcrumbSchema(
+          isAll
+            ? [{ name: "Home", url: "/" }, { name: "Shop", url: "/shop" }]
+            : [
+                { name: "Home", url: "/" },
+                { name: "Shop", url: "/shop" },
+                { name: catEn, url: `/shop?category=${catEn}` },
+              ]
+        )}
+      />
+      <StructuredData data={faqSchema(getCategoryFaqs(catEn))} />
+
       <Header />
       <Breadcrumbs />
       <main className="pt-4 pb-20">
