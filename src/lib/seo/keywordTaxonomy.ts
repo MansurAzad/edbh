@@ -573,10 +573,13 @@ export const MAX_META_KEYWORDS = 40;
  * (page-specific, highest priority) always come first.
  */
 export function getScopeKeywords(scope: KeywordScope, seed: string[] = []): string[] {
-  return dedupeKeywords([...seed, ...groupKeywords(...SCOPE_GROUPS[scope])]).slice(
-    0,
-    MAX_META_KEYWORDS,
-  );
+  // Round-robin across the scope's groups so the cap never starves a whole
+  // group (e.g. the Bengali keywords) out of the tag.
+  const lists = SCOPE_GROUPS[scope].map((id) => [...getGroup(id).keywords]);
+  const interleaved: string[] = [];
+  for (let i = 0; lists.some((l) => i < l.length); i++)
+    for (const l of lists) if (i < l.length) interleaved.push(l[i]);
+  return dedupeKeywords([...seed, ...interleaved]).slice(0, MAX_META_KEYWORDS);
 }
 
 /* ------------------------------ product tags ------------------------------ */
