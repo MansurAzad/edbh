@@ -495,7 +495,11 @@ export default function IndexingIssues() {
         </Button>
       </div>
 
+      {/* Sitemap submission + Search Console status */}
+      <SitemapSubmitCard />
+
       {/* Notification settings */}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2"><Bell className="w-4 h-4" /> Notification settings</CardTitle>
