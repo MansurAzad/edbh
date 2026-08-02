@@ -93,6 +93,9 @@ const Shop = () => {
     }
   }, [urlMaxPrice]);
 
+  // Crawler-friendly pagination: ?page=N is a real entry point into the list.
+  const initialPage = Math.max(1, Number(searchParams.get("page")) || 1);
+
   const {
     data: productPages,
     fetchNextPage,
@@ -100,8 +103,8 @@ const Shop = () => {
     isFetchingNextPage,
     isLoading: loading,
   } = useInfiniteQuery({
-    queryKey: ["shop-products", selectedCategory, searchQuery, priceRange, sortBy, selectedMaterial],
-    queryFn: async ({ pageParam = 0 }) => {
+    queryKey: ["shop-products", selectedCategory, searchQuery, priceRange, sortBy, selectedMaterial, initialPage],
+    queryFn: async ({ pageParam = initialPage - 1 }) => {
       const { column, ascending } = getSortConfig(sortBy);
       const from = pageParam * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -131,7 +134,7 @@ const Shop = () => {
       if (nextPage * PAGE_SIZE >= lastPage.totalCount) return undefined;
       return nextPage;
     },
-    initialPageParam: 0,
+    initialPageParam: initialPage - 1,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -142,6 +145,28 @@ const Shop = () => {
     return flat.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   }, [productPages]);
   const totalCount = productPages?.pages[0]?.totalCount ?? 0;
+
+  // --- Pagination metadata for canonical / rel=prev|next / JSON-LD ---
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const currentPage = Math.min(
+    totalPages,
+    initialPage + Math.max(0, (productPages?.pages.length ?? 1) - 1)
+  );
+  const pageQuery = useMemo(
+    () => ({ category: urlCategory !== "All" ? urlCategory : undefined }),
+    [urlCategory]
+  );
+  const pageUrl = useCallback(
+    (p: number) => {
+      const params = new URLSearchParams();
+      if (pageQuery.category) params.set("category", pageQuery.category);
+      if (p > 1) params.set("page", String(p));
+      const qs = params.toString();
+      return `/shop${qs ? `?${qs}` : ""}`;
+    },
+    [pageQuery]
+  );
+
 
   // Infinite scroll observer
   const handleObserver = useCallback(
