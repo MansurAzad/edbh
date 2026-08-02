@@ -7,6 +7,8 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import SEOHead from "@/components/seo/SEOHead";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import StructuredData from "@/components/seo/StructuredData";
+import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
+
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Input } from "@/components/ui/input";
@@ -227,8 +229,35 @@ const Shop = () => {
     description: seoDescription,
     url: `https://dubaiborkahouse.com/shop${selectedCategory !== "All" ? `?category=${selectedCategory}` : ""}`,
     numberOfItems: totalCount,
+    inLanguage: "bn",
     provider: { "@type": "Organization", name: "Dubai Borka House" },
+    // Product-level rich-snippet data for the visible grid.
+    mainEntity: {
+      "@type": "ItemList",
+      numberOfItems: allProducts.length,
+      itemListElement: allProducts.slice(0, 20).map((p, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        item: {
+          "@type": "Product",
+          name: p.name,
+          url: `https://dubaiborkahouse.com/product/${p.slug || p.id}`,
+          image: getProductImage(p),
+          category: p.category,
+          brand: { "@type": "Brand", name: "Dubai Borka House" },
+          offers: {
+            "@type": "Offer",
+            price: p.sale_price || p.price,
+            priceCurrency: "BDT",
+            availability:
+              (p.stock ?? 0) > 0 ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
+            url: `https://dubaiborkahouse.com/product/${p.slug || p.id}`,
+          },
+        },
+      })),
+    },
   };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -372,7 +401,9 @@ const Shop = () => {
 
           <RecentlyViewed productIds={recentlyViewed} />
         </div>
+        <KeywordLinksBlock title="কীওয়ার্ড অনুযায়ী কালেকশন" className="mt-10" />
       </main>
+
       <Footer />
 
       {quickViewProduct && (

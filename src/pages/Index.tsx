@@ -5,7 +5,9 @@ import HeroSection from "@/components/home/HeroSection";
 import AnnouncementBar from "@/components/marketing/AnnouncementBar";
 import SEOHead from "@/components/seo/SEOHead";
 import StructuredData, { organizationSchema, websiteSchema, localBusinessSchema } from "@/components/seo/StructuredData";
+import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
 import { useHomepageSections } from "@/hooks/useHomepageSections";
+
 
 // Lazy load below-the-fold sections
 const FeaturedCategories = lazy(() => import("@/components/home/FeaturedCategories"));
@@ -126,7 +128,9 @@ const Index = () => {
           })}
           <DubaiImportedProof />
           <ShowroomLocation />
+          <KeywordLinksBlock title="জনপ্রিয় বোরকা ও আবায়া কালেকশন" />
         </Suspense>
+
       </main>
       <Footer />
       <Suspense fallback={null}>

@@ -37,6 +37,8 @@ const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
 const Blog = lazy(() => import("./pages/Blog"));
 const AbayaStylingGuide = lazy(() => import("./pages/AbayaStylingGuide"));
+const KeywordLanding = lazy(() => import("./pages/KeywordLanding"));
+
 const OrderTracking = lazy(() => import("./pages/OrderTracking"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ReturnPolicy = lazy(() => import("./pages/ReturnPolicy"));
@@ -99,6 +101,8 @@ const CustomersHub = lazy(() => import("./pages/admin/CustomersHub"));
 const AiProductStudio = lazy(() => import("./pages/admin/AiProductStudio"));
 const IndexingIssues = lazy(() => import("./pages/admin/IndexingIssues"));
 const IndexingIssueDetail = lazy(() => import("./pages/admin/IndexingIssueDetail"));
+const SeoKeywordAudit = lazy(() => import("./pages/admin/SeoKeywordAudit"));
+
 
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
@@ -149,6 +153,8 @@ const App = () => (
                     <Route path="/wishlist" element={<Wishlist />} />
                     <Route path="/blog" element={<Blog />} />
                     <Route path="/blog/abaya-styling-guide" element={<AbayaStylingGuide />} />
+                    <Route path="/collections/:slug" element={<KeywordLanding />} />
+
                     <Route path="/help" element={<HelpCenter />} />
                     <Route path="/developers" element={<DeveloperDocs />} />
                     <Route path="/track/:id?" element={<OrderTracking />} />
@@ -207,6 +213,8 @@ const App = () => (
                     <Route path="/admin/customer-insights" element={<PermissionGuard><CustomerInsights /></PermissionGuard>} />
                     <Route path="/admin/indexing-issues" element={<PermissionGuard><IndexingIssues /></PermissionGuard>} />
                     <Route path="/admin/indexing-issues/:encodedUrl" element={<PermissionGuard><IndexingIssueDetail /></PermissionGuard>} />
+                    <Route path="/admin/seo-keywords" element={<PermissionGuard><SeoKeywordAudit /></PermissionGuard>} />
+
 
 
                     <Route path="/return-policy" element={<ReturnPolicy />} />

@@ -4,6 +4,8 @@ import StructuredData, { breadcrumbSchema } from "./StructuredData";
 
 const routeNames: Record<string, string> = {
   shop: "Shop",
+  collections: "Collections",
+
   about: "About Us",
   contact: "Contact",
   categories: "Categories",

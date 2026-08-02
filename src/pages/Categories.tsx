@@ -6,6 +6,8 @@ import Footer from "@/components/layout/Footer";
 import SEOHead from "@/components/seo/SEOHead";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import StructuredData from "@/components/seo/StructuredData";
+import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
+
 import productAbaya from "@/assets/product-abaya-1.jpg";
 import productHijab from "@/assets/product-hijab-1.jpg";
 import productBorka from "@/assets/product-borka-1.jpg";
@@ -111,7 +113,10 @@ const Categories = () => {
             ))}
           </div>
         </div>
+        <KeywordLinksBlock title="কীওয়ার্ড অনুযায়ী কালেকশন" className="mt-10" />
       </main>
+
+
 
       <Footer />
     </div>
