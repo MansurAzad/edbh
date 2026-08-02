@@ -214,10 +214,61 @@ export default function IndexingIssueDetail() {
   }
 
 
+  /** Write a status snapshot; the DB trigger appends a new history entry automatically. */
+  async function writeStatus(next: { status: FixStatus; action_title: string | null; notes: string | null }) {
+    const { data: userData } = await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from("indexing_fix_status")
+      .upsert({ url: target, ...next, updated_by: userData?.user?.id ?? null }, { onConflict: "url" })
+      .select("updated_at")
+      .maybeSingle();
+    if (error) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+      return false;
+    }
+    setFixStatus(next.status);
+    setFixTitle(next.action_title ?? "");
+    setFixNotes(next.notes ?? "");
+    setFixSavedAt(data?.updated_at ?? new Date().toISOString());
+    await loadHistory();
+    return true;
+  }
+
+  async function saveHistoryEdit() {
+    setHistorySaving(true);
+    const ok = await writeStatus({
+      status: editStatus,
+      action_title: editTitle.trim() || null,
+      notes: editNotes.trim() || null,
+    });
+    setHistorySaving(false);
+    if (ok) {
+      setEditingLatest(false);
+      toast({ title: "Latest entry updated" });
+    }
+  }
+
+  /** Undo the most recent entry by restoring the previous one (or a clean unresolved state). */
+  async function undoLatest() {
+    const prev = history[1];
+    setHistorySaving(true);
+    const ok = await writeStatus(
+      prev
+        ? { status: prev.status as FixStatus, action_title: prev.action_title, notes: prev.notes }
+        : { status: "unresolved", action_title: null, notes: null },
+    );
+    setHistorySaving(false);
+    if (ok) {
+      setEditingLatest(false);
+      toast({ title: prev ? "Reverted to previous entry" : "Reset to unresolved" });
+    }
+  }
+
   const idx = result?.inspectionResult?.indexStatusResult ?? {};
   const mobile = result?.inspectionResult?.mobileUsabilityResult ?? {};
   const rich = result?.inspectionResult?.richResultsResult ?? {};
   const fix = recommendFix(idx);
+
 
   return (
     <div className="p-4 md:p-6 space-y-4">
