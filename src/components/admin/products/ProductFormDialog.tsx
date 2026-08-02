@@ -46,6 +46,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import ProductTagsField from "@/components/admin/products/ProductTagsField";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import ImageUpload from "@/components/admin/ImageUpload";
@@ -371,6 +372,20 @@ export default function ProductFormDialog({
               />
             </div>
           </div>
+
+          {/* ── Section 6b: SEO tags (5–10 relevant) ───────────────── */}
+          <ProductTagsField
+            tags={formData.tags ?? []}
+            onChange={(tags) => setFormData({ ...formData, tags })}
+            product={{
+              name: formData.name,
+              category: formData.category,
+              subcategory: formData.subcategory ?? undefined,
+              fabric: formData.fabric ?? undefined,
+              description: formData.description ?? undefined,
+              sizes: formData.sizes ?? undefined,
+            }}
+          />
 
           {/* ── Section 7: Fabric + Video (2-col) ─────────────────── */}
           <div className="grid grid-cols-2 gap-4">

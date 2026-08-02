@@ -206,6 +206,8 @@ export interface AdminProduct {
   meta_title: string | null;
   /** SEO meta description. */
   meta_description: string | null;
+  /** 5–10 relevant search tags (enforced in the admin form). */
+  tags?: string[];
 }
 
 export type AdminProductInput = Omit<AdminProduct, "id" | "margin">;
@@ -234,6 +236,7 @@ export const emptyProduct: AdminProductInput = {
   image_alt_text: "",
   meta_title: "",
   meta_description: "",
+  tags: [],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

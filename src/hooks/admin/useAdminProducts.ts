@@ -248,6 +248,7 @@ export function useAdminProducts() {
         meta_title: data.meta_title?.trim() || null,
         meta_description: data.meta_description?.trim() || null,
         purchase_cost: data.purchase_cost ? Number(data.purchase_cost) : null,
+        tags: (data.tags ?? []).filter(Boolean).slice(0, 10),
       };
 
       // Sanitise gallery URLs (trim whitespace, drop empty strings)
