@@ -164,6 +164,64 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ---- Google Indexing API: request (re)indexing for specific URLs -------
+    // Sends urlNotifications:publish through the connector gateway and logs
+    // every attempt (status + upstream body) into public.indexing_requests.
+    if (action === "request-indexing") {
+      const urls: string[] = Array.isArray(body.urls)
+        ? body.urls.map((u: unknown) => String(u)).filter(Boolean).slice(0, 50)
+        : [String(body.url ?? SITE_URL)];
+      const type = body.type === "URL_DELETED" ? "URL_DELETED" : "URL_UPDATED";
+
+      const admin = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+
+      const results = [];
+      for (const target of urls) {
+        const r = await fetchWithRetry("request-indexing", `${GATEWAY}/v3/urlNotifications:publish`, {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ url: target, type }),
+        });
+        const row = {
+          url: target,
+          request_type: type,
+          status: r.ok ? "sent" : "failed",
+          http_status: r.status,
+          response: r.body ?? null,
+          error: r.ok ? null : JSON.stringify(r.body ?? {}).slice(0, 1000),
+          requested_by: guard.userId,
+        };
+        await admin.from("indexing_requests").insert(row);
+        log(r.ok ? "info" : "error", FN, "indexing_request", {
+          requestId, url: target, type, status: r.status, ok: r.ok,
+        });
+        results.push({ url: target, ok: r.ok, status: r.status, response: r.body });
+      }
+
+      const sent = results.filter((x) => x.ok).length;
+      return jsonResponse({
+        connected: true, requestId, type, sent, failed: results.length - sent, results,
+      });
+    }
+
+    // ---- Recent indexing request history -----------------------------------
+    if (action === "indexing-history") {
+      const admin = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data, error } = await admin
+        .from("indexing_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(Number(body.limit ?? 100));
+      if (error) return errorResponse(error.message, 500);
+      return jsonResponse({ connected: true, requestId, rows: data ?? [] });
+    }
+
     if (action === "errors" || action === "summary") {
       const end = new Date().toISOString().slice(0, 10);
       const start = new Date(Date.now() - 28 * 86400_000).toISOString().slice(0, 10);
