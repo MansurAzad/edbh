@@ -47,6 +47,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import ProductTagsField from "@/components/admin/products/ProductTagsField";
+import LanguageMixWarning from "@/components/admin/seo/LanguageMixWarning";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import ImageUpload from "@/components/admin/ImageUpload";
@@ -327,6 +328,7 @@ export default function ProductFormDialog({
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
             />
+            <LanguageMixWarning value={formData.description} field="Description" />
           </div>
 
           {/* ── Section 6: Sizes + Colors (2-col) ────────────────────── */}

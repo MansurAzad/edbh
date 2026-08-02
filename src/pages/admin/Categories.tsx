@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import LanguageMixWarning from "@/components/admin/seo/LanguageMixWarning";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -318,10 +319,12 @@ const AdminCategories = () => {
             <div className="space-y-2">
               <Label>বিবরণ (English)</Label>
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} />
+              <LanguageMixWarning value={form.description} field="English description" />
             </div>
             <div className="space-y-2">
               <Label>বিবরণ (বাংলা)</Label>
               <Textarea value={form.description_bn} onChange={(e) => setForm({ ...form, description_bn: e.target.value })} rows={2} />
+              <LanguageMixWarning value={form.description_bn} field="বাংলা বিবরণ" />
             </div>
             <div className="space-y-2">
               <Label>ক্যাটাগরি ইমেজ</Label>
