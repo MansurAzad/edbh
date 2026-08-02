@@ -7,6 +7,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import SEOHead from "@/components/seo/SEOHead";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import StructuredData, { faqSchema, breadcrumbSchema } from "@/components/seo/StructuredData";
+import CategorySeoDescription from "@/components/seo/CategorySeoDescription";
 import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
 import { buildPaginationJsonLd } from "@/lib/seo/config";
 import { getCategoryMeta } from "@/lib/seo/metaGenerator";
@@ -473,6 +474,8 @@ const Shop = () => {
 
           <RecentlyViewed productIds={recentlyViewed} />
         </div>
+        <CategorySeoDescription category={catEn} className="mt-12" />
+
         {/* Visible FAQ backing the FAQPage JSON-LD */}
         <section className="container mx-auto px-4 mt-12" aria-labelledby="shop-faq-heading">
           <h2 id="shop-faq-heading" className="font-display text-xl md:text-2xl font-bold mb-4">
