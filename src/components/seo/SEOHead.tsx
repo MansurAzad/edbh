@@ -10,6 +10,10 @@ interface SEOHeadProps {
   keywords?: string;
   /** If true, use `title` as-is without appending " | Dubai Borka House". */
   fullTitle?: boolean;
+  /** Site-relative path of the previous paginated page (adds <link rel="prev">). */
+  prevPath?: string;
+  /** Site-relative path of the next paginated page (adds <link rel="next">). */
+  nextPath?: string;
 }
 
 const SITE_NAME = "Dubai Borka House";
