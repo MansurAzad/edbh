@@ -69,13 +69,14 @@ const PremiumDubaiCollection = () => {
               <Crown className="w-4 h-4" /> Premium Dubai Collection
             </div>
             <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
-              Dubai abaya collection Bangladesh — প্রিমিয়াম বোরকা বাংলাদেশ
+              Original Dubai Borka in Bangladesh — Luxury Borka Bangladesh
             </h2>
             <p className="text-muted-foreground mt-1 text-sm md:text-base max-w-2xl">
-              Dubai imported abaya Bangladesh — Farasha abaya Bangladesh, 2 part Farasha abaya,
-              Dubai imported Nida abaya ও Dubai imported black abaya। Karchupi borka Bangladesh সহ
-              premium abaya Bangladesh কালেকশন।
+              Dubai imported abaya Bangladesh — Two Part Farasha Borka, Four Part Abaya Bangladesh,
+              Korean Nida Borka, Dubai Cherry Fabric Borka ও Premium Black Borka। Borka with matching
+              hijab, custom size abaya Bangladesh ও Dubai borka price in Bangladesh এক জায়গায়।
             </p>
+
           </div>
           <Link
             to="/shop?sort=price-desc"
