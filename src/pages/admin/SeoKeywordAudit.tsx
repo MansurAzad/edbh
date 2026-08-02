@@ -32,6 +32,8 @@ const SeoKeywordAudit = () => {
   const rows = useMemo(() => auditKeywordCoverage(), []);
   const summary = useMemo(() => coverageSummary(rows), [rows]);
   const issues = useMemo(() => validateKeywordPages(), []);
+  const metaIssues = useMemo(() => validateMeta(), []);
+
 
   const filtered = rows.filter((r) => {
     if (onlyGaps && r.strength === "strong") return false;
