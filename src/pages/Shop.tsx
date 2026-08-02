@@ -280,8 +280,27 @@ const Shop = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead title={seoTitle} fullTitle description={seoDescription} canonical="/shop" keywords={seoKeywords} />
+      <SEOHead
+        title={seoTitle}
+        fullTitle
+        description={seoDescription}
+        canonical={pageUrl(currentPage)}
+        keywords={seoKeywords}
+        prevPath={currentPage > 1 ? pageUrl(currentPage - 1) : undefined}
+        nextPath={currentPage < totalPages ? pageUrl(currentPage + 1) : undefined}
+      />
       <StructuredData data={collectionSchema} />
+      <StructuredData
+        data={buildPaginationJsonLd({
+          path: "/shop",
+          query: { category: pageQuery.category },
+          page: currentPage,
+          totalPages,
+          totalItems: totalCount,
+          name: seoTitle,
+        })}
+      />
+
       <StructuredData
         data={breadcrumbSchema(
           isAll
