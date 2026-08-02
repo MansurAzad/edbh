@@ -7,6 +7,10 @@ import SEOHead from "@/components/seo/SEOHead";
 import StructuredData, { organizationSchema, websiteSchema, localBusinessSchema } from "@/components/seo/StructuredData";
 import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
 import { useHomepageSections } from "@/hooks/useHomepageSections";
+import { getMeta } from "@/lib/seo/metaGenerator";
+
+const homeMeta = getMeta("section:home")!;
+
 
 
 // Lazy load below-the-fold sections
