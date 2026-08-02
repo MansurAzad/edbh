@@ -399,7 +399,9 @@ const Shop = () => {
 
           <RecentlyViewed productIds={recentlyViewed} />
         </div>
+        <KeywordLinksBlock title="কীওয়ার্ড অনুযায়ী কালেকশন" className="mt-10" />
       </main>
+
       <Footer />
 
       {quickViewProduct && (
