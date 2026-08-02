@@ -29,6 +29,8 @@ const SEOHead = ({
   noIndex = false,
   keywords,
   fullTitle = false,
+  prevPath,
+  nextPath,
 }: SEOHeadProps) => {
   const fullTitleStr = !title
     ? `${SITE_NAME} – Premium Dubai Imported Borka, Abaya & Hijab in Bangladesh`
@@ -36,6 +38,8 @@ const SEOHead = ({
       ? title
       : `${title} | ${SITE_NAME}`;
   const canonicalUrl = canonical ? `${BASE_URL}${canonical}` : undefined;
+  const prevUrl = prevPath ? `${BASE_URL}${prevPath}` : undefined;
+  const nextUrl = nextPath ? `${BASE_URL}${nextPath}` : undefined;
 
   useEffect(() => {
     document.title = fullTitleStr;
