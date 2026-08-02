@@ -84,10 +84,30 @@ const SEOHead = ({
       link.remove();
     }
 
+    // rel=prev / rel=next — crawler-friendly paginated navigation
+    const setRel = (rel: "prev" | "next", href?: string) => {
+      let el = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+      if (href) {
+        if (!el) {
+          el = document.createElement("link");
+          el.rel = rel;
+          document.head.appendChild(el);
+        }
+        el.href = href;
+      } else if (el) {
+        el.remove();
+      }
+    };
+    setRel("prev", prevUrl);
+    setRel("next", nextUrl);
+
     return () => {
       document.title = `${SITE_NAME} - প্রিমিয়াম ইসলামিক ফ্যাশন`;
+      setRel("prev", undefined);
+      setRel("next", undefined);
     };
-  }, [fullTitleStr, description, canonicalUrl, ogImage, ogType, noIndex, keywords]);
+  }, [fullTitleStr, description, canonicalUrl, ogImage, ogType, noIndex, keywords, prevUrl, nextUrl]);
+
 
   return null;
 };
