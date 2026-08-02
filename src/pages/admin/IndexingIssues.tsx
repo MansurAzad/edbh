@@ -647,8 +647,14 @@ export default function IndexingIssues() {
                   </div>
                   <div className="flex items-center gap-2">
                     {fixStatusBadge(r.status)}
+                    {(Date.now() - new Date(r.updated_at).getTime()) / 86400000 >= ageDays && (
+                      <Badge variant="destructive">
+                        Aging · {Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000)}d
+                      </Badge>
+                    )}
                     <span className="text-xs text-muted-foreground">{relative(new Date(r.updated_at))}</span>
                   </div>
+
                 </div>
               ))}
             </div>
