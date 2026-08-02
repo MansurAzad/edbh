@@ -37,6 +37,8 @@ const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
 const Blog = lazy(() => import("./pages/Blog"));
 const AbayaStylingGuide = lazy(() => import("./pages/AbayaStylingGuide"));
+const KeywordLanding = lazy(() => import("./pages/KeywordLanding"));
+
 const OrderTracking = lazy(() => import("./pages/OrderTracking"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ReturnPolicy = lazy(() => import("./pages/ReturnPolicy"));
