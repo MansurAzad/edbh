@@ -207,7 +207,7 @@ export interface AdminProduct {
   /** SEO meta description. */
   meta_description: string | null;
   /** 5–10 relevant search tags (enforced in the admin form). */
-  tags: string[];
+  tags?: string[];
 }
 
 export type AdminProductInput = Omit<AdminProduct, "id" | "margin">;
