@@ -7,6 +7,8 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import SEOHead from "@/components/seo/SEOHead";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import StructuredData from "@/components/seo/StructuredData";
+import KeywordLinksBlock from "@/components/seo/KeywordLinksBlock";
+
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Input } from "@/components/ui/input";
