@@ -241,13 +241,15 @@ const Shop = () => {
           <div className="container mx-auto px-4">
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="text-center">
               <h1 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-2 md:mb-4">
-                <span className="text-foreground">Borka &amp; Abaya Shop </span>
+                <span className="text-foreground">Best Borka Shop in </span>
                 <span className="text-gradient-gold">Bangladesh</span>
               </h1>
               <p className="text-muted-foreground max-w-2xl mx-auto text-sm md:text-base">
-                Premium borka Bangladesh ও premium abaya Bangladesh — Dubai imported abaya Bangladesh,
-                Farasha abaya, Nida abaya, Karchupi borka, kaftan shop ও hijab shop Bangladesh এক জায়গায়।
+                Original Dubai borka in Bangladesh — luxury borka Bangladesh, premium black borka,
+                two part Farasha borka, four part abaya, Korean Nida borka, plus size ও custom size abaya।
+                Online borka shopping in Bangladesh, cash on delivery borka।
               </p>
+
             </motion.div>
           </div>
         </div>
