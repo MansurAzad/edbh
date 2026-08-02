@@ -155,10 +155,10 @@ const list = (items: string[]) => items.join(", ");
 
 function englishParagraphs(s: CategorySeed): string[] {
   return [
-    `Dubai Borka House brings you a hand-picked ${s.en} for modest fashion lovers across Bangladesh. Every piece in this category is sourced from trusted Dubai suppliers, checked for stitching quality, fabric weight and colour fastness before it reaches our Dhaka showroom, so what you see online is exactly what arrives at your door.`,
-    `The category currently features ${list(s.designs)} silhouettes, cut from premium ${list(s.fabrics)} fabrics. These fabrics are chosen for the Bangladeshi climate: they stay breathable in humid summer afternoons, drape softly without clinging, and hold their shape after repeated washes, which is why our regular customers keep returning for the same fabric families season after season.`,
+    `Dubai Borka House brings you a hand-picked ${s.en} for modest fashion lovers across Bangladesh. Every piece is sourced from trusted Dubai suppliers and checked for stitching quality and colour fastness before it reaches our Dhaka showroom.`,
+    `The category currently features ${list(s.designs)} silhouettes, cut from premium ${list(s.fabrics)} fabrics. These fabrics are chosen for the Bangladeshi climate: breathable in humid weather, soft in drape and stable in shape after repeated washes.`,
     `Styles here suit ${list(s.occasions)} occasions. Prices generally range from BDT ${s.priceFrom.toLocaleString("en-US")} to BDT ${s.priceTo.toLocaleString("en-US")}, so a student, a working professional and a bride can all find something appropriate without leaving the category. Sizes run from 50 to 60 inches, and custom sizing is available on request for plus size and petite customers alike.`,
-    `Ordering is simple: add to cart, confirm on WhatsApp, and pay cash on delivery anywhere in Bangladesh. Inside Dhaka delivery usually takes one to two days, outside Dhaka two to four days. Exchange is available within the stated return window if the size does not fit, and our team helps you pick the right length before you order.`,
+    `Ordering from the ${s.en} is simple: add to cart, confirm on WhatsApp and pay cash on delivery anywhere in Bangladesh. Inside Dhaka takes one to two days, outside Dhaka two to four. Exchange is available if the size does not fit.`,
     `Key search terms shoppers use for this page include ${list(s.keywords)}. If you are comparing prices before buying, visit our showroom or message us for live stock photos, fabric close-ups and honest advice about which design will suit your height, body type and everyday routine best.`,
   ];
 }
@@ -168,7 +168,7 @@ function bengaliParagraphs(s: CategorySeed): string[] {
     `দুবাই বোরকা হাউস-এর ${s.bn} সাজানো হয়েছে বাংলাদেশের মডেস্ট ফ্যাশনপ্রেমীদের জন্য। ${s.bn}-এর প্রতিটি পণ্য সরাসরি দুবাই থেকে আমদানি করা এবং আমাদের ঢাকার শোরুমে পৌঁছানোর আগে সেলাই, কাপড়ের ওজন ও রঙের স্থায়িত্ব যাচাই করা হয়, তাই অনলাইনে যা দেখছেন হাতে পাবেন ঠিক তেমনটাই।`,
     `এই ক্যাটাগরিতে পাবেন ${s.bnDesigns} সহ নানা ডিজাইন। ব্যবহৃত কাপড়ের মধ্যে রয়েছে ${s.bnFabrics}, যা বাংলাদেশের আবহাওয়ায় আরামদায়ক, সহজে কুঁচকে যায় না এবং বারবার ধোয়ার পরেও আকার ঠিক থাকে।`,
     `দৈনন্দিন ব্যবহার, অফিস, ভার্সিটি, দাওয়াত, ঈদ, হজ-উমরাহ কিংবা বিয়ের অনুষ্ঠান — সব উপলক্ষের জন্য ${s.bn}-এ আলাদা ডিজাইন সাজানো আছে। দাম শুরু ${s.priceFrom} টাকা থেকে এবং প্রিমিয়াম কালেকশনে সর্বোচ্চ ${s.priceTo} টাকা পর্যন্ত, ফলে বাজেট অনুযায়ী পছন্দ করা সহজ হয়।`,
-    `সাইজ পাওয়া যায় ৫০ থেকে ৬০ ইঞ্চি পর্যন্ত, প্লাস সাইজ ও কাস্টম সাইজের অর্ডারও নেওয়া হয়। অর্ডার করতে কার্টে যোগ করে হোয়াটসঅ্যাপে কনফার্ম করুন; সারা বাংলাদেশে ক্যাশ অন ডেলিভারি সুবিধা রয়েছে। ঢাকার ভিতরে সাধারণত এক থেকে দুই দিন এবং ঢাকার বাইরে দুই থেকে চার দিনে ডেলিভারি সম্পন্ন হয়।`,
+    `${s.bn}-এ সাইজ পাওয়া যায় ৫০ থেকে ৬০ ইঞ্চি পর্যন্ত এবং কাস্টম সাইজের অর্ডারও নেওয়া হয়। কার্টে যোগ করে হোয়াটসঅ্যাপে কনফার্ম করুন; সারা বাংলাদেশে ক্যাশ অন ডেলিভারি সুবিধা রয়েছে।`,
     `সাইজ না মিললে নির্ধারিত সময়ের মধ্যে এক্সচেঞ্জ করার সুযোগ আছে। ${s.bn} থেকে কোন ডিজাইনটি আপনার উচ্চতা ও শরীরের গড়নের সাথে মানাবে তা জানতে আমাদের শোরুমে আসুন অথবা মেসেজ দিন — লাইভ স্টক ছবি ও কাপড়ের ক্লোজ-আপ দেখে নিশ্চিত হয়ে তবেই অর্ডার করতে পারবেন।`,
   ];
 }
