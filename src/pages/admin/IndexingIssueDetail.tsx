@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, ExternalLink, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Save, Undo2 } from "lucide-react";
 
 type FixStatus = "unresolved" | "in_progress" | "applied";
 
