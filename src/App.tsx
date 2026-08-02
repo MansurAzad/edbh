@@ -102,6 +102,7 @@ const AiProductStudio = lazy(() => import("./pages/admin/AiProductStudio"));
 const IndexingIssues = lazy(() => import("./pages/admin/IndexingIssues"));
 const IndexingIssueDetail = lazy(() => import("./pages/admin/IndexingIssueDetail"));
 const SeoKeywordAudit = lazy(() => import("./pages/admin/SeoKeywordAudit"));
+const SeoPreview = lazy(() => import("./pages/admin/SeoPreview"));
 
 
 import PermissionGuard from "@/components/admin/PermissionGuard";
@@ -214,6 +215,7 @@ const App = () => (
                     <Route path="/admin/indexing-issues" element={<PermissionGuard><IndexingIssues /></PermissionGuard>} />
                     <Route path="/admin/indexing-issues/:encodedUrl" element={<PermissionGuard><IndexingIssueDetail /></PermissionGuard>} />
                     <Route path="/admin/seo-keywords" element={<PermissionGuard><SeoKeywordAudit /></PermissionGuard>} />
+                    <Route path="/admin/seo-preview" element={<PermissionGuard><SeoPreview /></PermissionGuard>} />
 
 
 
