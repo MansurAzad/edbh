@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, ExternalLink, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Save, Undo2 } from "lucide-react";
 
 type FixStatus = "unresolved" | "in_progress" | "applied";
 
@@ -147,6 +147,12 @@ export default function IndexingIssueDetail() {
   const [fixSavedAt, setFixSavedAt] = useState<string | null>(null);
   const [savingFix, setSavingFix] = useState(false);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [editingLatest, setEditingLatest] = useState(false);
+  const [historySaving, setHistorySaving] = useState(false);
+  const [editStatus, setEditStatus] = useState<FixStatus>("unresolved");
+  const [editTitle, setEditTitle] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
 
   async function load() {
     if (!target) return;
@@ -214,10 +220,61 @@ export default function IndexingIssueDetail() {
   }
 
 
+  /** Write a status snapshot; the DB trigger appends a new history entry automatically. */
+  async function writeStatus(next: { status: FixStatus; action_title: string | null; notes: string | null }) {
+    const { data: userData } = await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from("indexing_fix_status")
+      .upsert({ url: target, ...next, updated_by: userData?.user?.id ?? null }, { onConflict: "url" })
+      .select("updated_at")
+      .maybeSingle();
+    if (error) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+      return false;
+    }
+    setFixStatus(next.status);
+    setFixTitle(next.action_title ?? "");
+    setFixNotes(next.notes ?? "");
+    setFixSavedAt(data?.updated_at ?? new Date().toISOString());
+    await loadHistory();
+    return true;
+  }
+
+  async function saveHistoryEdit() {
+    setHistorySaving(true);
+    const ok = await writeStatus({
+      status: editStatus,
+      action_title: editTitle.trim() || null,
+      notes: editNotes.trim() || null,
+    });
+    setHistorySaving(false);
+    if (ok) {
+      setEditingLatest(false);
+      toast({ title: "Latest entry updated" });
+    }
+  }
+
+  /** Undo the most recent entry by restoring the previous one (or a clean unresolved state). */
+  async function undoLatest() {
+    const prev = history[1];
+    setHistorySaving(true);
+    const ok = await writeStatus(
+      prev
+        ? { status: prev.status as FixStatus, action_title: prev.action_title, notes: prev.notes }
+        : { status: "unresolved", action_title: null, notes: null },
+    );
+    setHistorySaving(false);
+    if (ok) {
+      setEditingLatest(false);
+      toast({ title: prev ? "Reverted to previous entry" : "Reset to unresolved" });
+    }
+  }
+
   const idx = result?.inspectionResult?.indexStatusResult ?? {};
   const mobile = result?.inspectionResult?.mobileUsabilityResult ?? {};
   const rich = result?.inspectionResult?.richResultsResult ?? {};
   const fix = recommendFix(idx);
+
 
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -335,11 +392,66 @@ export default function IndexingIssueDetail() {
                     {i === 0 && <Badge variant="outline">Latest</Badge>}
                     <span className="text-xs text-muted-foreground">{fmt(h.created_at)}</span>
                     <span className="text-xs text-muted-foreground">· {h.changed_by_email ?? "unknown"}</span>
+                    {i === 0 && !editingLatest && (
+                      <span className="flex items-center gap-1 ml-auto">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditStatus(h.status as FixStatus);
+                            setEditTitle(h.action_title ?? "");
+                            setEditNotes(h.notes ?? "");
+                            setEditingLatest(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={undoLatest} disabled={historySaving}>
+                          <Undo2 className="w-4 h-4 mr-1" /> Undo
+                        </Button>
+                      </span>
+                    )}
                   </div>
-                  {h.action_title && <div className="mt-1 font-medium">{h.action_title}</div>}
-                  {h.notes && <div className="text-muted-foreground whitespace-pre-wrap">{h.notes}</div>}
+
+                  {i === 0 && editingLatest ? (
+                    <div className="mt-2 space-y-2 rounded-md border p-3">
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground">Status</label>
+                          <Select value={editStatus} onValueChange={(v) => setEditStatus(v as FixStatus)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unresolved">Unresolved</SelectItem>
+                              <SelectItem value="in_progress">In progress</SelectItem>
+                              <SelectItem value="applied">Applied</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Action title</label>
+                          <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Notes</label>
+                        <Textarea rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={saveHistoryEdit} disabled={historySaving}>
+                          <Save className="w-4 h-4 mr-1" /> {historySaving ? "Saving…" : "Save entry"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingLatest(false)}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {h.action_title && <div className="mt-1 font-medium">{h.action_title}</div>}
+                      {h.notes && <div className="text-muted-foreground whitespace-pre-wrap">{h.notes}</div>}
+                    </>
+                  )}
                 </li>
               ))}
+
             </ol>
           )}
         </CardContent>

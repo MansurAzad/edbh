@@ -29,6 +29,36 @@ import { toast } from "@/hooks/use-toast";
 const AUTO_REFRESH_MS = 15 * 60 * 1000; // 15 minutes
 const STALE_HOURS = 6;
 const NOTIFY_KEY = "indexing-issues-notify";
+const AGE_KEY = "indexing-issues-age-days";
+
+type NotifySettings = {
+  enabled: boolean;
+  channelToast: boolean;
+  channelBrowser: boolean;
+  errorThreshold: number;
+  warningThreshold: number;
+};
+
+const DEFAULT_NOTIFY: NotifySettings = {
+  enabled: false,
+  channelToast: true,
+  channelBrowser: false,
+  errorThreshold: 1,
+  warningThreshold: 1,
+};
+
+function loadNotifySettings(): NotifySettings {
+  try {
+    const raw = localStorage.getItem(NOTIFY_KEY);
+    if (!raw) return DEFAULT_NOTIFY;
+    if (raw === "1") return { ...DEFAULT_NOTIFY, enabled: true };
+    if (raw === "0") return DEFAULT_NOTIFY;
+    return { ...DEFAULT_NOTIFY, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_NOTIFY;
+  }
+}
+
 
 type Inspection = {
   url: string;
@@ -102,19 +132,25 @@ export default function IndexingIssues() {
   // Filters
   const [search, setSearch] = useState("");
   const [unresolvedOnly, setUnresolvedOnly] = useState(false);
+  const [ageFilterOn, setAgeFilterOn] = useState(false);
+  const [ageDays, setAgeDays] = useState<number>(() => {
+    const n = Number(localStorage.getItem(AGE_KEY));
+    return Number.isFinite(n) && n > 0 ? n : 7;
+  });
 
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkNote, setBulkNote] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkRechecking, setBulkRechecking] = useState(false);
+  const [exportingUnresolved, setExportingUnresolved] = useState(false);
 
   // Notifications
-  const [notifyEnabled, setNotifyEnabled] = useState<boolean>(() => {
-    try { return localStorage.getItem(NOTIFY_KEY) === "1"; } catch { return false; }
-  });
+  const [notify, setNotify] = useState<NotifySettings>(loadNotifySettings);
   const prevCountsRef = useRef<{ errors: number; warnings: number } | null>(null);
-  const notifyEnabledRef = useRef(notifyEnabled);
-  notifyEnabledRef.current = notifyEnabled;
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
+
 
   async function loadSites() {
     setError(null);
@@ -214,46 +250,76 @@ export default function IndexingIssues() {
     return m;
   }, [fixRows]);
 
-  // Apply search + unresolved-only filters to each bucket.
+  // Age (in days) of an unresolved fix row, or null when resolved/unknown.
+  const unresolvedAgeDays = useCallback((url: string): number | null => {
+    const fx = fixByUrl.get(url);
+    if (!fx || fx.status === "applied") return null;
+    return (Date.now() - new Date(fx.updated_at).getTime()) / 86400000;
+  }, [fixByUrl]);
+
+  // Apply search + unresolved-only + unresolved-age filters to each bucket.
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const apply = (items: Inspection[]) =>
       items.filter((it) => {
         if (q && !it.url.toLowerCase().includes(q)) return false;
         if (unresolvedOnly && fixByUrl.get(it.url)?.status === "applied") return false;
+        if (ageFilterOn) {
+          const age = unresolvedAgeDays(it.url);
+          if (age === null || age < ageDays) return false;
+        }
         return true;
       });
     return { errors: apply(buckets.errors), warnings: apply(buckets.warnings), ok: apply(buckets.ok) };
-  }, [buckets, search, unresolvedOnly, fixByUrl]);
+  }, [buckets, search, unresolvedOnly, fixByUrl, ageFilterOn, ageDays, unresolvedAgeDays]);
 
-  // Notify when Errors/Warnings counts change after a refresh.
+  // Notify when Errors/Warnings counts change past the configured thresholds.
   useEffect(() => {
     if (!summary) return;
     const next = { errors: buckets.errors.length, warnings: buckets.warnings.length };
     const prev = prevCountsRef.current;
     prevCountsRef.current = next;
-    if (!prev || !notifyEnabledRef.current) return;
-    if (prev.errors === next.errors && prev.warnings === next.warnings) return;
+    const cfg = notifyRef.current;
+    if (!prev || !cfg.enabled) return;
+
+    const errDelta = Math.abs(next.errors - prev.errors);
+    const warnDelta = Math.abs(next.warnings - prev.warnings);
+    const errHit = errDelta >= Math.max(1, cfg.errorThreshold);
+    const warnHit = warnDelta >= Math.max(1, cfg.warningThreshold);
+    if (!errHit && !warnHit) return;
 
     const body = `Errors ${prev.errors} → ${next.errors}, Warnings ${prev.warnings} → ${next.warnings}`;
-    toast({ title: "Indexing counts changed", description: body });
-    try {
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        new Notification("Indexing counts changed", { body });
-      }
-    } catch { /* notifications unavailable */ }
+    if (cfg.channelToast) toast({ title: "Indexing counts changed", description: body });
+    if (cfg.channelBrowser) {
+      try {
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          new Notification("Indexing counts changed", { body });
+        }
+      } catch { /* notifications unavailable */ }
+    }
   }, [summary, buckets]);
 
-  async function toggleNotify(on: boolean) {
-    setNotifyEnabled(on);
-    try { localStorage.setItem(NOTIFY_KEY, on ? "1" : "0"); } catch { /* ignore */ }
-    if (on && typeof Notification !== "undefined" && Notification.permission === "default") {
+  function updateNotify(patch: Partial<NotifySettings>) {
+    setNotify((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(NOTIFY_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  async function toggleNotifyChannel(kind: "channelToast" | "channelBrowser", on: boolean) {
+    updateNotify({ [kind]: on } as Partial<NotifySettings>);
+    if (kind === "channelBrowser" && on && typeof Notification !== "undefined" && Notification.permission === "default") {
       try { await Notification.requestPermission(); } catch { /* ignore */ }
     }
   }
 
   const stale = lastFetched ? (Date.now() - lastFetched.getTime()) / 3600000 >= STALE_HOURS : false;
   const unresolved = fixRows.filter((r) => r.status !== "applied");
+  const agingCount = unresolved.filter(
+    (r) => (Date.now() - new Date(r.updated_at).getTime()) / 86400000 >= ageDays,
+  ).length;
+
 
   function toggleSelected(url: string) {
     setSelected((prev) => {
@@ -307,6 +373,96 @@ export default function IndexingIssues() {
     URL.revokeObjectURL(url);
   }
 
+  /** Re-inspect only the URLs currently selected, sequentially to stay under GSC quota. */
+  async function bulkRecheckSelected() {
+    const urls = Array.from(selected);
+    if (!urls.length) return;
+    setBulkRechecking(true);
+    let ok = 0, failed = 0;
+    for (const url of urls) {
+      // eslint-disable-next-line no-await-in-loop
+      const { data, error } = await supabase.functions.invoke("gsc-indexing", {
+        body: { action: "inspect", url },
+      });
+      if (error) { failed++; continue; }
+      ok++;
+      setSummary((prev) => {
+        if (!prev) return prev;
+        const inspections = prev.inspections.map((it) =>
+          it.url === url ? { ...it, result: data?.result ?? it.result } : it,
+        );
+        if (!inspections.some((it) => it.url === url) && data?.result) inspections.push({ url, result: data.result });
+        return { ...prev, inspections };
+      });
+    }
+    setBulkRechecking(false);
+    setLastFetched(new Date());
+    toast({
+      title: `Rechecked ${ok} URL${ok === 1 ? "" : "s"}`,
+      description: failed ? `${failed} failed` : undefined,
+      variant: failed ? "destructive" : undefined,
+    });
+  }
+
+  /** CSV of unresolved fixes only, with latest status/notes plus history timeline fields. */
+  async function exportUnresolvedCsv() {
+    if (!unresolved.length) { toast({ title: "Nothing to export" }); return; }
+    setExportingUnresolved(true);
+    const urls = unresolved.map((r) => r.url);
+    const { data: history } = await supabase
+      .from("indexing_fix_history")
+      .select("url,status,action_title,notes,changed_by_email,created_at")
+      .in("url", urls)
+      .order("created_at", { ascending: false });
+
+    const byUrl = new Map<string, any[]>();
+    for (const h of history ?? []) {
+      const list = byUrl.get(h.url) ?? [];
+      list.push(h);
+      byUrl.set(h.url, list);
+    }
+
+    const header = [
+      "URL","CurrentStatus","ActionTitle","Notes","LastUpdated","UnresolvedAgeDays","Verdict","Coverage",
+      "HistoryEntries","LastChangeAt","LastChangeBy","LastChangeStatus","LastChangeNotes","HistoryTimeline",
+    ];
+    const lines = [header.join(",")];
+    for (const r of unresolved) {
+      const hist = byUrl.get(r.url) ?? [];
+      const last = hist[0];
+      const insp = (summary?.inspections ?? []).find((i) => i.url === r.url);
+      const idx = insp?.result?.inspectionResult?.indexStatusResult ?? {};
+      const timeline = hist
+        .map((h) => `${new Date(h.created_at).toISOString()} | ${h.status} | ${h.changed_by_email ?? "unknown"} | ${(h.action_title ?? "").replace(/\|/g, "/")} | ${(h.notes ?? "").replace(/\s+/g, " ")}`)
+        .join(" ;; ");
+      lines.push([
+        r.url,
+        r.status,
+        r.action_title ?? "",
+        r.notes ?? "",
+        r.updated_at,
+        ((Date.now() - new Date(r.updated_at).getTime()) / 86400000).toFixed(1),
+        idx.verdict ?? "",
+        idx.coverageState ?? "",
+        hist.length,
+        last?.created_at ?? "",
+        last?.changed_by_email ?? "",
+        last?.status ?? "",
+        last?.notes ?? "",
+        timeline,
+      ].map(csvEscape).join(","));
+    }
+
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href; a.download = `unresolved-indexing-fixes-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(href);
+    setExportingUnresolved(false);
+  }
+
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div>
@@ -333,12 +489,54 @@ export default function IndexingIssues() {
         <Button size="sm" variant="outline" onClick={exportCsv} disabled={!(summary?.inspections?.length)}>
           <Download className="w-4 h-4 mr-2" /> Export CSV
         </Button>
-        <div className="flex items-center gap-2 ml-auto">
-          <Bell className="w-4 h-4 text-muted-foreground" />
-          <Label htmlFor="notify-toggle" className="text-xs text-muted-foreground">Alert on count change</Label>
-          <Switch id="notify-toggle" checked={notifyEnabled} onCheckedChange={toggleNotify} />
-        </div>
+        <Button size="sm" variant="outline" onClick={exportUnresolvedCsv} disabled={!unresolved.length || exportingUnresolved}>
+          <Download className="w-4 h-4 mr-2" />
+          {exportingUnresolved ? "Exporting…" : `Export unresolved (${unresolved.length})`}
+        </Button>
       </div>
+
+      {/* Notification settings */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2"><Bell className="w-4 h-4" /> Notification settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Switch id="notify-toggle" checked={notify.enabled} onCheckedChange={(v) => updateNotify({ enabled: v })} />
+            <Label htmlFor="notify-toggle" className="text-sm">Alert me when Errors/Warnings change after a refresh</Label>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">Channels</div>
+              <div className="flex items-center gap-2">
+                <Switch id="ch-toast" checked={notify.channelToast} disabled={!notify.enabled}
+                  onCheckedChange={(v) => toggleNotifyChannel("channelToast", v)} />
+                <Label htmlFor="ch-toast" className="text-sm">In-app toast</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="ch-browser" checked={notify.channelBrowser} disabled={!notify.enabled}
+                  onCheckedChange={(v) => toggleNotifyChannel("channelBrowser", v)} />
+                <Label htmlFor="ch-browser" className="text-sm">Browser notification</Label>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">Thresholds (minimum change to alert)</div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="th-err" className="text-sm w-24">Errors ±</Label>
+                <Input id="th-err" type="number" min={1} className="w-24" disabled={!notify.enabled}
+                  value={notify.errorThreshold}
+                  onChange={(e) => updateNotify({ errorThreshold: Math.max(1, Number(e.target.value) || 1) })} />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="th-warn" className="text-sm w-24">Warnings ±</Label>
+                <Input id="th-warn" type="number" min={1} className="w-24" disabled={!notify.enabled}
+                  value={notify.warningThreshold}
+                  onChange={(e) => updateNotify({ warningThreshold: Math.max(1, Number(e.target.value) || 1) })} />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card>
@@ -357,11 +555,30 @@ export default function IndexingIssues() {
             <Switch id="unresolved-only" checked={unresolvedOnly} onCheckedChange={setUnresolvedOnly} />
             <Label htmlFor="unresolved-only" className="text-sm">Unresolved only</Label>
           </div>
-          {(search || unresolvedOnly) && (
-            <Button size="sm" variant="ghost" onClick={() => { setSearch(""); setUnresolvedOnly(false); }}>Clear</Button>
+          <div className="flex items-center gap-2">
+            <Switch id="age-filter" checked={ageFilterOn} onCheckedChange={setAgeFilterOn} />
+            <Label htmlFor="age-filter" className="text-sm whitespace-nowrap">Unresolved older than</Label>
+            <Input
+              type="number"
+              min={1}
+              className="w-20"
+              value={ageDays}
+              aria-label="Unresolved age in days"
+              onChange={(e) => {
+                const n = Math.max(1, Number(e.target.value) || 1);
+                setAgeDays(n);
+                try { localStorage.setItem(AGE_KEY, String(n)); } catch { /* ignore */ }
+              }}
+            />
+            <span className="text-sm text-muted-foreground">days</span>
+            {agingCount > 0 && <Badge variant="destructive">{agingCount} aging</Badge>}
+          </div>
+          {(search || unresolvedOnly || ageFilterOn) && (
+            <Button size="sm" variant="ghost" onClick={() => { setSearch(""); setUnresolvedOnly(false); setAgeFilterOn(false); }}>Clear</Button>
           )}
         </CardContent>
       </Card>
+
 
       {/* Bulk actions */}
       {selected.size > 0 && (
@@ -381,7 +598,12 @@ export default function IndexingIssues() {
                 <CheckCircle2 className="w-4 h-4 mr-1" />
                 {bulkSaving ? "Saving…" : "Mark selected as Applied"}
               </Button>
+              <Button size="sm" variant="outline" onClick={bulkRecheckSelected} disabled={bulkRechecking}>
+                <RefreshCw className={`w-4 h-4 mr-1 ${bulkRechecking ? "animate-spin" : ""}`} />
+                {bulkRechecking ? "Rechecking…" : "Recheck selected URLs"}
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear selection</Button>
+
             </div>
           </CardContent>
         </Card>
@@ -425,8 +647,14 @@ export default function IndexingIssues() {
                   </div>
                   <div className="flex items-center gap-2">
                     {fixStatusBadge(r.status)}
+                    {(Date.now() - new Date(r.updated_at).getTime()) / 86400000 >= ageDays && (
+                      <Badge variant="destructive">
+                        Aging · {Math.floor((Date.now() - new Date(r.updated_at).getTime()) / 86400000)}d
+                      </Badge>
+                    )}
                     <span className="text-xs text-muted-foreground">{relative(new Date(r.updated_at))}</span>
                   </div>
+
                 </div>
               ))}
             </div>
@@ -517,6 +745,13 @@ export default function IndexingIssues() {
                           </div>
                           <div className="flex items-center gap-2">
                             {fx && fixStatusBadge(fx.status)}
+                            {(() => {
+                              const age = unresolvedAgeDays(it.url);
+                              return age !== null && age >= ageDays
+                                ? <Badge variant="destructive">Aging · {Math.floor(age)}d</Badge>
+                                : null;
+                            })()}
+
                             {verdictBadge(idx.verdict)}
                             <Button size="sm" variant="outline" onClick={() => recheckRow(it.url)} disabled={busy}>
                               <RefreshCw className={`w-3.5 h-3.5 mr-1 ${busy ? "animate-spin" : ""}`} />
