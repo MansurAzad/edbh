@@ -1478,6 +1478,7 @@ export type Database = {
           slug: string | null
           stock: number | null
           subcategory: string | null
+          tags: string[]
           updated_at: string
           video_url: string | null
           work_type: string | null
@@ -1509,6 +1510,7 @@ export type Database = {
           slug?: string | null
           stock?: number | null
           subcategory?: string | null
+          tags?: string[]
           updated_at?: string
           video_url?: string | null
           work_type?: string | null
@@ -1540,6 +1542,7 @@ export type Database = {
           slug?: string | null
           stock?: number | null
           subcategory?: string | null
+          tags?: string[]
           updated_at?: string
           video_url?: string | null
           work_type?: string | null
