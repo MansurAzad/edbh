@@ -250,46 +250,76 @@ export default function IndexingIssues() {
     return m;
   }, [fixRows]);
 
-  // Apply search + unresolved-only filters to each bucket.
+  // Age (in days) of an unresolved fix row, or null when resolved/unknown.
+  const unresolvedAgeDays = useCallback((url: string): number | null => {
+    const fx = fixByUrl.get(url);
+    if (!fx || fx.status === "applied") return null;
+    return (Date.now() - new Date(fx.updated_at).getTime()) / 86400000;
+  }, [fixByUrl]);
+
+  // Apply search + unresolved-only + unresolved-age filters to each bucket.
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const apply = (items: Inspection[]) =>
       items.filter((it) => {
         if (q && !it.url.toLowerCase().includes(q)) return false;
         if (unresolvedOnly && fixByUrl.get(it.url)?.status === "applied") return false;
+        if (ageFilterOn) {
+          const age = unresolvedAgeDays(it.url);
+          if (age === null || age < ageDays) return false;
+        }
         return true;
       });
     return { errors: apply(buckets.errors), warnings: apply(buckets.warnings), ok: apply(buckets.ok) };
-  }, [buckets, search, unresolvedOnly, fixByUrl]);
+  }, [buckets, search, unresolvedOnly, fixByUrl, ageFilterOn, ageDays, unresolvedAgeDays]);
 
-  // Notify when Errors/Warnings counts change after a refresh.
+  // Notify when Errors/Warnings counts change past the configured thresholds.
   useEffect(() => {
     if (!summary) return;
     const next = { errors: buckets.errors.length, warnings: buckets.warnings.length };
     const prev = prevCountsRef.current;
     prevCountsRef.current = next;
-    if (!prev || !notifyEnabledRef.current) return;
-    if (prev.errors === next.errors && prev.warnings === next.warnings) return;
+    const cfg = notifyRef.current;
+    if (!prev || !cfg.enabled) return;
+
+    const errDelta = Math.abs(next.errors - prev.errors);
+    const warnDelta = Math.abs(next.warnings - prev.warnings);
+    const errHit = errDelta >= Math.max(1, cfg.errorThreshold);
+    const warnHit = warnDelta >= Math.max(1, cfg.warningThreshold);
+    if (!errHit && !warnHit) return;
 
     const body = `Errors ${prev.errors} → ${next.errors}, Warnings ${prev.warnings} → ${next.warnings}`;
-    toast({ title: "Indexing counts changed", description: body });
-    try {
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        new Notification("Indexing counts changed", { body });
-      }
-    } catch { /* notifications unavailable */ }
+    if (cfg.channelToast) toast({ title: "Indexing counts changed", description: body });
+    if (cfg.channelBrowser) {
+      try {
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          new Notification("Indexing counts changed", { body });
+        }
+      } catch { /* notifications unavailable */ }
+    }
   }, [summary, buckets]);
 
-  async function toggleNotify(on: boolean) {
-    setNotifyEnabled(on);
-    try { localStorage.setItem(NOTIFY_KEY, on ? "1" : "0"); } catch { /* ignore */ }
-    if (on && typeof Notification !== "undefined" && Notification.permission === "default") {
+  function updateNotify(patch: Partial<NotifySettings>) {
+    setNotify((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(NOTIFY_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  async function toggleNotifyChannel(kind: "channelToast" | "channelBrowser", on: boolean) {
+    updateNotify({ [kind]: on } as Partial<NotifySettings>);
+    if (kind === "channelBrowser" && on && typeof Notification !== "undefined" && Notification.permission === "default") {
       try { await Notification.requestPermission(); } catch { /* ignore */ }
     }
   }
 
   const stale = lastFetched ? (Date.now() - lastFetched.getTime()) / 3600000 >= STALE_HOURS : false;
   const unresolved = fixRows.filter((r) => r.status !== "applied");
+  const agingCount = unresolved.filter(
+    (r) => (Date.now() - new Date(r.updated_at).getTime()) / 86400000 >= ageDays,
+  ).length;
+
 
   function toggleSelected(url: string) {
     setSelected((prev) => {
