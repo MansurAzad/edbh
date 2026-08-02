@@ -373,6 +373,96 @@ export default function IndexingIssues() {
     URL.revokeObjectURL(url);
   }
 
+  /** Re-inspect only the URLs currently selected, sequentially to stay under GSC quota. */
+  async function bulkRecheckSelected() {
+    const urls = Array.from(selected);
+    if (!urls.length) return;
+    setBulkRechecking(true);
+    let ok = 0, failed = 0;
+    for (const url of urls) {
+      // eslint-disable-next-line no-await-in-loop
+      const { data, error } = await supabase.functions.invoke("gsc-indexing", {
+        body: { action: "inspect", url },
+      });
+      if (error) { failed++; continue; }
+      ok++;
+      setSummary((prev) => {
+        if (!prev) return prev;
+        const inspections = prev.inspections.map((it) =>
+          it.url === url ? { ...it, result: data?.result ?? it.result } : it,
+        );
+        if (!inspections.some((it) => it.url === url) && data?.result) inspections.push({ url, result: data.result });
+        return { ...prev, inspections };
+      });
+    }
+    setBulkRechecking(false);
+    setLastFetched(new Date());
+    toast({
+      title: `Rechecked ${ok} URL${ok === 1 ? "" : "s"}`,
+      description: failed ? `${failed} failed` : undefined,
+      variant: failed ? "destructive" : undefined,
+    });
+  }
+
+  /** CSV of unresolved fixes only, with latest status/notes plus history timeline fields. */
+  async function exportUnresolvedCsv() {
+    if (!unresolved.length) { toast({ title: "Nothing to export" }); return; }
+    setExportingUnresolved(true);
+    const urls = unresolved.map((r) => r.url);
+    const { data: history } = await supabase
+      .from("indexing_fix_history")
+      .select("url,status,action_title,notes,changed_by_email,created_at")
+      .in("url", urls)
+      .order("created_at", { ascending: false });
+
+    const byUrl = new Map<string, any[]>();
+    for (const h of history ?? []) {
+      const list = byUrl.get(h.url) ?? [];
+      list.push(h);
+      byUrl.set(h.url, list);
+    }
+
+    const header = [
+      "URL","CurrentStatus","ActionTitle","Notes","LastUpdated","UnresolvedAgeDays","Verdict","Coverage",
+      "HistoryEntries","LastChangeAt","LastChangeBy","LastChangeStatus","LastChangeNotes","HistoryTimeline",
+    ];
+    const lines = [header.join(",")];
+    for (const r of unresolved) {
+      const hist = byUrl.get(r.url) ?? [];
+      const last = hist[0];
+      const insp = (summary?.inspections ?? []).find((i) => i.url === r.url);
+      const idx = insp?.result?.inspectionResult?.indexStatusResult ?? {};
+      const timeline = hist
+        .map((h) => `${new Date(h.created_at).toISOString()} | ${h.status} | ${h.changed_by_email ?? "unknown"} | ${(h.action_title ?? "").replace(/\|/g, "/")} | ${(h.notes ?? "").replace(/\s+/g, " ")}`)
+        .join(" ;; ");
+      lines.push([
+        r.url,
+        r.status,
+        r.action_title ?? "",
+        r.notes ?? "",
+        r.updated_at,
+        ((Date.now() - new Date(r.updated_at).getTime()) / 86400000).toFixed(1),
+        idx.verdict ?? "",
+        idx.coverageState ?? "",
+        hist.length,
+        last?.created_at ?? "",
+        last?.changed_by_email ?? "",
+        last?.status ?? "",
+        last?.notes ?? "",
+        timeline,
+      ].map(csvEscape).join(","));
+    }
+
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href; a.download = `unresolved-indexing-fixes-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(href);
+    setExportingUnresolved(false);
+  }
+
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div>
