@@ -146,7 +146,8 @@ serve(async (req) => {
   }
 
   const rules: Rules = settingsRow?.rules ?? {
-    keywords: ["kinghorsetoto","slot gacor"], tags: ["script","iframe"],
+    keywords: ["kinghorsetoto","slot gacor","judi bola","judi bola online","sbobet","fastoto","intertogel","bandar bola","kingdom4d","toto amanah"],
+    tags: ["script","iframe"],
     uri_schemes: ["javascript:"], hidden_css: ["display:none"], sensitivity: "high",
   };
   const alerts: Alerts = settingsRow?.alerts ?? {
