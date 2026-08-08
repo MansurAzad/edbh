@@ -35,7 +35,7 @@ type EditPatch = Partial<Pick<ProductRow, "name" | "price" | "sale_price" | "sto
 const DEFAULT_TEMPLATE = "Dubai Imported {name} – {color} – {category}";
 
 // ---------- Client-side sanitizer (matches DB trigger; friendly UX before hitting server) ----------
-const SPAM_RE = /(kinghorsetoto|judi\s*bola|fastoto|intertogel|slot\s*gacor|situs\s*togel|bandar\s*judi|prediksi\s*togel|casino\s*online|sbobet|pkv\s*games|<\s*script|<\s*iframe|display\s*:\s*none|visibility\s*:\s*hidden)/i;
+const SPAM_RE = /(kinghorsetoto|judi\s*bola(\s*online)?|fastoto|intertogel|kingdom4d|toto\s*amanah|bandar\s*bola|slot\s*gacor|situs\s*togel|bandar\s*judi|prediksi\s*togel|casino\s*online|sbobet|pkv\s*games|<\s*script|<\s*iframe|display\s*:\s*none|visibility\s*:\s*hidden)/i;
 
 const sanitizeName = (s: string) => s.replace(/<[^>]*>/g, "").trim();
 const sanitizeDescription = (s: string) =>
